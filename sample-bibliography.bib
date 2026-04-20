@@ -1,0 +1,442 @@
+%%% ====================================================================
+%%%  BibTeX-file{
+%%%     author          = "Gerry Murray",
+%%%     version         = "1.2",
+%%%     date            = "2 April 2012",
+%%%     filename        = "acmsmall-sample-bibfile.bib",
+%%%     address         = "ACM, NY",
+%%%     email           = "murray at hq.acm.org",
+%%%     codetable       = "ISO/ASCII",
+%%%     keywords        = "ACM Reference Format, bibliography, citation, references",
+%%%     supported       = "yes",
+%%%     docstring       = "This BibTeX database file contains 'bibdata' entries
+%%%                        that 'match' the examples provided in the Specifications Document
+%%%                        AND, also, 'legacy'-type bibs. It should assist authors in
+%%%                        choosing the 'correct' at-bibtype and necessary bib-fields
+%%%                        so as to obtain the appropriate ACM Reference Format output.
+%%%                        It also contains many 'Standard Abbreviations'. "
+%%%  }
+%%% ====================================================================
+
+% Journals
+
+% First the Full Name is given, then the abbreviation used in the AMS Math
+% Reviews, with an indication if it could not be found there.
+% Note the 2nd overwrites the 1st, so swap them if you want the full name.
+
+ %{AMS}
+ @String{AMSTrans = "American Mathematical Society Translations" }
+ @String{AMSTrans = "Amer. Math. Soc. Transl." }
+ @String{BullAMS = "Bulletin of the American Mathematical Society" }
+ @String{BullAMS = "Bull. Amer. Math. Soc." }
+ @String{ProcAMS = "Proceedings of the American Mathematical Society" }
+ @String{ProcAMS = "Proc. Amer. Math. Soc." }
+ @String{TransAMS = "Transactions of the American Mathematical Society" }
+ @String{TransAMS = "Trans. Amer. Math. Soc." }
+
+ %ACM
+ @String{CACM = "Communications of the {ACM}" }
+ @String{CACM = "Commun. {ACM}" }
+ @String{CompServ = "Comput. Surveys" }
+ @String{JACM = "J. ACM" }
+ @String{ACMMathSoft = "{ACM} Transactions on Mathematical Software" }
+ @String{ACMMathSoft = "{ACM} Trans. Math. Software" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newsletter" }
+ @String{SIGNUM = "{ACM} {SIGNUM} Newslett." }
+
+ @String{AmerSocio = "American Journal of Sociology" }
+ @String{AmerStatAssoc = "Journal of the American Statistical Association" }
+ @String{AmerStatAssoc = "J. Amer. Statist. Assoc." }
+ @String{ApplMathComp = "Applied Mathematics and Computation" }
+ @String{ApplMathComp = "Appl. Math. Comput." }
+ @String{AmerMathMonthly = "American Mathematical Monthly" }
+ @String{AmerMathMonthly = "Amer. Math. Monthly" }
+ @String{BIT = "{BIT}" }
+ @String{BritStatPsych = "British Journal of Mathematical and Statistical
+          Psychology" }
+ @String{BritStatPsych = "Brit. J. Math. Statist. Psych." }
+ @String{CanMathBull = "Canadian Mathematical Bulletin" }
+ @String{CanMathBull = "Canad. Math. Bull." }
+ @String{CompApplMath = "Journal of Computational and Applied Mathematics" }
+ @String{CompApplMath = "J. Comput. Appl. Math." }
+ @String{CompPhys = "Journal of Computational Physics" }
+ @String{CompPhys = "J. Comput. Phys." }
+ @String{CompStruct = "Computers and Structures" }
+ @String{CompStruct = "Comput. \& Structures" }
+ @String{CompJour = "The Computer Journal" }
+ @String{CompJour = "Comput. J." }
+ @String{CompSysSci = "Journal of Computer and System Sciences" }
+ @String{CompSysSci = "J. Comput. System Sci." }
+ @String{Computing = "Computing" }
+ @String{ContempMath = "Contemporary Mathematics" }
+ @String{ContempMath = "Contemp. Math." }
+ @String{Crelle = "Crelle's Journal" }
+ @String{GiornaleMath = "Giornale di Mathematiche" }
+ @String{GiornaleMath = "Giorn. Mat." } % didn't find in AMS MR., ibid.
+
+ %IEEE
+ @String{Computer = "{IEEE} Computer" }
+ @String{IEEETransComp = "{IEEE} Transactions on Computers" }
+ @String{IEEETransComp = "{IEEE} Trans. Comput." }
+ @String{IEEETransAC = "{IEEE} Transactions on Automatic Control" }
+ @String{IEEETransAC = "{IEEE} Trans. Automat. Control" }
+ @String{IEEESpec = "{IEEE} Spectrum" } % didn't find in AMS MR
+ @String{ProcIEEE = "Proceedings of the {IEEE}" }
+ @String{ProcIEEE = "Proc. {IEEE}" } % didn't find in AMS MR
+ @String{IEEETransAeroElec = "{IEEE} Transactions on Aerospace and Electronic
+     Systems" }
+ @String{IEEETransAeroElec = "{IEEE} Trans. Aerospace Electron. Systems" }
+
+ @String{IMANumerAna = "{IMA} Journal of Numerical Analysis" }
+ @String{IMANumerAna = "{IMA} J. Numer. Anal." }
+ @String{InfProcLet = "Information Processing Letters" }
+ @String{InfProcLet = "Inform. Process. Lett." }
+ @String{InstMathApp = "Journal of the Institute of Mathematics and
+     its Applications" }
+ @String{InstMathApp = "J. Inst. Math. Appl." }
+ @String{IntControl = "International Journal of Control" }
+ @String{IntControl = "Internat. J. Control" }
+ @String{IntNumerEng = "International Journal for Numerical Methods in
+     Engineering" }
+ @String{IntNumerEng = "Internat. J. Numer. Methods Engrg." }
+ @String{IntSuper = "International Journal of Supercomputing Applications" }
+ @String{IntSuper = "Internat. J. Supercomputing Applic." } % didn't find
+%% in AMS MR
+ @String{Kibernetika = "Kibernetika" }
+ @String{JResNatBurStand = "Journal of Research of the National Bureau
+     of Standards" }
+ @String{JResNatBurStand = "J. Res. Nat. Bur. Standards" }
+ @String{LinAlgApp = "Linear Algebra and its Applications" }
+ @String{LinAlgApp = "Linear Algebra Appl." }
+ @String{MathAnaAppl = "Journal of Mathematical Analysis and Applications" }
+ @String{MathAnaAppl = "J. Math. Anal. Appl." }
+ @String{MathAnnalen = "Mathematische Annalen" }
+ @String{MathAnnalen = "Math. Ann." }
+ @String{MathPhys = "Journal of Mathematical Physics" }
+ @String{MathPhys = "J. Math. Phys." }
+ @String{MathComp = "Mathematics of Computation" }
+ @String{MathComp = "Math. Comp." }
+ @String{MathScand = "Mathematica Scandinavica" }
+ @String{MathScand = "Math. Scand." }
+ @String{TablesAidsComp = "Mathematical Tables and Other Aids to Computation" }
+ @String{TablesAidsComp = "Math. Tables Aids Comput." }
+ @String{NumerMath = "Numerische Mathematik" }
+ @String{NumerMath = "Numer. Math." }
+ @String{PacificMath = "Pacific Journal of Mathematics" }
+ @String{PacificMath = "Pacific J. Math." }
+ @String{ParDistComp = "Journal of Parallel and Distributed Computing" }
+ @String{ParDistComp = "J. Parallel and Distrib. Comput." } % didn't find
+%% in AMS MR
+ @String{ParComputing = "Parallel Computing" }
+ @String{ParComputing = "Parallel Comput." }
+ @String{PhilMag = "Philosophical Magazine" }
+ @String{PhilMag = "Philos. Mag." }
+ @String{ProcNAS = "Proceedings of the National Academy of Sciences
+                    of the USA" }
+ @String{ProcNAS = "Proc. Nat. Acad. Sci. U. S. A." }
+ @String{Psychometrika = "Psychometrika" }
+ @String{QuartMath = "Quarterly Journal of Mathematics, Oxford, Series (2)" }
+ @String{QuartMath = "Quart. J. Math. Oxford Ser. (2)" }
+ @String{QuartApplMath = "Quarterly of Applied Mathematics" }
+ @String{QuartApplMath = "Quart. Appl. Math." }
+ @String{RevueInstStat = "Review of the International Statisical Institute" }
+ @String{RevueInstStat = "Rev. Inst. Internat. Statist." }
+
+ %SIAM
+ @String{JSIAM = "Journal of the Society for Industrial and Applied
+     Mathematics" }
+ @String{JSIAM = "J. Soc. Indust. Appl. Math." }
+ @String{JSIAMB = "Journal of the Society for Industrial and Applied
+     Mathematics, Series B, Numerical Analysis" }
+ @String{JSIAMB = "J. Soc. Indust. Appl. Math. Ser. B Numer. Anal." }
+ @String{SIAMAlgMeth = "{SIAM} Journal on Algebraic and Discrete Methods" }
+ @String{SIAMAlgMeth = "{SIAM} J. Algebraic Discrete Methods" }
+ @String{SIAMAppMath = "{SIAM} Journal on Applied Mathematics" }
+ @String{SIAMAppMath = "{SIAM} J. Appl. Math." }
+ @String{SIAMComp = "{SIAM} Journal on Computing" }
+ @String{SIAMComp = "{SIAM} J. Comput." }
+ @String{SIAMMatrix = "{SIAM} Journal on Matrix Analysis and Applications" }
+ @String{SIAMMatrix = "{SIAM} J. Matrix Anal. Appl." }
+ @String{SIAMNumAnal = "{SIAM} Journal on Numerical Analysis" }
+ @String{SIAMNumAnal = "{SIAM} J. Numer. Anal." }
+ @String{SIAMReview = "{SIAM} Review" }
+ @String{SIAMReview = "{SIAM} Rev." }
+ @String{SIAMSciStat = "{SIAM} Journal on Scientific and Statistical
+     Computing" }
+ @String{SIAMSciStat = "{SIAM} J. Sci. Statist. Comput." }
+
+ @String{SoftPracExp = "Software Practice and Experience" }
+ @String{SoftPracExp = "Software Prac. Experience" } % didn't find in AMS MR
+ @String{StatScience = "Statistical Science" }
+ @String{StatScience = "Statist. Sci." }
+ @String{Techno = "Technometrics" }
+ @String{USSRCompMathPhys = "{USSR} Computational Mathematics and Mathematical
+     Physics" }
+ @String{USSRCompMathPhys = "{U. S. S. R.} Comput. Math. and Math. Phys." }
+ @String{VLSICompSys = "Journal of {VLSI} and Computer Systems" }
+ @String{VLSICompSys = "J. {VLSI} Comput. Syst." }
+ @String{ZAngewMathMech = "Zeitschrift fur Angewandte Mathematik und
+     Mechanik" }
+ @String{ZAngewMathMech = "Z. Angew. Math. Mech." }
+ @String{ZAngewMathPhys = "Zeitschrift fur Angewandte Mathematik und Physik" }
+ @String{ZAngewMathPhys = "Z. Angew. Math. Phys." }
+
+% Publishers % ================================================= |
+
+ @String{Academic = "Academic Press" }
+ @String{ACMPress = "{ACM} Press" }
+ @String{AdamHilger = "Adam Hilger" }
+ @String{AddisonWesley = "Addison-Wesley" }
+ @String{AllynBacon = "Allyn and Bacon" }
+ @String{AMS = "American Mathematical Society" }
+ @String{Birkhauser = "Birkha{\"u}ser" }
+ @String{CambridgePress = "Cambridge University Press" }
+ @String{Chelsea = "Chelsea" }
+ @String{ClaredonPress = "Claredon Press" }
+ @String{DoverPub = "Dover Publications" }
+ @String{Eyolles = "Eyolles" }
+ @String{HoltRinehartWinston = "Holt, Rinehart and Winston" }
+ @String{Interscience = "Interscience" }
+ @String{JohnsHopkinsPress = "The Johns Hopkins University Press" }
+ @String{JohnWileySons = "John Wiley and Sons" }
+ @String{Macmillan = "Macmillan" }
+ @String{MathWorks = "The Math Works Inc." }
+ @String{McGrawHill = "McGraw-Hill" }
+ @String{NatBurStd = "National Bureau of Standards" }
+ @String{NorthHolland = "North-Holland" }
+ @String{OxfordPress = "Oxford University Press" }  %address Oxford or London?
+ @String{PergamonPress = "Pergamon Press" }
+ @String{PlenumPress = "Plenum Press" }
+ @String{PrenticeHall = "Prentice-Hall" }
+ @String{SIAMPub = "{SIAM} Publications" }
+ @String{Springer = "Springer-Verlag" }
+ @String{TexasPress = "University of Texas Press" }
+ @String{VanNostrand = "Van Nostrand" }
+ @String{WHFreeman = "W. H. Freeman and Co." }
+
+%Entries
+
+@article{herschel1926konsistenzmessungen,
+  title   = {Konsistenzmessungen von {G}ummi-{B}enzoll{\"o}sungen},
+  author  = {Herschel, Winslow H. and Bulkley, Ronald},
+  journal = {Kolloid-Zeitschrift},
+  volume  = {39},
+  number  = {4},
+  pages   = {291--300},
+  year    = {1926},
+  doi     = {10.1007/BF01432034}
+}
+
+@book{bridson2015fluid,
+  title     = {Fluid Simulation for Computer Graphics},
+  author    = {Bridson, Robert},
+  publisher = {A K Peters/CRC Press},
+  year      = {2015},
+  edition   = {2nd}
+}
+
+@inproceedings{jiang2015affine,
+  title     = {The Affine Particle-in-Cell Method},
+  author    = {Jiang, Chenfanfu and Schroeder, Craig and Selle, Andrew and Teran, Joseph and Stomakhin, Alexey},
+  booktitle = {ACM SIGGRAPH 2015 Papers},
+  pages     = {Article 51},
+  year      = {2015},
+  doi       = {10.1145/2766996}
+}
+
+@article{stomakhin2013material,
+  title   = {A Material Point Method for Snow Simulation},
+  author  = {Stomakhin, Alexey and Schroeder, Craig and Chai, Lawrence and Teran, Joseph and Selle, Andrew},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {32},
+  number  = {4},
+  pages   = {102:1--102:10},
+  year    = {2013},
+  doi     = {10.1145/2461912.2461948}
+}
+
+@article{hu2018moving,
+  title   = {Moving Least Squares Material Point Method},
+  author  = {Hu, Yuanming and Fang, Yu and Ge, Ziyin and Qu, Ziyin and Zhu, Yixin and Pradhana, Andre and Jiang, Chenfanfu},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {37},
+  number  = {4},
+  pages   = {150:1--150:14},
+  year    = {2018},
+  doi     = {10.1145/3197517.3201293}
+}
+
+@article{hu2019taichi,
+  title   = {{Taichi}: A Language for High-Performance Computation on Spatially Sparse Data Structures},
+  author  = {Hu, Yuanming and Li, Tzu-Mao and Anderson, Luke and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {38},
+  number  = {6},
+  pages   = {201:1--201:16},
+  year    = {2019},
+  doi     = {10.1145/3355089.3356506}
+}
+
+@inproceedings{bhat2002computing,
+  title     = {Computing the Physical Parameters of Rigid-Body Motion from Video},
+  author    = {Bhat, Kiran S. and Seitz, Steven M. and Popovi{\'c}, Jovan and Khosla, Pradeep K.},
+  booktitle = {Proceedings of the European Conference on Computer Vision (ECCV)},
+  pages     = {551--565},
+  year      = {2002},
+  doi       = {10.1007/3-540-47966-0_37}
+}
+
+@article{monszpart2016smash,
+  title   = {{SMASH}: Physics-Guided Reconstruction of Collisions from Videos},
+  author  = {Monszpart, {\'E}loi and Thuerey, Nils and Mitra, Niloy J.},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {35},
+  number  = {6},
+  pages   = {1--14},
+  year    = {2016},
+  doi     = {10.1145/2980179.2982421}
+}
+
+@article{hamamichi2023nonnewtonian,
+  title   = {Non-{N}ewtonian {ViRheometry} via Similarity Analysis},
+  author  = {Hamamichi, Mitsuki and Nagasawa, Kentaro and Okada, Masato and Seto, Ryohei and Yue, Yonghao},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {42},
+  number  = {6},
+  pages   = {193:1--193:16},
+  year    = {2023},
+  doi     = {10.1145/3618310}
+}
+
+@article{jones1998efficient,
+  title   = {Efficient Global Optimization of Expensive Black-Box Functions},
+  author  = {Jones, Donald R. and Schonlau, Matthias and Welch, William J.},
+  journal = {Journal of Global Optimization},
+  volume  = {13},
+  number  = {4},
+  pages   = {455--492},
+  year    = {1998},
+  doi     = {10.1023/A:1008306431147}
+}
+
+@inproceedings{snoek2012practical,
+  title     = {Practical Bayesian Optimization of Machine Learning Algorithms},
+  author    = {Snoek, Jasper and Larochelle, Hugo and Adams, Ryan P.},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {25},
+  year      = {2012}
+}
+
+@article{shahriari2016taking,
+  title   = {Taking the Human Out of the Loop: A Review of {B}ayesian Optimization},
+  author  = {Shahriari, Bobak and Swersky, Kevin and Wang, Ziyu and Adams, Ryan P. and de Freitas, Nando},
+  journal = {Proceedings of the IEEE},
+  volume  = {104},
+  number  = {1},
+  pages   = {148--175},
+  year    = {2016},
+  doi     = {10.1109/JPROC.2015.2494218}
+}
+
+@book{rasmussen2006gaussian,
+  title     = {Gaussian Processes for Machine Learning},
+  author    = {Rasmussen, Carl Edward and Williams, Christopher K. I.},
+  publisher = {MIT Press},
+  year      = {2006},
+  isbn      = {026218253X}
+}
+
+@inproceedings{titsias2009variational,
+  title     = {Variational Learning of Inducing Variables in Sparse {G}aussian Processes},
+  author    = {Titsias, Michalis K.},
+  booktitle = {Proceedings of the 12th International Conference on Artificial Intelligence and Statistics (AISTATS)},
+  pages     = {567--574},
+  year      = {2009}
+}
+
+@inproceedings{hensman2013gaussian,
+  title     = {Gaussian Processes for Big Data},
+  author    = {Hensman, James and Fusi, Nicolo and Lawrence, Neil D.},
+  booktitle = {Proceedings of the 29th Conference on Uncertainty in Artificial Intelligence (UAI)},
+  pages     = {282--290},
+  year      = {2013}
+}
+
+@article{jordan1994hierarchical,
+  title   = {Hierarchical Mixtures of Experts and the {EM} Algorithm},
+  author  = {Jordan, Michael I. and Jacobs, Robert A.},
+  journal = {Neural Computation},
+  volume  = {6},
+  number  = {2},
+  pages   = {181--214},
+  year    = {1994},
+  doi     = {10.1162/neco.1994.6.2.181}
+}
+
+@article{hansen2016cma,
+  title   = {The {CMA} Evolution Strategy: A Tutorial},
+  author  = {Hansen, Nikolaus},
+  journal = {arXiv preprint arXiv:1604.00772},
+  year    = {2016}
+}
+
+@inproceedings{snelson2006sparse,
+  title     = {Sparse {G}aussian Processes using Pseudo-inputs},
+  author    = {Snelson, Edward and Ghahramani, Zoubin},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {18},
+  pages     = {1257--1264},
+  year      = {2006}
+}
+
+@article{quinonero2005unifying,
+  title   = {A Unifying View of Sparse Approximate {G}aussian Process Regression},
+  author  = {Qui{\~n}onero-Candela, Joaquin and Rasmussen, Carl Edward},
+  journal = {Journal of Machine Learning Research},
+  volume  = {6},
+  pages   = {1939--1959},
+  year    = {2005}
+}
+
+@article{yuksel2012twenty,
+  title   = {Twenty Years of Mixture of Experts},
+  author  = {Yuksel, Seniha Esen and Wilson, Joseph N. and Gader, Paul D.},
+  journal = {IEEE Transactions on Neural Networks and Learning Systems},
+  volume  = {23},
+  number  = {8},
+  pages   = {1177--1193},
+  year    = {2012},
+  doi     = {10.1109/TNNLS.2012.2200299}
+}
+
+@inproceedings{tresp2001mixtures,
+  title     = {Mixtures of {G}aussian Processes},
+  author    = {Tresp, Volker},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {13},
+  pages     = {654--660},
+  year      = {2001}
+}
+
+@inproceedings{hu2020difftaichi,
+  title     = {{DiffTaichi}: Differentiable Programming for Physical Simulation},
+  author    = {Hu, Yuanming and Anderson, Luke and Li, Tzu-Mao and Sun, Qi and Carr, Nathan and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2020}
+}
+
+@inproceedings{murthy2021gradsim,
+  title     = {{gradSim}: Differentiable simulation for system identification and visuomotor control},
+  author    = {Murthy, J. Krishna and Macklin, Miles and Golemo, Florian and Voleti, Vikram and Petrini, Linda and Weiss, Martin and Considine, Breandan and Parent-L{\'e}vesque, J{\'e}r{\^o}me and Xie, Kevin and Erleben, Kenny and others},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2021}
+}
+
+@inproceedings{liang2019differentiable,
+  title     = {Differentiable Cloth Simulation for Inverse Problems},
+  author    = {Liang, Junbang and Lin, Ming C. and Koltun, Vladlen},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {32},
+  pages     = {771--780},
+  year      = {2019}
+}

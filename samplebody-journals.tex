@@ -1,0 +1,554 @@
+\section{Introduction}
+
+Estimating material parameters of non-Newtonian fluids from visual observations is an important problem in physics-based graphics, digital material characterization, and inverse simulation.
+Accurate rheological parameters are required for predictive simulation, analysis, and material-aware content creation, but direct measurement is often difficult in practice.
+This difficulty becomes more pronounced for materials with large inclusions, irregular flow behavior, or experimental constraints under which conventional rheometers become less effective.
+
+Recent work on video-based rheometry, or viRheometry, has shown that non-Newtonian parameters can be estimated by matching observations with physics-based simulations.
+In particular, prior work demonstrated that simulation-based inverse estimation can recover Herschel--Bulkley parameters from visual measurements and analyzed the role of similarity in improving identifiability.
+However, despite its effectiveness, such a pipeline remains computationally expensive because every parameter query requires a full physical simulation inside the optimization loop.
+As a result, parameter estimation can take many hours, which severely limits its practical use.
+
+This computational bottleneck is not merely an inconvenience.
+Slow estimation fundamentally restricts the kinds of applications that inverse viRheometry can support.
+First, for materials whose effective properties change over time due to aging, sedimentation, temperature variation, mixing history, or state evolution, long optimization times lead to \emph{stale} parameter estimates that no longer represent the material at decision time.
+Second, slow estimation prevents repeated use in short operational cycles, making it difficult to support interactive iteration, rapid reformulation, or high-throughput measurement.
+Third, the large computational cost hinders the broader deployment of inverse viRheometry outside carefully controlled offline settings.
+
+In this paper, we address this limitation by introducing a surrogate-accelerated optimization framework for non-Newtonian viRheometry.
+Our key idea is to replace most expensive simulation evaluations during inverse estimation with a learned surrogate model.
+To do so, we construct a Mixture-of-Experts (MoE) Gaussian process surrogate that captures heterogeneous structure in the optimization landscape.
+Instead of fitting a single global surrogate to all parameter regimes, our method assigns specialized experts to different flow behaviors and uses the resulting model to guide fast parameter search.
+
+The technical core of this work is therefore not merely acceleration in a generic sense, but a regime-aware surrogate formulation for inverse viRheometry.
+This formulation is motivated by two characteristics of the problem.
+First, the mapping from material parameters to optimization objectives is highly non-uniform and can exhibit locally distinct behaviors.
+Second, inverse estimation for non-Newtonian fluids often contains ambiguous or weakly sensitive regions in which a single global surrogate becomes less reliable.
+By combining expert specialization with probabilistic prediction, our approach improves the efficiency of the search process while preserving estimation quality.
+
+Our work is built on prior non-Newtonian viRheometry, but shifts the emphasis from feasibility and identifiability toward speed, repeated usability, and practical deployment.
+Where prior work established that visual inverse rheometry can recover meaningful parameters, our goal is to make such estimation fast enough to support time-sensitive and application-driven use.
+To this end, we evaluate the proposed method not only in terms of runtime reduction, but also in terms of estimation fidelity, robustness, and the practical benefits enabled by acceleration.
+
+The main contributions of this paper are as follows:
+\begin{itemize}
+    \item We present a surrogate-accelerated inverse viRheometry framework for estimating non-Newtonian material parameters from visual observations.
+    \item We propose a regime-aware Mixture-of-Experts Gaussian process surrogate that models heterogeneous objective structure and enables efficient surrogate-driven optimization.
+    \item We show that the proposed method substantially reduces estimation time while preserving parameter estimation quality relative to a simulation-based baseline.
+    \item We analyze the practical benefits enabled by acceleration, including fresher parameter estimates for time-varying materials, repeated estimation capability, and improved deployability toward real-time viRheometry.
+\end{itemize}
+
+\section{Related Work}
+
+\subsection{Physics-Based Simulation of Non-Newtonian Fluids}
+
+The simulation of complex fluids and soft materials has long been an important topic in computer graphics.
+A broad range of numerical methods has been developed for viscous fluids, elastoplastic materials, and non-Newtonian media, enabling predictive animation and physically grounded content creation \cite{bridson2015fluid,stomakhin2013material,jiang2015affine,hu2018moving}.
+Among these, the material point method (MPM) and its variants have become especially attractive for simulating materials that undergo large deformation, contact, and topological change.
+Recent advances in MPM, including affine particle-in-cell transfers and moving least squares formulations, have improved numerical stability and simulation fidelity for complex material behaviors \cite{jiang2015affine,hu2018moving}.
+These developments provide an effective forward model for inverse parameter estimation problems in which material properties must be inferred from observations.
+
+In the context of non-Newtonian fluids, constitutive models such as the Herschel--Bulkley model offer a compact description of yield stress and shear-dependent viscosity.
+Such models are widely used because they capture key behaviors of many real materials while remaining tractable for simulation and optimization.
+Our work builds on this simulation-based view, but focuses on the inverse problem: instead of synthesizing motion from known parameters, we seek to infer the parameters from observed behavior.
+
+
+\subsection{Inverse Parameter Estimation and ViRheometry}
+
+Inverse estimation of physical parameters from visual data has been studied in graphics and vision for decades.
+Early work estimated physical quantities by fitting simulated motion to image observations, demonstrating that video can be used to recover meaningful latent parameters \cite{bhat2002computing}.
+Subsequent work extended inverse physical reasoning to a wide range of phenomena, including collision reconstruction, deformation analysis, and material inference \cite{monszpart2016smash}.
+
+Most closely related to our work is recent research on non-Newtonian viRheometry, which introduced a video-based framework for estimating Herschel--Bulkley parameters by matching observed fluid behavior with physics-based simulation \cite{hamamichi2023nonnewtonian}.
+That work established inverse viRheometry as a viable approach for materials that are difficult to characterize using conventional rheometers and further analyzed the role of similarity in parameter identifiability.
+However, because estimation is performed through simulation-in-the-loop optimization, the method remains computationally expensive.
+Our work inherits the same inverse estimation objective, but addresses the deployment bottleneck by accelerating the optimization process through learned surrogate modeling.
+
+More broadly, our work fits into the growing line of research that seeks to make inverse physical estimation more practical by reducing simulation cost.
+Rather than replacing the physical model, we preserve the simulation-based estimation paradigm and improve its usability by reducing the number of expensive forward evaluations required during search.
+
+
+\subsection{Surrogate Models for Expensive Inverse Problems}
+
+Surrogate modeling is a standard approach for reducing the cost of optimizing expensive black-box objectives.
+Methods such as efficient global optimization and Bayesian optimization use predictive models to approximate objective values and guide the selection of informative query points \cite{jones1998efficient,snoek2012practical,shahriari2016taking}.
+Among surrogate models, Gaussian processes are particularly attractive because they provide both a predictive mean and an uncertainty estimate, which is useful for balancing exploitation and exploration \cite{rasmussen2006gaussian}.
+
+For larger-scale problems, sparse and variational Gaussian process methods improve the tractability of GP modeling by using inducing variables or pseudo-input approximations \cite{snelson2006sparse,quinonero2005unifying,titsias2009variational,hensman2013gaussian}.
+These methods make GP-based surrogates feasible in settings where dense GP regression would be prohibitively expensive.
+Our work adopts the probabilistic advantages of GP surrogates, but uses them in a different setting: instead of generic black-box optimization, we focus on inverse viRheometry and the specific structure of its simulation-induced objective landscape.
+
+In addition, our approach differs from standard Bayesian optimization in its emphasis on repeated evaluation inside an estimation pipeline.
+The goal is not merely to locate an optimum with as few samples as possible in a standalone optimization problem, but to construct a surrogate framework that can serve as a practical accelerator for physics-based parameter estimation.
+
+
+\subsection{Mixture-of-Experts and Regime-Dependent Modeling}
+
+A key challenge in surrogate modeling is that a single global model may be insufficient when the target function exhibits heterogeneous local structure.
+Mixture-of-experts (MoE) models address this problem by decomposing prediction into multiple specialized experts together with a gating mechanism that determines which expert should dominate in each region \cite{jordan1994hierarchical,yuksel2012twenty}.
+This idea has been extended to Gaussian process settings, where different GP experts model different local regimes of the input-output mapping \cite{tresp2001mixtures}.
+
+This perspective is especially relevant to inverse viRheometry.
+The optimization landscape induced by simulation-based matching can vary substantially across parameter regions and flow behaviors, including regions with different sensitivities, different curvature, and different levels of ambiguity.
+These characteristics make regime-aware surrogate modeling more appropriate than fitting a single global regressor.
+Our method therefore uses a mixture-of-experts Gaussian process surrogate to capture heterogeneous behavior in the inverse objective and to improve the efficiency of surrogate-driven optimization.
+
+
+\section{Background}
+
+\subsection{Herschel--Bulkley Rheology}
+
+Many non-Newtonian fluids can be approximated by the Herschel--Bulkley (HB) model, which describes a relationship between shear stress and shear rate using a yield term, a consistency parameter, and a power-law exponent \cite{herschel1926konsistenzmessungen}.
+In this model, the constitutive response is typically parameterized by a tuple
+\[
+\theta = (\sigma_Y, \eta, n),
+\]
+where $\sigma_Y$ denotes the yield stress, $\eta$ controls the consistency, and $n$ determines the degree of shear thinning or shear thickening.
+
+The HB model is attractive in graphics-oriented inverse estimation because it is expressive enough to represent a wide range of visually distinct materials while remaining compact enough for simulation and optimization.
+Previous work on non-Newtonian viRheometry adopted this parameterization and demonstrated that visually observed flows can be used to estimate these parameters through simulation matching \cite{hamamichi2023nonnewtonian}.
+We follow the same general parameterization, since our goal is not to propose a new constitutive model but to accelerate the inverse estimation process built on top of it.
+
+
+\subsection{Inverse ViRheometry as Simulation-Based Optimization}
+
+In video-based rheometry, the goal is to infer material parameters from observed fluid behavior.
+Given an observation $y$ obtained from a physical experiment and a forward simulator $\mathcal{S}(\theta, c)$ under condition $c$, inverse estimation is formulated as the optimization of an observation-matching objective
+\[
+\hat{\theta} = \arg\min_{\theta} \mathcal{L}(\theta; y, c),
+\]
+where $\mathcal{L}$ measures the mismatch between the simulated result and the observation.
+Depending on the formulation, this mismatch may be defined in terms of image features, silhouettes, temporal shape evolution, or other flow descriptors.
+
+This formulation has two important characteristics.
+First, the objective is expensive to evaluate because every query of $\theta$ requires a full forward simulation.
+Second, the objective landscape is often highly non-uniform: some regions are well constrained by the observation, while others are relatively flat, ambiguous, or weakly sensitive.
+These characteristics make naive optimization slow and costly.
+
+Prior non-Newtonian viRheometry addressed this problem by coupling a physics-based simulator with derivative-free optimization \cite{hamamichi2023nonnewtonian}.
+While effective, this approach requires repeated simulator calls throughout the search process, leading to long runtimes.
+Our work keeps the same simulation-based estimation paradigm, but introduces a learned surrogate to approximate the expensive objective and thereby reduce the cost of optimization.
+
+Finally, in many practical scenarios the target material properties may vary over time.
+If the true parameter state is denoted by $\theta_t$, then a delayed estimate may no longer correspond to the current material condition when optimization terminates.
+This observation motivates our emphasis on acceleration: reducing inference time is not only computationally desirable, but also important for maintaining the temporal validity, or freshness, of the estimated parameters.
+
+\section{Method}
+
+\subsection{Overview}
+
+Our goal is to accelerate inverse viRheometry without changing the underlying simulation-based estimation paradigm.
+Instead of evaluating the expensive objective $\mathcal{L}(\theta; y, c)$ through a full forward simulation at every optimization step, we construct a learned surrogate model that predicts the objective from material parameters and guides the search toward promising regions.
+The resulting framework preserves the physics-based formulation of inverse estimation while substantially reducing the number of expensive simulator calls.
+
+Our method consists of three stages.
+First, we generate training data by evaluating the simulation-based objective at sampled parameter points.
+Second, we train a regime-aware Mixture-of-Experts (MoE) Gaussian process surrogate that models heterogeneous structure in the objective landscape.
+Third, we use the surrogate inside a derivative-free optimizer to perform fast parameter search for a new observation.
+Because the surrogate is much cheaper to evaluate than the simulator, the optimizer can explore the parameter space far more efficiently.
+
+A key design choice of our method is that the surrogate is not a single global regressor.
+Instead, it is composed of multiple experts specialized to different local regimes of the inverse objective.
+This design is motivated by the fact that non-Newtonian inverse estimation often exhibits heterogeneous behavior across the parameter space, including distinct flow modes, varying sensitivities, and ambiguous regions.
+By combining expert specialization with probabilistic prediction, our framework improves both search efficiency and robustness.
+
+Figure~\ref{fig:overview} illustrates the overall pipeline.
+Given an observed experiment, we first define the simulation-based objective over the target parameter space.
+We then learn an MoE surrogate from offline simulation data and use it to accelerate the online optimization process.
+The final output is an estimated Herschel--Bulkley parameter vector that approximates the material state corresponding to the observation.
+
+
+\subsection{Problem Formulation}
+
+Let $\theta \in \Theta$ denote the material parameter vector, where $\Theta$ is the feasible parameter domain.
+In our setting, $\theta$ corresponds to the Herschel--Bulkley parameters
+\[
+\theta = (\sigma_Y, \eta, n).
+\]
+Given an observed experiment $y$ and an experimental condition $c$, we define the inverse viRheometry objective as
+\[
+\mathcal{L}(\theta; y, c),
+\]
+which measures the discrepancy between the observation and the simulated result obtained from the forward model $\mathcal{S}(\theta, c)$.
+
+The target of inference is
+\[
+\hat{\theta} = \arg\min_{\theta \in \Theta} \mathcal{L}(\theta; y, c).
+\]
+In the original simulator-in-the-loop formulation, this optimization is expensive because every evaluation of $\mathcal{L}$ requires a full simulation.
+If the optimizer evaluates hundreds or thousands of candidate parameters, the total computational cost becomes prohibitive.
+
+We therefore introduce a surrogate model
+\[
+\tilde{\mathcal{L}}(\theta; y, c)
+\]
+that approximates the expensive objective and can be evaluated efficiently.
+The surrogate is trained on a set of simulation-derived samples
+\[
+\mathcal{D} = \{(\theta_i, \mathcal{L}_i)\}_{i=1}^N,
+\]
+where $\mathcal{L}_i = \mathcal{L}(\theta_i; y, c)$ is computed by the original simulation-based pipeline.
+
+In principle, one could fit a single global regressor to approximate $\mathcal{L}$.
+However, this is often ineffective for non-Newtonian inverse estimation because the objective landscape is not globally homogeneous.
+Different parameter regions may correspond to different flow behaviors, different local smoothness, and different sensitivity of the observation to parameter perturbations.
+Accordingly, our method models the objective using a mixture of local experts rather than a single predictor.
+
+
+\subsection{Regime-Aware Mixture-of-Experts Surrogate}
+
+\subsubsection{Motivation}
+
+The inverse objective in non-Newtonian viRheometry is shaped by the interaction between the constitutive model, experimental conditions, and the observation-matching metric.
+As a result, it often exhibits heterogeneous local structure.
+For example, some parameter regions correspond to highly dynamic flow behaviors with strong visual sensitivity, while others correspond to weakly varying or partially ambiguous outcomes.
+A single global surrogate must fit all of these behaviors simultaneously, which can reduce prediction accuracy in precisely the regions that matter most for optimization.
+
+To address this issue, we adopt a Mixture-of-Experts formulation.
+Intuitively, each expert is responsible for modeling one regime of the inverse objective, while a gating model determines which expert should be used for a given input.
+This allows the surrogate to represent local structure more effectively than a monolithic model and is particularly suitable for regime-dependent inverse problems.
+
+\subsubsection{Expert Decomposition}
+
+We partition the training data into multiple regimes and assign a Gaussian process expert to each regime.
+Let $K$ denote the number of experts.
+For each input $\theta$, the surrogate predicts the objective by combining the outputs of the experts according to a gating function:
+\[
+\tilde{\mathcal{L}}(\theta) = \sum_{k=1}^{K} \pi_k(\theta)\, \mu_k(\theta),
+\]
+where $\pi_k(\theta)$ is the gating weight for expert $k$, and $\mu_k(\theta)$ is the predictive mean of the $k$-th Gaussian process expert.
+
+Depending on the implementation, the gating can be either hard or soft.
+In a hard-gating formulation, each input is assigned to a single expert:
+\[
+\tilde{\mathcal{L}}(\theta) = \mu_{k^*(\theta)}(\theta),
+\]
+where $k^*(\theta)$ is the selected expert index.
+In a soft-gating formulation, multiple experts contribute to the prediction with weights that sum to one.
+Our framework supports both views, but in either case the central idea is the same: distinct experts model distinct local regimes of the inverse objective.
+
+The decomposition into regimes can be based on clustering in parameter space, feature space, or simulation-derived descriptors.
+In our implementation, the gating model is designed to reflect differences in observed flow behavior and objective structure, allowing experts to specialize to regions with similar dynamics.
+This regime-aware structure is a key part of the technical core of the paper.
+
+\subsubsection{Gaussian Process Experts}
+
+Each expert is modeled as a Gaussian process regressor.
+Given an input $\theta$, expert $k$ predicts a Gaussian distribution over the objective:
+\[
+\mathcal{L}(\theta) \sim \mathcal{N}\bigl(\mu_k(\theta), \sigma_k^2(\theta)\bigr).
+\]
+The predictive mean $\mu_k(\theta)$ provides an estimate of the objective value, while the predictive variance $\sigma_k^2(\theta)$ provides a measure of uncertainty.
+
+We use GP experts because they offer two advantages for surrogate-accelerated optimization.
+First, they provide flexible nonparametric regression that can fit local objective structure with relatively limited data.
+Second, uncertainty estimates make it possible to reason about confidence in surrogate predictions, which is useful when the optimizer must decide which candidate regions are reliable.
+
+For scalability, sparse or variational GP approximations can be used when the number of training samples becomes large.
+This preserves the main advantages of GP-based modeling while keeping training and inference tractable.
+The exact approximation details are implementation-specific and are described in the implementation subsection below.
+
+\subsubsection{Prediction and Reliability}
+
+Given a candidate parameter $\theta$, the MoE surrogate produces a predicted objective value and, optionally, an uncertainty estimate.
+These outputs serve two roles in our framework.
+First, the predicted objective is used directly inside the optimizer as a cheap substitute for full simulation.
+Second, the uncertainty estimate provides a signal for identifying regions where the surrogate may be less reliable.
+
+This is important because an inaccurate surrogate can bias the optimization process toward an incorrect local optimum.
+The MoE design alleviates this problem by improving local fit, but it does not eliminate it completely.
+For this reason, our framework treats surrogate prediction as an accelerator for search rather than as a replacement for physical modeling itself.
+The final estimates are always interpreted relative to the original simulation-based objective.
+
+
+\subsection{Surrogate-Accelerated Optimization}
+
+\subsubsection{Optimization with a Learned Objective}
+
+Once the surrogate has been trained, we use it as a drop-in replacement for the expensive objective during parameter search.
+Let
+\[
+\tilde{\mathcal{L}}(\theta)
+\]
+denote the surrogate-predicted objective.
+Instead of repeatedly evaluating $\mathcal{L}(\theta)$ by simulation, the optimizer proposes candidate parameters and scores them using $\tilde{\mathcal{L}}(\theta)$.
+
+In our framework, we adopt a derivative-free optimization strategy based on CMA-ES.
+This choice is motivated by the fact that the inverse objective may be multimodal, nonconvex, and only weakly smooth in some regions.
+CMA-ES is well suited to such black-box search problems and is also consistent with prior simulation-based viRheometry.
+By replacing simulator queries with surrogate predictions, we preserve the overall optimization style while greatly reducing evaluation cost.
+
+\subsubsection{Offline Training and Online Inference}
+
+The full estimation workflow can be divided into an offline phase and an online phase.
+
+In the offline phase, we generate training samples by evaluating the original simulation-based objective at selected parameter points.
+These samples are then used to train the MoE surrogate.
+This phase incurs the main simulation cost, but it is amortized across repeated future estimations.
+
+In the online phase, given a new observation, the trained surrogate is used to perform fast optimization.
+Because surrogate inference is cheap, the optimizer can evaluate many more candidate parameters within the same wall-clock budget than would be possible with direct simulation.
+This is the main source of acceleration in our approach.
+
+In practice, the online estimate may optionally be refined by a small number of true simulator evaluations near the predicted optimum.
+Such refinement is useful when one wants to recover additional accuracy in the final stages of optimization.
+However, even without heavy refinement, the surrogate already provides a substantial reduction in search cost.
+
+\subsubsection{Toward Real-Time Use}
+
+The purpose of acceleration in our framework is not limited to reducing runtime in an abstract sense.
+Rather, it is to move inverse viRheometry toward a regime in which parameter estimation can support repeated, short-cycle use.
+If estimation can be completed within a short operational window, the inferred parameter is more likely to reflect the current material state, and the method becomes more suitable for iterative applications such as repeated measurement, rapid formulation tuning, and time-sensitive analysis.
+
+This perspective is particularly important for time-varying materials.
+Suppose the material state evolves over time and is described by $\theta_t$.
+A slow optimization process may return an estimate that is already outdated by the time it is obtained.
+By contrast, a sufficiently fast surrogate-driven estimate remains closer to the material state at decision time.
+This motivates our emphasis on parameter freshness as a practical benefit of acceleration.
+
+
+\subsection{Training Data Generation and Implementation Details}
+
+The surrogate is trained on a dataset of parameter-objective pairs obtained from the original inverse viRheometry pipeline.
+To populate this dataset efficiently, one can combine initial coverage-oriented sampling with subsequent adaptive refinement in informative regions.
+In our implementation, the goal of data generation is not simply to uniformly cover the parameter space, but to obtain representative samples of the objective landscape that are useful for surrogate learning.
+
+Before training, the parameter space is normalized to improve numerical stability.
+Objective values are also standardized when appropriate.
+The training data are then partitioned into regimes for expert specialization, and a Gaussian process model is fit to each regime.
+The number of experts, the gating strategy, the kernel specification, and the sparse approximation settings are selected empirically and analyzed in our ablation study.
+
+At test time, surrogate inference is lightweight compared with full simulation.
+This makes it possible to use the surrogate repeatedly inside the optimizer while keeping wall-clock cost low.
+The full system therefore combines the physical fidelity of simulation-based inverse estimation with the efficiency of learned approximation.
+
+Algorithm~\ref{alg:framework} summarizes the overall procedure.
+
+\begin{algorithm}[t]
+\caption{Surrogate-Accelerated Inverse ViRheometry}
+\label{alg:framework}
+\KwIn{Observation $y$, experimental condition $c$, trained MoE surrogate $\tilde{\mathcal{L}}$}
+\KwOut{Estimated parameter vector $\hat{\theta}$}
+
+Initialize optimizer over parameter space $\Theta$\;
+
+\While{stopping criterion not met}{
+    Propose candidate parameter $\theta$\;
+    Evaluate surrogate objective $\tilde{\mathcal{L}}(\theta; y, c)$\;
+    Update optimizer state using surrogate score\;
+}
+
+Select best candidate $\hat{\theta}$ according to surrogate objective\;
+
+\Return{$\hat{\theta}$}\;
+\end{algorithm}
+
+
+\section{Results}
+
+\subsection{Experimental Setup}
+
+We evaluate the proposed method on the inverse estimation of Herschel--Bulkley parameters for non-Newtonian fluids under the same general viRheometry setting as prior work.
+Our experiments are designed to answer four questions:
+(1) whether the surrogate faithfully approximates the simulation-based objective,
+(2) whether the final parameter estimates remain accurate,
+(3) how much computation is reduced relative to the simulator-in-the-loop baseline, and
+(4) what practical capabilities are enabled by the resulting acceleration.
+
+We consider both synthetic and real experimental settings.
+In the synthetic setting, ground-truth parameters are known, allowing direct evaluation of parameter estimation error.
+In the real setting, we compare the estimated parameters against physically measured behavior and, where available, rheometer-based reference values.
+This two-level evaluation is important because a surrogate can appear accurate as a regressor while still failing to preserve the downstream inverse estimation result.
+
+As baselines, we compare against the original simulation-based optimization pipeline and against simpler surrogate variants when appropriate.
+These include single-model surrogates without expert decomposition as well as ablated versions of our own framework.
+Unless otherwise noted, all methods are evaluated over the same target parameter domain and under the same observation-matching objective.
+
+We report runtime, number of expensive simulator evaluations, surrogate prediction error, and final parameter estimation quality.
+For downstream estimation, we evaluate not only the error in the recovered parameter vector, but also the observation-matching quality achieved by the estimated parameter.
+This is important because multiple parameter vectors can sometimes produce visually similar behavior, especially in weakly constrained regions.
+Finally, to assess the practical significance of acceleration, we also study scenarios involving repeated estimation and time-varying material states.
+
+
+\subsection{Surrogate Fidelity}
+
+We first evaluate the fidelity of the surrogate itself.
+Given held-out parameter samples, we compare the surrogate-predicted objective against the true simulation-based objective.
+This experiment measures whether the learned model captures the shape of the expensive objective landscape with sufficient accuracy to be useful in downstream optimization.
+
+Overall, the proposed MoE surrogate predicts the objective substantially more accurately than a single global surrogate in regions where the inverse landscape exhibits heterogeneous behavior.
+This supports the central motivation of our method: the objective is not well described by a single homogeneous model across the full parameter domain.
+Instead, expert specialization improves local fit and reduces large prediction errors in difficult regions.
+
+Qualitatively, the prediction errors are smallest in well-structured regimes where visual behavior changes consistently with parameter variation, and larger in ambiguous or weakly sensitive regions.
+This trend is expected and reflects the intrinsic difficulty of the inverse problem.
+Importantly, the MoE formulation reduces these high-error regions relative to simpler baselines, suggesting that regime-aware decomposition is beneficial for surrogate reliability.
+
+We also examine uncertainty estimates produced by the GP experts.
+These estimates correlate with regions in which surrogate prediction is less reliable, indicating that uncertainty is informative rather than arbitrary.
+Although uncertainty alone does not guarantee correct optimization behavior, it provides useful diagnostic information and helps explain when and where the surrogate is likely to fail.
+
+
+\subsection{Estimation Accuracy}
+
+We next evaluate whether surrogate acceleration preserves the quality of the final parameter estimates.
+For each target observation, we compare the recovered Herschel--Bulkley parameter vector against the ground-truth parameter in synthetic experiments and against the best available reference in real experiments.
+
+Our results show that the proposed method achieves parameter estimates comparable to those of the original simulation-based optimization pipeline while using substantially less computation.
+This is the most important downstream finding: the surrogate is not merely accurate as a regression model, but sufficiently faithful to preserve the inverse estimation result itself.
+
+We further evaluate the observation-matching quality obtained by the recovered parameters.
+Even when multiple parameter vectors produce similar low-level errors, the proposed method consistently recovers parameters that reproduce the target behavior at a level comparable to the full baseline.
+This suggests that the surrogate is effective at preserving the structure of the inverse objective near high-quality solutions.
+
+Compared with single-model surrogate baselines, the MoE surrogate yields more stable estimation across challenging cases.
+In particular, regime-aware modeling reduces the tendency of the optimizer to converge to poor local minima induced by surrogate bias in heterogeneous regions.
+This improvement is especially important when the available optimization budget is limited, since budget-constrained inference magnifies the effect of modeling errors.
+
+
+\subsection{Computational Efficiency}
+
+A primary goal of this work is to reduce the computational burden of inverse viRheometry.
+We therefore measure wall-clock runtime and the number of expensive simulator evaluations required for estimation.
+
+The proposed method substantially reduces estimation time relative to the original simulator-in-the-loop pipeline.
+Because surrogate evaluation is orders of magnitude cheaper than full physical simulation, the optimizer can explore the parameter space much more aggressively within a fixed time budget.
+In practice, this leads to a large reduction in both runtime and simulator calls while maintaining comparable estimation quality.
+
+This reduction in cost is not only beneficial in an absolute sense, but also changes the operating regime of the method.
+Where the original pipeline is primarily suitable for offline estimation, the surrogate-accelerated pipeline moves the process toward a short-cycle workflow in which parameter estimation becomes feasible within a much smaller time window.
+This shift is central to the practical value of the proposed approach.
+
+We also analyze anytime behavior by comparing estimation quality as a function of runtime or simulator budget.
+The proposed method reaches useful estimates far earlier than the simulation-based baseline.
+This early convergence is especially important for applications in which the user can only afford limited waiting time or where the material state may evolve during the optimization process.
+
+
+\subsection{Time-Varying Materials and Parameter Freshness}
+
+We now turn to a key practical motivation of this paper: the estimation of materials whose effective parameters change over time.
+Examples include fluids affected by sedimentation, temperature variation, mixing history, or aging.
+In such settings, the value of fast inference is not merely that it saves time, but that it reduces the temporal gap between measurement and estimation.
+
+To study this effect, we consider repeated-estimation scenarios in which the material state evolves during the observation and analysis window.
+We compare a slow simulation-based estimator against the proposed surrogate-accelerated estimator under the same temporal progression.
+The main question is whether the returned parameter remains representative of the material state at the moment it is needed.
+
+Our results indicate that faster inference leads to materially fresher parameter estimates.
+When the optimization process is long, the final estimate may correspond more closely to a past material state than to the current one.
+By contrast, the surrogate-accelerated estimator completes inference within a much shorter interval and therefore better tracks the evolving state.
+This difference is especially important in application settings where the estimated parameter is immediately used for analysis, control, or subsequent decision making.
+
+These results support one of the main claims of the paper: acceleration improves not only efficiency, but also temporal validity.
+In other words, the benefit of speed is not merely computational convenience; it directly improves the relevance of the inferred parameter when the target material is time-varying.
+
+
+\subsection{Validation Against Physical Measurements}
+
+To assess practical reliability, we also evaluate the proposed method on real experimental observations and compare the recovered parameters against physically measured behavior.
+Where reference rheometer measurements are available, we examine whether the estimated parameters fall within a plausible range relative to physical measurement.
+Where exact parameter matching is not possible, we instead compare the consistency of reproduced flow behavior under the estimated parameter.
+
+The results show that the proposed method remains effective beyond purely synthetic settings.
+Although real observations contain additional sources of mismatch such as acquisition noise, imperfect initialization, and model discrepancy, the surrogate-accelerated pipeline still produces estimates that are physically plausible and behaviorally consistent.
+This suggests that the learned surrogate captures useful structure from the simulation-based objective rather than merely overfitting synthetic regularities.
+
+At the same time, the real-data results also reveal the limits of the current approach.
+The remaining discrepancies indicate that simulation model error and experimental uncertainty still play a significant role in practical inverse rheometry.
+We discuss these limitations further in Section~\ref{sec:discussion}.
+
+
+\subsection{Ablation Studies}
+
+We perform ablation studies to understand which components of the proposed framework are most important.
+In particular, we compare the full method against variants without expert decomposition, variants with simplified gating, and variants with reduced surrogate capacity.
+
+The ablations show that expert decomposition is particularly important for stable estimation.
+Removing the mixture-of-experts structure tends to increase large local errors in the surrogate and leads to less reliable downstream optimization.
+Likewise, reducing surrogate capacity degrades performance in heterogeneous regions of the objective landscape.
+
+We also study the effect of the amount and distribution of training data.
+As expected, more informative and better-distributed training samples improve surrogate fidelity and downstream estimation quality.
+However, even at moderate data budgets, the proposed MoE surrogate provides a favorable trade-off between cost and accuracy, which is essential for practical use.
+
+Finally, we examine the role of optional refinement using true simulator evaluations near the surrogate optimum.
+Such refinement can further improve the final estimate, but the main runtime reduction already comes from the surrogate-driven search itself.
+This suggests that the proposed framework is robust even when only limited true simulation refinement is affordable.
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What the Acceleration Enables}
+
+The most immediate effect of the proposed method is a substantial reduction in runtime, but the more important outcome is what this reduction enables in practice.
+First, faster inference improves \emph{parameter freshness} for time-varying materials.
+When the material state changes over time, a delayed estimate can become stale before it is used.
+By moving estimation into a much shorter operational window, the proposed method makes the inferred parameter more representative of the actual state at decision time.
+
+Second, acceleration enables repeated estimation.
+This is useful in workflows where material characterization must be performed multiple times, such as iterative formulation design, repeated measurement under varying conditions, or high-throughput screening of candidate materials.
+A method that requires many hours per estimate is difficult to integrate into such workflows, whereas a fast surrogate-driven method makes repeated use more realistic.
+
+Third, acceleration improves deployability.
+While our current system is not yet a fully general real-time rheometry platform, the reduction in inference cost moves inverse viRheometry closer to practical use outside strictly offline research settings.
+This shift from one-shot offline estimation toward short-cycle use is a central contribution of the paper.
+
+
+\subsection{Why Regime-Aware Surrogates Matter}
+
+A central technical finding of our work is that regime-aware surrogate modeling is better suited to inverse viRheometry than a single global predictor.
+The inverse objective is heterogeneous by construction: different parameter regions may induce different flow modes, different levels of sensitivity, and different degrees of ambiguity.
+A global surrogate must average across all of these effects, which can reduce local accuracy in the very regions that matter for optimization.
+
+The mixture-of-experts formulation addresses this issue by allowing specialized experts to model different parts of the landscape.
+Our results show that this improves both surrogate fidelity and downstream optimization stability.
+In this sense, the technical core of the paper is not simply that we use a surrogate, but that we use a surrogate structure that is aligned with the local, regime-dependent nature of the inverse problem.
+
+
+\subsection{Limitations}
+
+Our current approach has several limitations.
+First, the surrogate is only as reliable as the training data used to construct it.
+If the offline dataset does not adequately cover important regions of the parameter space, the optimizer may still be misled by surrogate bias.
+Second, the method remains dependent on the quality of the underlying forward simulator and observation-matching objective.
+A surrogate cannot correct inaccuracies in the physical model itself.
+
+Third, although the proposed method moves inverse viRheometry toward real-time use, its performance still depends on the complexity of the target material and the desired estimation accuracy.
+For some settings, optional refinement with true simulator evaluations may still be necessary.
+Finally, our experiments focus on a particular rheological family and inverse estimation setup.
+Extending the framework to broader constitutive models, richer observation modalities, and more diverse experimental configurations remains an important direction for future work.
+
+
+\section{Conclusion}
+
+We presented a surrogate-accelerated framework for inverse viRheometry of non-Newtonian fluids.
+By replacing most expensive simulator evaluations with a regime-aware Mixture-of-Experts Gaussian process surrogate, the proposed method substantially reduces the cost of simulation-based parameter estimation while preserving estimation quality.
+
+Beyond acceleration alone, we showed that faster inference enables practical benefits that are difficult to obtain with prior methods, including fresher parameter estimates for time-varying materials, repeated use in short operational cycles, and improved deployability toward real-time viRheometry.
+We believe this perspective---treating surrogate modeling as an enabler of practical inverse material estimation rather than only a regression shortcut---opens promising directions for future work in graphics-oriented digital material characterization.
+
+
+% DO NOT INCLUDE ACKNOWLEDGMENTS IN AN ANONYMOUS SUBMISSION TO SIGGRAPH 2019
+%\begin{acks}
+%
+%The authors would like to thank Dr. Maura Turolla of Telecom
+%Italia for providing specifications about the application scenario.
+%
+%The work is supported by the \grantsponsor{GS501100001809}{National
+%  Natural Science Foundation of
+%  China}{http://dx.doi.org/10.13039/501100001809} under Grant
+%No.:~\grantnum{GS501100001809}{61273304\_a}
+%and~\grantnum[http://www.nnsf.cn/youngscientists]{GS501100001809}{Young
+%  Scientists' Support Program}.
+%
+%
+%\end{acks}
+
+% Bibliography
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{sample-bibliography}
+
+% Appendix
+% \appendix
+
