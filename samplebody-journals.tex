@@ -404,13 +404,22 @@ warm-start and a training-data-anchored prior---that together resolve
 the identifiability degeneracy discussed in \S3.3. The pipeline has
 three phases, summarised in Figure~\ref{fig:overview}. In the
 \emph{offline} phase we generate a library of MPM training runs and
-fit the hierarchical surrogate (\S\ref{sec:surrogate}). In the
-\emph{online forward} phase each query
-$(\boldsymbol{\theta}, W, H)$ is routed through the hierarchical gate
-to a specialised expert and predicted in milliseconds. In the
-\emph{online inverse} phase each observation is routed to its expert
-and the surrogate is driven by an identifiability-aware CMA-ES loop
-(\S\ref{sec:inverse}).
+fit the hierarchical surrogate (\S\ref{sec:surrogate},
+Algorithm~\ref{alg:train}). In the \emph{online forward} phase
+each query $(\boldsymbol{\theta}, W, H)$ is routed through the
+hierarchical gate to a specialised expert and predicted in
+milliseconds (Algorithm~\ref{alg:forward}). In the
+\emph{online inverse} phase each observation is routed to its
+expert and the surrogate is driven by an identifiability-aware
+CMA-ES loop (\S\ref{sec:inverse}, Algorithm~\ref{alg:invert}
+for a single observation; Algorithm~\ref{alg:joint} for the joint
+multi-setup variant that implements the paper's
+\emph{two-stage} protocol of \S\ref{sec:multi}). The two-stage
+variant---used for the real-fluid validation of
+\S\ref{sec:rheometer}---runs a single-setup inverse on one
+observation to obtain an anchor $\boldsymbol{\theta}_{1}$, then
+re-optimises across all available setups with a stronger
+log-$\sigma_{Y}$ prior centred on that anchor.
 
 \begin{figure*}[t]
     \centering
@@ -879,124 +888,333 @@ entering regions where the expert has no support and would
 extrapolate into spurious near-zero-flow minima.
 
 \paragraph{CMA-ES configuration.}
-We run CMA-ES~\cite{hansen2016cma,bajaj2019gaussian} with population
-size $12$, initial step size $\sigma_0 = 0.25$ (log-space), and a
-hard budget of $25$ generations---$300$ surrogate evaluations total.
-Parameter bounds are enforced through CMA's boundary handler. The
-algorithm returns the best-ever candidate
-$\hat{\boldsymbol{\theta}}$ together with the surrogate prediction
-$\hat{\mathbf{y}} = \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};
-W, H)$ and the converged loss. On a single consumer GPU, the
-entire per-video inverse---routing, NN warm-start, $25$ CMA
-generations, and the final forward---takes a median of $12$\,s.
+We use CMA-ES~\cite{hansen2016cma,bajaj2019gaussian} with a small
+log-space population, initial step size $\sigma_{0} = 0.5$, and
+early stopping on CMA's tol-x / tol-f criteria under a bounded
+maximum-generation budget. The benchmark pipeline used for our
+headline synthetic numbers in \S\ref{sec:mainresults}
+(\texttt{vi\_mogp.invert\_rbcm}) runs with popsize $P = 12$ and
+$T_{\mathrm{cma}} = 60$ (i.e.\ up to $720$ surrogate evaluations);
+the user-facing single-setup entry point
+(\texttt{Optimization/optimize\_1setup.py}) defaults to the looser
+$P = 16$, $T_{\mathrm{cma}} = 700$, which rarely matters because
+early stopping fires well before the budget. Parameter bounds are
+enforced through CMA's boundary handler. On a single consumer GPU,
+the full single-setup inverse---routing, NN warm-start, the bounded
+CMA loop, and the final forward---takes a median of $12$\,s per
+video; the joint multi-setup variant of \S\ref{sec:multi} roughly
+doubles this cost (Algorithm~\ref{alg:joint}).
+
+\paragraph{Joint multi-setup inverse.}
+When several observations of the same material are available, we
+solve (\ref{eq:Pstar}) in two stages. Stage~1 runs
+Algorithm~\ref{alg:invert} on a single nominated setup to obtain a
+well-scaled anchor $\boldsymbol{\theta}_{1}$. Stage~2 re-routes each
+setup through the hierarchical gate independently, intersects the
+per-expert boxes to form a joint search region
+$\Theta_{\mathrm{joint}} = \Theta \cap \bigcap_{s}
+\Theta_{k_{s}^{\star}}$, and runs CMA-ES on the
+summed-NMSE objective (\ref{eq:Pstar}) anchored at $\sigma_Y^{(1)}$
+with a heavier prior weight $\lambda_{\mathrm{joint}} = 5\cdot 10^{-2}$.
+The stronger anchor is justified because $\boldsymbol{\theta}_{1}$
+is itself already data-driven; the prior term now plays the role of
+a \emph{stage-coupling regulariser} rather than a physical
+identifiability prior.
 
 
 \subsection{Algorithms}
 \label{sec:algs}
 
-Algorithm~\ref{alg:train} summarises offline training.
-Algorithms~\ref{alg:forward} and~\ref{alg:invert} summarise the online
-forward and inverse passes, respectively.
+Algorithm~\ref{alg:train} summarises offline construction of the
+surrogate. Algorithm~\ref{alg:forward} is the online forward pass.
+Algorithm~\ref{alg:invert} is the single-setup inverse; it solves
+(\ref{eq:Pprime}).
+Algorithm~\ref{alg:joint} is the two-stage joint multi-setup
+inverse; it solves (\ref{eq:Pstar}) and is the configuration used
+for our real-fluid validation in \S\ref{sec:rheometer}.
 
 \begin{algorithm}[t]
-\caption{Offline training of HVIMoGP-rBCM.}
+\caption{Offline construction of the HVIMoGP-rBCM surrogate.}
 \label{alg:train}
-\KwIn{Training set
-      $\{(\boldsymbol{\theta}_i, W_i, H_i, \mathbf{y}_i)\}_{i=1}^{N}$,
-      $N = 295{,}419$; gate granularity
-      $K_{\mathrm{geo}} = 12$ and $\{K_{\phi}^{(g)}\}_{g=1}^{12}$ from
-      BIC scan.}
-\KwOut{Hierarchical surrogate checkpoint.}
-Fit input/output scalers
-  $(\boldsymbol{\mu}_X, \boldsymbol{\sigma}_X, \boldsymbol{\mu}_Y)$
-  \tcp*{Eqs.~\eqref{eq:xscale}--\eqref{eq:yscale}}
-Fit level-1 BGM $p^{\mathrm{geo}}$ on
-  $\{(W_i, H_i)\}$, $K = K_{\mathrm{geo}}$
-  \tcp*{Eq.~\eqref{eq:level1}}
-\ForEach{geo group $g = 1,\dots,K_{\mathrm{geo}}$}{
-  Compute $\boldsymbol{\phi}_i = \boldsymbol{\phi}(\mathbf{y}_i, W_i, H_i)$
-    for $i \in g$\;
-  Fit level-2 BGM $p^{\phi\mid g}$, $K = K_{\phi}^{(g)}$
-    \tcp*{Eq.~\eqref{eq:level2}}
+\KwData{Training corpus
+  $\mathcal{D}_{\mathrm{all}}=\{(\boldsymbol{\theta}_{i}, W_{i}, H_{i},
+  \mathbf{y}_{i})\}_{i=1}^{N}$, $N=295{,}419$.}
+\KwIn{$K_{\mathrm{geo}}=12$; $\{K_{\phi}^{(g)}\}_{g=1}^{12}$ from
+  per-geo BIC scan (Eqs.~\eqref{eq:bgm-geo},\,\eqref{eq:level2});
+  expert training budget $T_{\mathrm{gp}}=100$, learning rate
+  $5\cdot 10^{-2}$; cell size thresholds
+  $N_{\min}=30$, $N_{\max}=2500$; polynomial degree $2$, ridge
+  $\alpha=10^{-3}$; hotfix threshold $\tau_{\mathrm{mae}}=0.15$.}
+\KwOut{Frozen checkpoint: scalers, two-level BGM gate, $540$
+  per-cell GP experts, polynomial residual coefficients.}
+\BlankLine
+
+\tcp{\bf (1) Normalisation.}
+Compute $(\boldsymbol{\mu}_{X}, \boldsymbol{\sigma}_{X})$ on
+  $\{\mathbf{x}_{\log, i}\}$ (Eq.~\eqref{eq:xscale})
+  and $\boldsymbol{\mu}_{Y}$ on $\{\mathbf{y}_{i}\}$
+  (Eq.~\eqref{eq:yscale})\;
+
+\tcp{\bf (2) Level-1 Bayesian Gaussian mixture on geometry.}
+Fit $p^{\mathrm{geo}}$ (DP weight prior, full covariance,
+  $K=K_{\mathrm{geo}}$) on standardised $\{(W_{i},H_{i})\}$
+  \tcp*{Eq.~\eqref{eq:bgm-geo}}
+Assign each training point
+  $g_{i}\leftarrow g^{\star}(W_{i}, H_{i})$
+  via Eq.~\eqref{eq:level1}\;
+
+\tcp{\bf (3) Per-geo level-2 BGM on observation signatures.}
+\ForEach{geo group $g\in\{1,\dots,K_{\mathrm{geo}}\}$}{
+  Compute
+    $\boldsymbol{\phi}_{i}=\boldsymbol{\phi}(\mathbf{y}_{i},W_{i},H_{i})$
+    for $i\in g$ (Eq.~\eqref{eq:phi})\;
+  Fit $p^{\phi\mid g}$ (DP weight prior, full covariance,
+    $K=K_{\phi}^{(g)}$) on standardised
+    $\{\boldsymbol{\phi}_{i}\}_{i\in g}$\;
+  Assign $k_{i}\leftarrow k^{\star}(\boldsymbol{\phi}_{i},g)$
+    via Eq.~\eqref{eq:level2}\;
 }
-\ForEach{cell $(g, k)$}{
-  Collect routed subset $\mathcal{D}_{(g,k)}$ via
-    Eqs.~\eqref{eq:level1}--\eqref{eq:level2}\;
-  \For{$d = 1, \dots, 8$}{
-    Train Mat\'ern-$5/2$ ARD exact GP on $\mathcal{D}_{(g,k)}$
-      (Adam, $100$ iter)
-      \tcp*{Eq.~\eqref{eq:matern}}
+
+\tcp{\bf (4) Train one ExactGP expert per cell.}
+\ForEach{cell $(g,k)$}{
+  $\mathcal{D}_{(g,k)}\leftarrow\{i:g_{i}=g\land k_{i}=k\}$\;
+  \If{$|\mathcal{D}_{(g,k)}|<N_{\min}$}{skip cell (absorbed by
+    neighbour at inference)\;}
+  \If{$|\mathcal{D}_{(g,k)}|>N_{\max}$}{stratified subsample
+    to $N_{\max}$ rows\;}
+  \For{$d=1,\dots,D_{Y}=8$}{
+    Initialise Mat\'ern-$5/2$ ARD kernel hyperparameters
+      $(\sigma_{f}^{\,2},\{\ell_{\delta}\}_{\delta=1}^{5},
+      \sigma_{n,k,d}^{\,2})$ and constant mean
+      (Eq.~\eqref{eq:matern})\;
+    Maximise the exact log-marginal likelihood
+      (Eq.~\eqref{eq:gp-mll}) by Adam for $T_{\mathrm{gp}}$ iterations\;
   }
-  Fit degree-$2$ polynomial residual
-    $\mathbf{c}_{(g,k), \cdot}$ on GP residuals
-    \tcp*{Eq.~\eqref{eq:poly}}
 }
-\Return{model checkpoint
-  (scalers, BGM gates, 540 experts, poly residuals).}
+
+\tcp{\bf (5) Diagnostic + hotfix for high-MAE experts.}
+On a held-out split, compute per-expert forward MAE
+  $\bar{m}_{(g,k)}$\;
+\ForEach{cell $(g,k)$ with $\bar{m}_{(g,k)}\ge\tau_{\mathrm{mae}}$}{
+  Re-train expert $(g,k)$ with an \emph{isotropic-baseline}
+    kernel (single shared lengthscale across $d$) for $300$
+    iterations to reduce the MAE tail\;
+}
+
+\tcp{\bf (6) Polynomial residual correction.}
+\ForEach{cell $(g,k)$}{
+  Assemble degree-$2$ monomial basis
+    $\Phi(\mathbf{X}_{\mathcal{D}_{(g,k)}})\in\mathbb{R}^{|\mathcal{D}_{(g,k)}|\times 21}$\;
+  \For{$d=1,\dots,D_{Y}$}{
+    Compute GP residual
+      $\mathbf{r}_{(g,k),d}=\tilde{\mathbf{y}}_{d}-\mu_{(g,k),d}$\;
+    Solve ridge regression (\ref{eq:poly}) in closed form
+      (Eq.~\eqref{eq:poly-closed}) to obtain
+      $\mathbf{c}_{(g,k),d}$\;
+  }
+}
+
+\Return{$(\boldsymbol{\mu}_{X},\boldsymbol{\sigma}_{X},\boldsymbol{\mu}_{Y},
+  p^{\mathrm{geo}},\{p^{\phi\mid g}\}_{g=1}^{12},
+  \{\mathrm{expert}_{(g,k)}\},\{\mathbf{c}_{(g,k),d}\})$.}
 \end{algorithm}
+
 
 \begin{algorithm}[t]
 \caption{Online forward pass
-  $\tilde{\mathcal{S}}(\boldsymbol{\theta}; W, H)$.}
+  $\hat{\mathbf{y}}=\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)$.}
 \label{alg:forward}
-\KwIn{Parameter $\boldsymbol{\theta} = (n, \eta, \sigma_Y)$,
-      geometry $(W, H)$, observation signature
-      $\boldsymbol{\phi}$ from
-      $\boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}, W, H)$.}
-\KwOut{Predicted flow curve $\hat{\mathbf{y}} \in \mathbb{R}^{8}$.}
-Standardise $\tilde{\mathbf{x}}$ via Eq.~\eqref{eq:xscale}\;
-$g^{\star} \leftarrow \arg\max_g p^{\mathrm{geo}}_{g}(W, H)$
+\KwIn{Parameter $\boldsymbol{\theta}=(n,\eta,\sigma_{Y})$, geometry
+  $(W,H)$; optional observation signature $\boldsymbol{\phi}$
+  (at inverse time derived from $\mathbf{y}_{\mathrm{obs}}$;
+  in data-gen mode the MPM output is used instead).}
+\KwOut{Predicted flow curve
+  $\hat{\mathbf{y}}\in\mathbb{R}_{\ge 0}^{8}$ (monotone
+  non-decreasing).}
+\BlankLine
+
+\tcp{\bf Input standardisation.}
+$\mathbf{x}_{\log}\leftarrow
+  (n,\log(\eta+\varepsilon),\log(\sigma_{Y}+\varepsilon),W,H)^{\!\top}$\;
+$\tilde{\mathbf{x}}\leftarrow
+  (\mathbf{x}_{\log}-\boldsymbol{\mu}_{X})/\boldsymbol{\sigma}_{X}$
+  \tcp*{Eq.~\eqref{eq:xscale}}
+
+\tcp{\bf Hierarchical top-1 routing.}
+$g^{\star}\leftarrow\arg\max_{g}\pi_{g}^{\mathrm{geo}}
+  \mathcal{N}\!\bigl((W,H);\boldsymbol{\mu}_{g}^{\mathrm{geo}},
+                     \boldsymbol{\Sigma}_{g}^{\mathrm{geo}}\bigr)$
   \tcp*{Eq.~\eqref{eq:level1}}
-$k^{\star} \leftarrow
-  \arg\max_k p^{\phi\mid g^{\star}}_{k}(\boldsymbol{\phi})$
+$k^{\star}\leftarrow\arg\max_{k}p_{k}^{\phi\mid g^{\star}}(\boldsymbol{\phi})$
   \tcp*{Eq.~\eqref{eq:level2}}
-Query expert $(g^{\star}, k^{\star})$ for
-  $(\mu_{k^{\star}}, \sigma_{k^{\star}}^{2})$\;
-Aggregate via rBCM to get $(\mu_\star, \sigma_\star^{2})$
-  \tcp*{Eq.~\eqref{eq:rbcm}}
-$\mu_\star \leftarrow \mu_\star +
-  \Phi(\mathbf{x})^{\!\top}\mathbf{c}_{(g^{\star}, k^{\star})}$
+
+\tcp{\bf Expert prediction (eight one-dimensional GPs).}
+\For{$d=1,\dots,8$}{
+  $(\mu_{k^{\star},d},\sigma_{k^{\star},d}^{\,2})\leftarrow
+    \text{GP predictive for expert }(g^{\star},k^{\star})$ at
+    $\tilde{\mathbf{x}}$
+    \tcp*{Eq.~\eqref{eq:gp-predictive}}
+}
+
+\tcp{\bf rBCM aggregation with top-1 routing.}
+$(\mu_{\star,d},\sigma_{\star,d}^{\,2})\leftarrow
+  (\mu_{k^{\star},d},\sigma_{k^{\star},d}^{\,2})$
+  \tcp*{Eq.~\eqref{eq:rbcm} with $|\mathcal{R}|=1$}
+
+\tcp{\bf Polynomial residual correction (if the cell was hotfixed).}
+$\mu_{\star,d}\leftarrow
+  \mu_{\star,d}+\Phi(\mathbf{x})^{\!\top}\mathbf{c}_{(g^{\star},k^{\star}),d}$
   \tcp*{Eq.~\eqref{eq:poly}}
-$\hat{\mathbf{y}} \leftarrow \mu_\star + \boldsymbol{\mu}_Y$
-  \tcp*{de-standardise}
-Enforce $\hat{y}_d \leftarrow \max_{j \le d}\,\hat{y}_j$
+
+\tcp{\bf De-standardise + enforce monotonicity.}
+$\hat{y}_{d}\leftarrow\mu_{\star,d}+\mu_{Y,d}$ for $d=1,\dots,8$\;
+$\hat{y}_{d}\leftarrow\max_{j\le d}\hat{y}_{j}$
   \tcp*{Eq.~\eqref{eq:mono}}
-\Return{$\hat{\mathbf{y}}$}\;
+
+\Return{$\hat{\mathbf{y}}=(\hat{y}_{1},\dots,\hat{y}_{8})$.}
 \end{algorithm}
 
+
 \begin{algorithm}[t]
-\caption{Online inverse
-  $(\mathbf{y}_{\mathrm{obs}}, W, H) \mapsto \hat{\boldsymbol{\theta}}$.}
+\caption{Online single-setup inverse
+  $(\mathbf{y}_{\mathrm{obs}},W,H)\mapsto\hat{\boldsymbol{\theta}}$.
+  Solves~(\ref{eq:Pprime}).}
 \label{alg:invert}
-\KwIn{Observed flow curve $\mathbf{y}_{\mathrm{obs}}$,
-      geometry $(W, H)$, trained surrogate
-      $\tilde{\mathcal{S}}$.}
-\KwOut{Estimated parameters
-  $\hat{\boldsymbol{\theta}} = (\hat{n}, \hat{\eta}, \hat{\sigma}_Y)$.}
-$\boldsymbol{\phi} \leftarrow \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}, W, H)$
+\KwIn{Observation $\mathbf{y}_{\mathrm{obs}}\in\mathbb{R}^{8}$,
+  geometry $(W,H)$, trained surrogate $\tilde{\mathcal{S}}$.
+  CMA-ES: popsize $P=12$, $\sigma_{0}=0.5$,
+  $T_{\mathrm{cma}}=60$ with tol-x / tol-f early stopping.
+  Prior: $\lambda=10^{-5}$, $w=1$.
+  Bound pad: $p_{\eta}=p_{\sigma_{Y}}=p_{n}=0.02$.}
+\KwOut{$\hat{\boldsymbol{\theta}}=(\hat{n},\hat{\eta},
+  \hat{\sigma}_{Y})$ and forward prediction $\hat{\mathbf{y}}$.}
+\BlankLine
+
+\tcp{\bf (1) Compute observation signature, route through gate.}
+$\boldsymbol{\phi}\leftarrow
+  \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}},W,H)$
   \tcp*{Eq.~\eqref{eq:phi}}
-Route
-  $(g^{\star}, k^{\star})$ via
-  Eqs.~\eqref{eq:level1}--\eqref{eq:level2}\;
-Compute tightened bounds
-  $\Theta_{k^{\star}} \subseteq \Theta$
-  (\S\ref{sec:inverse})\;
-$\boldsymbol{\theta}^{\mathrm{NN}},\,\sigma_Y^{\mathrm{NN}}
-  \leftarrow$ NN sample in $\mathcal{D}_{k^{\star}}$
+$(g^{\star},k^{\star})\leftarrow
+  \text{hierarchical route}(W,H,\boldsymbol{\phi})$
+  \tcp*{Eqs.~\eqref{eq:level1},\eqref{eq:level2}}
+
+\tcp{\bf (2) Per-expert bound tightening.}
+Compute
+  $\theta_{d}^{\,k^{\star},\min},\theta_{d}^{\,k^{\star},\max}$
+  for $d\in\{n,\eta,\sigma_{Y}\}$
+  over $\mathcal{D}_{k^{\star}}$\;
+$\Theta_{k^{\star}}\leftarrow\Theta\cap\bigotimes_{d}
+  [\theta_{d}^{\,k^{\star},\min}(1-p_{d}),\,
+   \theta_{d}^{\,k^{\star},\max}(1+p_{d})]$
+  \tcp*{Eq.~\eqref{eq:tight-box}}
+
+\tcp{\bf (3) Observation-space nearest-neighbour warm-start.}
+$i^{\star}\leftarrow\arg\min_{i\in\mathcal{D}_{k^{\star}}}
+  \|\mathbf{y}_{i}-\mathbf{y}_{\mathrm{obs}}\|^{2}/
+  \max(\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}},10^{-12})$
   \tcp*{Eq.~\eqref{eq:nn}}
+$\boldsymbol{\theta}^{\mathrm{NN}}
+  \leftarrow\boldsymbol{\theta}_{i^{\star}}$,\quad
+$\sigma_{Y}^{\mathrm{NN}}\leftarrow
+  [\boldsymbol{\theta}^{\mathrm{NN}}]_{\sigma_{Y}}$\;
+
+\tcp{\bf (4) Loss oracle.}
+Define
+  $\tilde{\mathcal{L}}:\boldsymbol{\theta}\mapsto
+    \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)
+         -\mathbf{y}_{\mathrm{obs}}\|^{2}}
+         {\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}}
+    +\lambda
+    \left(\tfrac{\log\sigma_{Y}-\log\sigma_{Y}^{\mathrm{NN}}}{w}\right)^{\!2}$
+    \tcp*{Eq.~\eqref{eq:Pprime}}
+
+\tcp{\bf (5) Bounded CMA-ES search.}
 Initialise CMA-ES on $\Theta_{k^{\star}}$ with
-  $\mathbf{x}_0 = \boldsymbol{\theta}^{\mathrm{NN}}$,
-  $\sigma_0 = 0.25$, popsize $= 12$\;
-\For{$t = 1, \dots, 25$}{
-  Sample population $\{\boldsymbol{\theta}^{(p)}\}_{p=1}^{12}$\;
-  Evaluate
-    $\tilde{\mathcal{L}}(\boldsymbol{\theta}^{(p)})$
-    via Eq.~\eqref{eq:Pprime} on $\tilde{\mathcal{S}}$\;
-  Update CMA-ES state\;
+  $\mathbf{x}_{0}=\boldsymbol{\theta}^{\mathrm{NN}}$,
+  step size $\sigma_{0}$, popsize $P$\;
+\For{$t=1,\dots,T_{\mathrm{cma}}$}{
+  Sample $\{\boldsymbol{\theta}^{(p)}\}_{p=1}^{P}\subset\Theta_{k^{\star}}$\;
+  Batch-evaluate $\tilde{\mathcal{L}}(\boldsymbol{\theta}^{(p)})$
+    through $\tilde{\mathcal{S}}$\;
+  Update CMA-ES mean, covariance, step size\;
+  \If{tol-x or tol-f satisfied}{break\;}
 }
-$\hat{\mathbf{y}} \leftarrow
-  \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}}; W, H)$\;
-\Return{$\hat{\boldsymbol{\theta}},\,\hat{\mathbf{y}}$.}
+$\hat{\boldsymbol{\theta}}\leftarrow$ best-ever sample\;
+$\hat{\mathbf{y}}\leftarrow\tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W,H)$\;
+
+\Return{$(\hat{\boldsymbol{\theta}},\hat{\mathbf{y}})$.}
+\end{algorithm}
+
+
+\begin{algorithm}[t]
+\caption{Online joint multi-setup inverse
+  $\{(\mathbf{y}_{\mathrm{obs}}^{(s)},W_{s},H_{s})\}_{s=1}^{S}
+  \mapsto\hat{\boldsymbol{\theta}}$.
+  Solves~(\ref{eq:Pstar}).}
+\label{alg:joint}
+\KwIn{$S\ge 2$ observations of the \emph{same} material under
+  different geometries. Optional stage-$1$ result
+  $(\hat{\boldsymbol{\theta}}_{1},\sigma_{Y}^{(1)})$; otherwise
+  obtained by running Algorithm~\ref{alg:invert}.
+  Joint prior:
+  $\lambda_{\mathrm{joint}}=5\cdot 10^{-2}$ (with a stage-$1$
+  anchor) or $10^{-3}$ (fallback), $w=1$. CMA-ES settings as in
+  Algorithm~\ref{alg:invert}.}
+\KwOut{$\hat{\boldsymbol{\theta}}$ shared across all $S$ setups.}
+\BlankLine
+
+\tcp{\bf Stage 1: single-setup inverse on setup~$1$.}
+\If{$\hat{\boldsymbol{\theta}}_{1}$ not supplied}{
+  $(\hat{\boldsymbol{\theta}}_{1},\hat{\mathbf{y}}_{1})\leftarrow
+    \textbf{Algorithm}~\ref{alg:invert}
+    (\mathbf{y}_{\mathrm{obs}}^{(1)},W_{1},H_{1})$\;
+}
+$\sigma_{Y}^{\mathrm{anchor}}\leftarrow
+  [\hat{\boldsymbol{\theta}}_{1}]_{\sigma_{Y}}$\;
+
+\tcp{\bf Per-setup routing and per-setup tightened boxes.}
+\ForEach{$s=1,\dots,S$}{
+  $\boldsymbol{\phi}_{s}\leftarrow
+    \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}^{(s)},W_{s},H_{s})$\;
+  $(g_{s}^{\star},k_{s}^{\star})\leftarrow
+    \text{route}(W_{s},H_{s},\boldsymbol{\phi}_{s})$\;
+  $\Theta_{k_{s}^{\star}}\leftarrow$ per-expert hull
+    (Eq.~\eqref{eq:tight-box})\;
+}
+$\Theta_{\mathrm{joint}}\leftarrow
+  \Theta\cap\bigcap_{s=1}^{S}\Theta_{k_{s}^{\star}}$\;
+\If{$\Theta_{\mathrm{joint}}$ degenerate}{
+  $\Theta_{\mathrm{joint}}\leftarrow\Theta$
+  \tcp*{fallback to global bounds}
+}
+
+\tcp{\bf Joint loss (Eq.~\eqref{eq:Pstar}).}
+Define
+  $\tilde{\mathcal{L}}_{\mathrm{joint}}:\boldsymbol{\theta}\mapsto
+    \sum_{s=1}^{S}
+    \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W_{s},H_{s})
+         -\mathbf{y}_{\mathrm{obs}}^{(s)}\|^{2}}
+         {\overline{(\mathbf{y}_{\mathrm{obs}}^{(s)})^{2}}}
+    +\lambda_{\mathrm{joint}}
+    \left(\tfrac{\log\sigma_{Y}-
+                  \log\sigma_{Y}^{\mathrm{anchor}}}{w}\right)^{\!2}$\;
+
+\tcp{\bf Stage 2: CMA-ES over joint loss, anchored at $\hat{\boldsymbol{\theta}}_{1}$.}
+Initialise CMA-ES on $\Theta_{\mathrm{joint}}$ with
+  $\mathbf{x}_{0}=\hat{\boldsymbol{\theta}}_{1}$, popsize $P$,
+  $\sigma_{0}=0.5$\;
+\For{$t=1,\dots,T_{\mathrm{cma}}$}{
+  Sample $\{\boldsymbol{\theta}^{(p)}\}$; batch-evaluate
+    $\tilde{\mathcal{L}}_{\mathrm{joint}}$ across all $S$ setups\;
+  Update CMA-ES; early stop on tol-x / tol-f\;
+}
+$\hat{\boldsymbol{\theta}}\leftarrow$ best-ever sample\;
+$\hat{\mathbf{y}}_{s}\leftarrow
+  \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W_{s},H_{s})$
+  for $s=1,\dots,S$\;
+
+\Return{$\hat{\boldsymbol{\theta}}$ and
+  $\{\hat{\mathbf{y}}_{s}\}_{s=1}^{S}$.}
 \end{algorithm}
 
 
@@ -1023,30 +1241,54 @@ scheme, and inverse augmentations are in \S\ref{sec:ablation}.
 \centering
 \small
 \caption{Frozen HVIMoGP-rBCM configuration used for all reported
-numbers.}
+numbers. Values match the release checkpoint
+\texttt{Models/rbcm\_v2/model.pt} and the pipeline defaults in
+\texttt{vi\_mogp/config.py}.}
 \label{tab:hyper}
 \begin{tabular}{@{}lll@{}}
 \toprule
 \textit{Training data}
   & $N$                        & $295{,}419$ MPM dam-break samples \\
-  & infill batch               & $2{,}500$ at $\sigma_Y \le 1$\,Pa \\
+  & infill batch               & $2{,}500$ at $\sigma_Y\le 1$\,Pa \\
 \textit{Gate}
-  & $K_{\mathrm{geo}}$         & $12$ (BGM full-cov on $(W,H)$) \\
-  & $K_{\phi}^{(g)}$           & BIC-selected per $g$, total $540$ \\
+  & $K_{\mathrm{geo}}$         & $12$ (BGM, full cov., DP prior) \\
+  & $K_{\phi}^{(g)}$           & BIC-selected per $g$,
+                                 $\sum_{g}K_{\phi}^{(g)}=540$ \\
   & signature $\boldsymbol{\phi}$ & $18$-D (Eq.~\eqref{eq:phi}) \\
 \textit{Experts}
-  & kernel                     & Mat\'ern-$5/2$, ARD on $\mathbb{R}^{5}$ \\
-  & training                   & Adam, lr $5 \cdot 10^{-2}$, $100$ iter \\
+  & kernel                     & Mat\'ern-$5/2$ ARD on $\mathbb{R}^{5}$ \\
+  & training                   & Adam, lr $5\cdot 10^{-2}$,
+                                 $100$ iter \\
+  & cell-size bounds           & $|\mathcal{D}_{(g,k)}|\in[30, 2500]$
+                                 (stratified subsample)\\
+\textit{Hotfix}
+  & MAE threshold $\tau_{\mathrm{mae}}$ & $0.15$ (isotropic-baseline retrain) \\
+  & retrain iters              & $300$ with Adam \\
 \textit{Correction}
-  & basis                      & degree-$2$ polynomial on raw $\mathbf{x}$ \\
-  & ridge $\alpha$             & $10^{-3}$ \\
-\textit{Inverse}
-  & CMA popsize                & $12$ \\
-  & CMA $\sigma_0$             & $0.25$ (log-space) \\
-  & CMA maxiter                & $25$ \\
-  & prior weight $\lambda$     & $10^{-5}$ \\
+  & basis                      & degree-$2$ monomials on raw $\mathbf{x}$,
+                                 $\Phi\in\mathbb{R}^{21}$ \\
+  & ridge $\alpha$             & $10^{-3}$ (intercept unregularised) \\
+\textit{Aggregation}
+  & paper configuration        & rBCM top-$1$ (\texttt{{-}{-}no-baseline}
+                                 \texttt{{-}{-}top-k-phi 1}) \\
+  & code default               & GRBCM + geo baseline expert \\
+\textit{Inverse CMA-ES}
+  & popsize $P$                & $12$ (benchmark,
+                                 \texttt{vi\_mogp.invert\_rbcm}) \\
+  & popsize $P$ (user-facing)  & $16$ (\texttt{optimize\_1setup.py}) \\
+  & $\sigma_{0}$               & $0.5$ (log-space) \\
+  & $T_{\mathrm{cma}}$         & $60$ (benchmark) / $700$ (user) \\
+  & early stopping             & CMA tol-x $/$ tol-f (fires long
+                                 before $T_{\mathrm{cma}}$) \\
+  & bound pad                  & $2\%$ log on $\eta,\sigma_{Y}$;
+                                 $2\%$ linear on $n$ \\
+\textit{Priors}
+  & single-setup $\lambda$     & $10^{-5}$ (data-honest anchor at
+                                 $\sigma_{Y}^{\mathrm{NN}}$) \\
+  & joint-stage $\lambda_{\mathrm{joint}}$
+                               & $5\cdot 10^{-2}$ (stage-coupling;
+                                 anchor at $\sigma_{Y}^{(1)}$) \\
   & prior width $w$            & $1$ (log-std) \\
-  & bound pad                  & $2\%$ log-space on $\eta, \sigma_Y$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1777,21 +2019,21 @@ is what brings the technique within reach of time-sensitive,
 iterative, and situated measurement.
 
 
-% DO NOT INCLUDE ACKNOWLEDGMENTS IN AN ANONYMOUS SUBMISSION TO SIGGRAPH 2019
-%\begin{acks}
-%
-%The authors would like to thank Dr. Maura Turolla of Telecom
-%Italia for providing specifications about the application scenario.
-%
-%The work is supported by the \grantsponsor{GS501100001809}{National
-%  Natural Science Foundation of
-%  China}{http://dx.doi.org/10.13039/501100001809} under Grant
-%No.:~\grantnum{GS501100001809}{61273304\_a}
-%and~\grantnum[http://www.nnsf.cn/youngscientists]{GS501100001809}{Young
-%  Scientists' Support Program}.
-%
-%
-%\end{acks}
+% --- Acknowledgements -------------------------------------------------
+% acmart's [anonymous] class option automatically suppresses the
+% \begin{acks}...\end{acks} block during peer review, so the block is
+% safe to keep enabled throughout submission. Replace the bracketed
+% placeholders with the real acknowledgement text at camera-ready.
+\begin{acks}
+    We thank
+    \textit{[collaborators, material / rheometer access providers,
+    compute-cluster contacts]}
+    for making this work possible. The $295{,}419$-row MPM training
+    corpus was generated on
+    \textit{[institutional compute resource]}.
+    This research was supported by
+    \textit{[funding sources and grant numbers]}.
+\end{acks}
 
 % Bibliography
 \bibliographystyle{ACM-Reference-Format}
