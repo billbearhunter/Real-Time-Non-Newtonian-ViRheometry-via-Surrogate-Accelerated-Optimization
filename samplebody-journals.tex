@@ -383,6 +383,31 @@ to a specialised expert and predicted in milliseconds. In the
 and the surrogate is driven by an identifiability-aware CMA-ES loop
 (\S\ref{sec:inverse}).
 
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figs/method_overview.pdf}
+    \caption{End-to-end pipeline. \textbf{Offline}
+    (\S\ref{sec:surrogate}): $295{,}419$ MPM dam-break samples train a
+    two-level Bayesian Gaussian mixture gate
+    ($K_{\mathrm{geo}} = 12$, $\sum_g K_{\phi}^{(g)} = 540$) and one
+    Mat\'ern-$5/2$ Gaussian-process expert per partition cell, patched
+    with a degree-$2$ polynomial residual. \textbf{Online forward}: a
+    query $(\boldsymbol{\theta}, W, H)$ is routed through the gate,
+    aggregated by robust BCM, corrected, and monotonised in $O(\mathrm{ms})$.
+    \textbf{Online inverse} (\S\ref{sec:inverse}): observed
+    $\mathbf{y}_{\mathrm{obs}}$ selects an expert and a nearest-neighbour
+    warm-start anchor; CMA-ES runs $25$ generations over a tightened
+    per-expert box under a data-honest log-$\sigma_Y$ prior, returning
+    $\hat{\boldsymbol{\theta}}$ in a median of $12$\,s per video.}
+    \Description{A three-panel block diagram showing the offline
+    training, online forward prediction, and online inverse estimation
+    stages of the HVIMoGP-rBCM pipeline, connecting 295,419 MPM
+    training samples through a hierarchical Bayesian Gaussian mixture
+    gate and 540 Gaussian-process experts to seconds-scale parameter
+    recovery.}
+    \label{fig:overview}
+\end{figure*}
+
 
 \subsection{Input and Output Representation}
 \label{sec:repr}
@@ -882,6 +907,10 @@ of two.
     \caption{Surrogate parity plot on $T_{\mathrm{sim}}$. Each point
     is one of $22{,}209$ held-out MPM samples; colour encodes the
     routed expert. $R^2 > 0.999$ across all eight output dimensions.}
+    \Description{Scatter plot of surrogate-predicted flow-front
+    displacement versus MPM ground truth across 22,209 held-out
+    samples, tightly following the $y=x$ identity line over three
+    orders of magnitude, with points colour-coded by routed expert.}
     \label{fig:parity}
 \end{figure}
 
@@ -892,6 +921,10 @@ of two.
     Median $R^2 = 0.9995$; the lower tail corresponds to experts on
     cluster boundaries and sparse regions of the box, which the
     polynomial correction is designed to reinforce.}
+    \Description{Box plot of coefficient-of-determination R-squared
+    values across 540 trained Gaussian-process experts, showing a
+    median near 0.9995 and a lower tail above 0.99, with the weakest
+    experts concentrated on partition boundaries.}
     \label{fig:expert-r2}
 \end{figure}
 
@@ -950,6 +983,11 @@ against ground truth on a representative sample.
     versus ground truth (black) on a representative synthetic
     sample. The shaded band is the rBCM-propagated $1\sigma$
     uncertainty.}
+    \Description{Log-log plot of shear stress versus shear rate for a
+    synthetic Herschel-Bulkley material. The recovered curve closely
+    tracks the ground-truth curve across the shear-rate range
+    probed by the dam-break experiment, within a narrow
+    one-sigma uncertainty band.}
     \label{fig:flowcurve-syn}
 \end{figure}
 
@@ -1052,6 +1090,13 @@ per-parameter log-relative error.
     estimate (orange, delayed by one inference cycle) and our
     surrogate estimate (blue, at measurement time). Bottom:
     per-measurement $|\log\hat\sigma_Y - \log\sigma_Y(t)|$.}
+    \Description{Two stacked time-series plots over 20 consecutive
+    measurements. The top panel shows the surrogate-accelerated
+    estimator tracking the evolving true yield stress within a narrow
+    band while the hour-scale simulation-in-loop baseline lags by a
+    full inference cycle. The bottom panel shows accumulated bias for
+    the lagging baseline versus near-constant low error for the
+    surrogate estimator.}
     \label{fig:freshness}
 \end{figure}
 
@@ -1088,6 +1133,12 @@ silhouette against the original phone video frame by frame.
     parallel-plate rheometer reference is available for this
     material. Inset: sim--real silhouette overlay at the final
     dam-break frame.}
+    \Description{Log-log flow curve of shear stress versus shear rate
+    for chunky okonomi sauce, showing the recovered Herschel-Bulkley
+    curve over the dam-break shear-rate range. An inset image
+    overlays the simulated silhouette (from our recovered parameters)
+    onto the original phone-video frame at the end of the dam-break,
+    showing close agreement.}
     \label{fig:chunky}
 \end{figure}
 
@@ -1163,6 +1214,12 @@ Each material is captured at two to three $(W, H)$ setups per
     the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
     indicates the physically valid shear-rate range of our
     dam-break observation.}
+    \Description{Log-log flow curve for lotion with black rheometer
+    sweep markers overlaid with the blue curve recovered from phone
+    video alone. The two curves agree within the rheometer
+    repeatability in the shear-rate range probed by the dam-break
+    observation; the dashed extension beyond that range indicates
+    extrapolation.}
     \label{fig:rheometer-overlay}
 \end{figure}
 
@@ -1191,6 +1248,10 @@ $\hat{\boldsymbol{\theta}}$.
     simulation-in-the-loop~\cite{hamamichi2023nonnewtonian}-style.
     Baseline~B: single-level MoE surrogate without warm-start or
     prior. Ours: HVIMoGP-rBCM with identifiability-aware inverse.}
+    \Description{Log-scale box plot of per-sample wall-clock times
+    for three pipelines: simulation-in-the-loop Baseline A in the
+    hours range, single-level surrogate Baseline B in the second
+    range, and our hierarchical pipeline at a median of 12 seconds.}
     \label{fig:speedup}
 \end{figure}
 
@@ -1202,6 +1263,11 @@ $\hat{\boldsymbol{\theta}}$.
     $1/1000$ of the wall-clock; Baseline~B stalls at a higher-loss
     plateau, failing to resolve the identifiability ridge without
     the prior.}
+    \Description{Log-scale loss-versus-wall-clock convergence curves
+    for three pipelines on one representative sample. Our pipeline
+    reaches the best loss value of Baseline A at roughly one
+    thousandth of its wall-clock time; Baseline B plateaus at a
+    higher loss and does not recover the sigma-y component.}
     \label{fig:convergence}
 \end{figure}
 
