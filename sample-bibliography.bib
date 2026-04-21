@@ -214,152 +214,120 @@
  @String{VanNostrand = "Van Nostrand" }
  @String{WHFreeman = "W. H. Freeman and Co." }
 
-%Entries
+%%% ====================================================================
+%%% Entries — organized by section (see related_work.md for full narrative)
+%%%   §A.  Core methodology  : rBCM / MoGP / VGP backbone
+%%%   §B.  Inverse problem   : surrogate + CMA-ES / BO
+%%%   §C.  Application       : MPM forward + HB fluids (incl. direct predecessor)
+%%%   §D.  Alt. paradigm     : differentiable MPM
+%%%   §E.  Visual rheometry  : video-based parameter inference
+%%%   §F.  Graphics/foundation: fluid textbook, HB original, Taichi
+%%%   §G.  Inverse-physics from video (legacy entries used in §2)
+%%% ====================================================================
 
-@article{herschel1926konsistenzmessungen,
-  title   = {Konsistenzmessungen von {G}ummi-{B}enzoll{\"o}sungen},
-  author  = {Herschel, Winslow H. and Bulkley, Ronald},
-  journal = {Kolloid-Zeitschrift},
-  volume  = {39},
-  number  = {4},
-  pages   = {291--300},
-  year    = {1926},
-  doi     = {10.1007/BF01432034}
+
+%% ----------------------------------------------------------------------
+%% §A.1   Aggregation of independent GP experts (rBCM)
+%% ----------------------------------------------------------------------
+
+@article{tresp2000bayesian,
+  title   = {A {B}ayesian Committee Machine},
+  author  = {Tresp, Volker},
+  journal = {Neural Computation},
+  volume  = {12},
+  number  = {11},
+  pages   = {2719--2741},
+  year    = {2000},
+  doi     = {10.1162/089976600300014908}
 }
 
-@book{bridson2015fluid,
-  title     = {Fluid Simulation for Computer Graphics},
-  author    = {Bridson, Robert},
-  publisher = {A K Peters/CRC Press},
+@article{cao2014generalized,
+  title   = {Generalized Product of Experts for Automatic and Principled Fusion of {G}aussian Process Predictions},
+  author  = {Cao, Yanshuai and Fleet, David J.},
+  journal = {arXiv preprint arXiv:1410.7827},
+  year    = {2014}
+}
+
+@inproceedings{deisenroth2015distributed,
+  title     = {Distributed {G}aussian Processes},
+  author    = {Deisenroth, Marc Peter and Ng, Jun Wei},
+  booktitle = {Proceedings of the 32nd International Conference on Machine Learning (ICML)},
+  pages     = {1481--1490},
   year      = {2015},
-  edition   = {2nd}
+  note      = {arXiv:1502.02843}
 }
 
-@inproceedings{jiang2015affine,
-  title     = {The Affine Particle-in-Cell Method},
-  author    = {Jiang, Chenfanfu and Schroeder, Craig and Selle, Andrew and Teran, Joseph and Stomakhin, Alexey},
-  booktitle = {ACM SIGGRAPH 2015 Papers},
-  pages     = {Article 51},
-  year      = {2015},
-  doi       = {10.1145/2766996}
+@inproceedings{liu2018generalized,
+  title     = {Generalized Robust {B}ayesian Committee Machine for Large-Scale {G}aussian Process Regression},
+  author    = {Liu, Haitao and Cai, Jianfei and Wang, Yi and Ong, Yew-Soon},
+  booktitle = {Proceedings of the 35th International Conference on Machine Learning (ICML)},
+  pages     = {3131--3140},
+  year      = {2018},
+  note      = {arXiv:1806.00720}
 }
 
-@article{stomakhin2013material,
-  title   = {A Material Point Method for Snow Simulation},
-  author  = {Stomakhin, Alexey and Schroeder, Craig and Chai, Lawrence and Teran, Joseph and Selle, Andrew},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {32},
-  number  = {4},
-  pages   = {102:1--102:10},
-  year    = {2013},
-  doi     = {10.1145/2461912.2461948}
+@article{cohen2024sparse,
+  title   = {A Sparse {B}ayesian Committee Machine Potential for Hydrocarbons},
+  author  = {Cohen, Thomas D. and others},
+  journal = {arXiv preprint arXiv:2402.14497},
+  year    = {2024}
 }
 
-@article{hu2018moving,
-  title   = {Moving Least Squares Material Point Method},
-  author  = {Hu, Yuanming and Fang, Yu and Ge, Ziyin and Qu, Ziyin and Zhu, Yixin and Pradhana, Andre and Jiang, Chenfanfu},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {37},
-  number  = {4},
-  pages   = {150:1--150:14},
-  year    = {2018},
-  doi     = {10.1145/3197517.3201293}
-}
+%% ----------------------------------------------------------------------
+%% §A.2   Mixture-of-GP gating architectures
+%% ----------------------------------------------------------------------
 
-@article{hu2019taichi,
-  title   = {{Taichi}: A Language for High-Performance Computation on Spatially Sparse Data Structures},
-  author  = {Hu, Yuanming and Li, Tzu-Mao and Anderson, Luke and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {38},
-  number  = {6},
-  pages   = {201:1--201:16},
-  year    = {2019},
-  doi     = {10.1145/3355089.3356506}
-}
-
-@inproceedings{bhat2002computing,
-  title     = {Computing the Physical Parameters of Rigid-Body Motion from Video},
-  author    = {Bhat, Kiran S. and Seitz, Steven M. and Popovi{\'c}, Jovan and Khosla, Pradeep K.},
-  booktitle = {Proceedings of the European Conference on Computer Vision (ECCV)},
-  pages     = {551--565},
-  year      = {2002},
-  doi       = {10.1007/3-540-47966-0_37}
-}
-
-@article{monszpart2016smash,
-  title   = {{SMASH}: Physics-Guided Reconstruction of Collisions from Videos},
-  author  = {Monszpart, {\'E}loi and Thuerey, Nils and Mitra, Niloy J.},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {35},
-  number  = {6},
-  pages   = {1--14},
-  year    = {2016},
-  doi     = {10.1145/2980179.2982421}
-}
-
-@article{hamamichi2023nonnewtonian,
-  title   = {Non-{N}ewtonian {ViRheometry} via Similarity Analysis},
-  author  = {Hamamichi, Mitsuki and Nagasawa, Kentaro and Okada, Masato and Seto, Ryohei and Yue, Yonghao},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {42},
-  number  = {6},
-  pages   = {193:1--193:16},
-  year    = {2023},
-  doi     = {10.1145/3618310}
-}
-
-@article{jones1998efficient,
-  title   = {Efficient Global Optimization of Expensive Black-Box Functions},
-  author  = {Jones, Donald R. and Schonlau, Matthias and Welch, William J.},
-  journal = {Journal of Global Optimization},
-  volume  = {13},
-  number  = {4},
-  pages   = {455--492},
-  year    = {1998},
-  doi     = {10.1023/A:1008306431147}
-}
-
-@inproceedings{snoek2012practical,
-  title     = {Practical Bayesian Optimization of Machine Learning Algorithms},
-  author    = {Snoek, Jasper and Larochelle, Hugo and Adams, Ryan P.},
+@inproceedings{tresp2001mixtures,
+  title     = {Mixtures of {G}aussian Processes},
+  author    = {Tresp, Volker},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  volume    = {25},
-  year      = {2012}
+  volume    = {13},
+  pages     = {654--660},
+  year      = {2001}
 }
 
-@article{shahriari2016taking,
-  title   = {Taking the Human Out of the Loop: A Review of {B}ayesian Optimization},
-  author  = {Shahriari, Bobak and Swersky, Kevin and Wang, Ziyu and Adams, Ryan P. and de Freitas, Nando},
-  journal = {Proceedings of the IEEE},
-  volume  = {104},
-  number  = {1},
-  pages   = {148--175},
-  year    = {2016},
-  doi     = {10.1109/JPROC.2015.2494218}
+@inproceedings{rasmussen2002infinite,
+  title     = {Infinite Mixtures of {G}aussian Process Experts},
+  author    = {Rasmussen, Carl Edward and Ghahramani, Zoubin},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {14},
+  pages     = {881--888},
+  year      = {2002}
 }
 
-@book{rasmussen2006gaussian,
-  title     = {Gaussian Processes for Machine Learning},
-  author    = {Rasmussen, Carl Edward and Williams, Christopher K. I.},
-  publisher = {MIT Press},
-  year      = {2006},
-  isbn      = {026218253X}
+@inproceedings{meeds2006alternative,
+  title     = {An Alternative Infinite Mixture of {G}aussian Process Experts},
+  author    = {Meeds, Edward and Osindero, Simon},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {18},
+  pages     = {883--890},
+  year      = {2006}
 }
 
-@inproceedings{titsias2009variational,
-  title     = {Variational Learning of Inducing Variables in Sparse {G}aussian Processes},
-  author    = {Titsias, Michalis K.},
-  booktitle = {Proceedings of the 12th International Conference on Artificial Intelligence and Statistics (AISTATS)},
-  pages     = {567--574},
-  year      = {2009}
+@inproceedings{yuan2008variational,
+  title     = {Variational Mixture of {G}aussian Process Experts},
+  author    = {Yuan, Chao and Neubauer, Claus},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {21},
+  pages     = {1897--1904},
+  year      = {2008}
 }
 
-@inproceedings{hensman2013gaussian,
-  title     = {Gaussian Processes for Big Data},
-  author    = {Hensman, James and Fusi, Nicolo and Lawrence, Neil D.},
-  booktitle = {Proceedings of the 29th Conference on Uncertainty in Artificial Intelligence (UAI)},
-  pages     = {282--290},
-  year      = {2013}
+@inproceedings{nguyen2008local,
+  title     = {Local {G}aussian Process Regression for Real-Time Online Model Learning},
+  author    = {Nguyen-Tuong, Duy and Seeger, Matthias and Peters, Jan},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {21},
+  pages     = {1193--1200},
+  year      = {2008}
+}
+
+@inproceedings{trapp2020deep,
+  title     = {Deep Structured Mixtures of {G}aussian Process Experts},
+  author    = {Trapp, Martin and Peharz, Robert and Pernkopf, Franz and Rasmussen, Carl Edward},
+  booktitle = {Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics (AISTATS)},
+  pages     = {2251--2261},
+  year      = {2020}
 }
 
 @article{jordan1994hierarchical,
@@ -373,11 +341,45 @@
   doi     = {10.1162/neco.1994.6.2.181}
 }
 
-@article{hansen2016cma,
-  title   = {The {CMA} Evolution Strategy: A Tutorial},
-  author  = {Hansen, Nikolaus},
-  journal = {arXiv preprint arXiv:1604.00772},
-  year    = {2016}
+@article{yuksel2012twenty,
+  title   = {Twenty Years of Mixture of Experts},
+  author  = {Yuksel, Seniha Esen and Wilson, Joseph N. and Gader, Paul D.},
+  journal = {IEEE Transactions on Neural Networks and Learning Systems},
+  volume  = {23},
+  number  = {8},
+  pages   = {1177--1193},
+  year    = {2012},
+  doi     = {10.1109/TNNLS.2012.2200299}
+}
+
+%% ----------------------------------------------------------------------
+%% §A.3   Scalable / variational GP backbone (SVGP)
+%% ----------------------------------------------------------------------
+
+@inproceedings{titsias2009variational,
+  title     = {Variational Learning of Inducing Variables in Sparse {G}aussian Processes},
+  author    = {Titsias, Michalis K.},
+  booktitle = {Proceedings of the 12th International Conference on Artificial Intelligence and Statistics (AISTATS)},
+  pages     = {567--574},
+  year      = {2009}
+}
+
+@inproceedings{hensman2013gaussian,
+  title     = {{G}aussian Processes for Big Data},
+  author    = {Hensman, James and Fusi, Nicolo and Lawrence, Neil D.},
+  booktitle = {Proceedings of the 29th Conference on Uncertainty in Artificial Intelligence (UAI)},
+  pages     = {282--290},
+  year      = {2013},
+  note      = {arXiv:1309.6835}
+}
+
+@inproceedings{matthews2016sparse,
+  title     = {On Sparse Variational Methods and the {KL} Divergence between Stochastic Processes},
+  author    = {Matthews, Alexander G. de G. and Hensman, James and Turner, Richard E. and Ghahramani, Zoubin},
+  booktitle = {Proceedings of the 19th International Conference on Artificial Intelligence and Statistics (AISTATS)},
+  pages     = {231--239},
+  year      = {2016},
+  note      = {arXiv:1504.07027}
 }
 
 @inproceedings{snelson2006sparse,
@@ -398,38 +400,338 @@
   year    = {2005}
 }
 
-@article{yuksel2012twenty,
-  title   = {Twenty Years of Mixture of Experts},
-  author  = {Yuksel, Seniha Esen and Wilson, Joseph N. and Gader, Paul D.},
-  journal = {IEEE Transactions on Neural Networks and Learning Systems},
-  volume  = {23},
-  number  = {8},
-  pages   = {1177--1193},
-  year    = {2012},
-  doi     = {10.1109/TNNLS.2012.2200299}
+@book{rasmussen2006gaussian,
+  title     = {{G}aussian Processes for Machine Learning},
+  author    = {Rasmussen, Carl Edward and Williams, Christopher K. I.},
+  publisher = {MIT Press},
+  year      = {2006},
+  isbn      = {026218253X}
 }
 
-@inproceedings{tresp2001mixtures,
-  title     = {Mixtures of {G}aussian Processes},
-  author    = {Tresp, Volker},
+
+%% ----------------------------------------------------------------------
+%% §B.    Inverse problem — surrogate + CMA-ES / BO
+%% ----------------------------------------------------------------------
+
+@article{kennedy2001bayesian,
+  title   = {Bayesian Calibration of Computer Models},
+  author  = {Kennedy, Marc C. and O'Hagan, Anthony},
+  journal = {Journal of the Royal Statistical Society: Series B},
+  volume  = {63},
+  number  = {3},
+  pages   = {425--464},
+  year    = {2001},
+  doi     = {10.1111/1467-9868.00294}
+}
+
+@article{cranmer2020frontier,
+  title   = {The Frontier of Simulation-Based Inference},
+  author  = {Cranmer, Kyle and Brehmer, Johann and Louppe, Gilles},
+  journal = {Proceedings of the National Academy of Sciences},
+  volume  = {117},
+  number  = {48},
+  pages   = {30055--30062},
+  year    = {2020},
+  doi     = {10.1073/pnas.1912789117},
+  note    = {arXiv:1911.01429}
+}
+
+@article{bajaj2019gaussian,
+  title   = {{G}aussian Process Surrogate Models for the {CMA} Evolution Strategy},
+  author  = {Bajaj, Ishan and Arora, Akhil and Hasan, M. M. Faruque},
+  journal = {Evolutionary Computation},
+  volume  = {27},
+  number  = {4},
+  pages   = {665--697},
+  year    = {2019},
+  doi     = {10.1162/evco_a_00243}
+}
+
+@article{hansen2016cma,
+  title   = {The {CMA} Evolution Strategy: A Tutorial},
+  author  = {Hansen, Nikolaus},
+  journal = {arXiv preprint arXiv:1604.00772},
+  year    = {2016}
+}
+
+@article{vandamme2021bayesian,
+  title   = {A {B}ayesian Optimisation Methodology for the Inverse Derivation of Viscoplasticity Model Constants in High Strain-Rate Simulations},
+  author  = {Van Damme, K. and others},
+  journal = {Defence Technology},
+  year    = {2021},
+  doi     = {10.1016/j.dt.2021.06.007}
+}
+
+@article{hashemi2025bayesian,
+  title   = {{B}ayesian Optimization to Infer Parameters in Viscoelasticity},
+  author  = {Hashemi, Mohammad Sadegh and others},
+  journal = {arXiv preprint arXiv:2502.19132},
+  year    = {2025}
+}
+
+@article{jones1998efficient,
+  title   = {Efficient Global Optimization of Expensive Black-Box Functions},
+  author  = {Jones, Donald R. and Schonlau, Matthias and Welch, William J.},
+  journal = {Journal of Global Optimization},
+  volume  = {13},
+  number  = {4},
+  pages   = {455--492},
+  year    = {1998},
+  doi     = {10.1023/A:1008306431147}
+}
+
+@inproceedings{snoek2012practical,
+  title     = {Practical {B}ayesian Optimization of Machine Learning Algorithms},
+  author    = {Snoek, Jasper and Larochelle, Hugo and Adams, Ryan P.},
   booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  volume    = {13},
-  pages     = {654--660},
-  year      = {2001}
+  volume    = {25},
+  year      = {2012}
+}
+
+@article{shahriari2016taking,
+  title   = {Taking the Human Out of the Loop: A Review of {B}ayesian Optimization},
+  author  = {Shahriari, Bobak and Swersky, Kevin and Wang, Ziyu and Adams, Ryan P. and de Freitas, Nando},
+  journal = {Proceedings of the IEEE},
+  volume  = {104},
+  number  = {1},
+  pages   = {148--175},
+  year    = {2016},
+  doi     = {10.1109/JPROC.2015.2494218}
+}
+
+
+%% ----------------------------------------------------------------------
+%% §C.0   Direct predecessor — ViRheometry (the work this paper extends)
+%% ----------------------------------------------------------------------
+
+@article{hamamichi2023nonnewtonian,
+  title   = {Non-{N}ewtonian {ViRheometry} via Similarity Analysis},
+  author  = {Hamamichi, Mitsuki and Nagasawa, Kentaro and Okada, Masato and Seto, Ryohei and Yue, Yonghao},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {42},
+  number  = {6},
+  pages   = {193:1--193:16},
+  year    = {2023},
+  doi     = {10.1145/3618310}
+}
+
+%% ----------------------------------------------------------------------
+%% §C.1   Foundational graphics-MPM
+%% ----------------------------------------------------------------------
+
+@article{stomakhin2013material,
+  title   = {A Material Point Method for Snow Simulation},
+  author  = {Stomakhin, Alexey and Schroeder, Craig and Chai, Lawrence and Teran, Joseph and Selle, Andrew},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {32},
+  number  = {4},
+  pages   = {102:1--102:10},
+  year    = {2013},
+  doi     = {10.1145/2461912.2461948}
+}
+
+@inproceedings{jiang2016material,
+  title     = {The Material Point Method for Simulating Continuum Materials},
+  author    = {Jiang, Chenfanfu and Schroeder, Craig and Teran, Joseph and Stomakhin, Alexey and Selle, Andrew},
+  booktitle = {ACM SIGGRAPH 2016 Courses},
+  pages     = {Article 24},
+  year      = {2016},
+  doi       = {10.1145/2897826.2927348}
+}
+
+@article{hu2018moving,
+  title   = {A Moving Least Squares Material Point Method with Displacement Discontinuity and Two-Way Rigid Body Coupling},
+  author  = {Hu, Yuanming and Fang, Yu and Ge, Ziyin and Qu, Ziyin and Zhu, Yixin and Pradhana, Andre and Jiang, Chenfanfu},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {37},
+  number  = {4},
+  pages   = {150:1--150:14},
+  year    = {2018},
+  doi     = {10.1145/3197517.3201293}
+}
+
+@article{gao2018gpu,
+  title   = {{GPU} Optimization of Material Point Methods},
+  author  = {Gao, Ming and Wang, Xinlei and Wu, Kui and Pradhana, Andre and Sifakis, Eftychios and Yuksel, Cem and Jiang, Chenfanfu},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {37},
+  number  = {6},
+  pages   = {254:1--254:12},
+  year    = {2018},
+  doi     = {10.1145/3272127.3275044}
+}
+
+@inproceedings{jiang2015affine,
+  title     = {The Affine Particle-in-Cell Method},
+  author    = {Jiang, Chenfanfu and Schroeder, Craig and Selle, Andrew and Teran, Joseph and Stomakhin, Alexey},
+  booktitle = {ACM SIGGRAPH 2015 Papers},
+  pages     = {Article 51},
+  year      = {2015},
+  doi       = {10.1145/2766996}
+}
+
+@article{wolper2019cdmpm,
+  title   = {{CD-MPM}: Continuum Damage Material Point Methods for Dynamic Fracture Animation},
+  author  = {Wolper, Joshuah and Fang, Yu and Li, Minchen and Lu, Jiecong and Gao, Ming and Jiang, Chenfanfu},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {38},
+  number  = {4},
+  pages   = {119:1--119:15},
+  year    = {2019},
+  doi     = {10.1145/3306346.3322949}
+}
+
+%% ----------------------------------------------------------------------
+%% §C.2   MPM with Herschel-Bulkley / yield-stress / related plasticity
+%% ----------------------------------------------------------------------
+
+@article{yue2015continuum,
+  title   = {Continuum Foam: A Material Point Method for Shear-Dependent Flows},
+  author  = {Yue, Yonghao and Smith, Breannan and Batty, Christopher and Zheng, Changxi and Grinspun, Eitan},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {34},
+  number  = {5},
+  pages   = {160:1--160:20},
+  year    = {2015},
+  doi     = {10.1145/2751541}
+}
+
+@inproceedings{ram2015material,
+  title     = {A Material Point Method for Viscoelastic Fluids, Foams and Sponges},
+  author    = {Ram, Daniel and Gast, Theodore and Jiang, Chenfanfu and Schroeder, Craig and Stomakhin, Alexey and Teran, Joseph and Kavehpour, Pirouz},
+  booktitle = {Proc. ACM SIGGRAPH/Eurographics Symposium on Computer Animation (SCA)},
+  pages     = {157--163},
+  year      = {2015},
+  doi       = {10.1145/2786784.2786798}
+}
+
+@article{klar2016drucker,
+  title   = {Drucker-Prager Elastoplasticity for Sand Animation},
+  author  = {Kl{\'a}r, Gergely and Gast, Theodore and Pradhana, Andre and Fu, Chuyuan and Schroeder, Craig and Jiang, Chenfanfu and Teran, Joseph},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {35},
+  number  = {4},
+  pages   = {103:1--103:12},
+  year    = {2016},
+  doi     = {10.1145/2897824.2925906}
+}
+
+@article{tampubolon2017multi,
+  title   = {Multi-Species Simulation of Porous Sand and Water Mixtures},
+  author  = {Tampubolon, Andre Pradhana and Gast, Theodore and Kl{\'a}r, Gergely and Fu, Chuyuan and Teran, Joseph and Jiang, Chenfanfu and Museth, Ken},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {36},
+  number  = {4},
+  pages   = {105:1--105:11},
+  year    = {2017},
+  doi     = {10.1145/3072959.3073651}
+}
+
+@article{nagasawa2019mixing,
+  title   = {Mixing Sauces: A Viscosity Blending Model for Shear Thinning Fluids},
+  author  = {Nagasawa, Kentaro and Suzuki, Takayuki and Seto, Ryohei and Okada, Masato and Yue, Yonghao},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {38},
+  number  = {4},
+  pages   = {95:1--95:17},
+  year    = {2019},
+  doi     = {10.1145/3306346.3322947}
+}
+
+%% ----------------------------------------------------------------------
+%% §C.3   Analytical / experimental HB dam-break and free-surface inverse
+%% ----------------------------------------------------------------------
+
+@article{balmforth2007two,
+  title   = {Two-Dimensional Dam-Break Flows of {H}erschel--{B}ulkley Fluids},
+  author  = {Balmforth, Neil J. and Craster, Richard V. and Rust, Alison C. and Sassi, Ruggero},
+  journal = {Journal of Non-Newtonian Fluid Mechanics},
+  volume  = {142},
+  number  = {1--3},
+  pages   = {63--78},
+  year    = {2007},
+  doi     = {10.1016/j.jnnfm.2006.08.008}
+}
+
+@article{cochard2009tracking,
+  title   = {Tracking the Free Surface of Time-Dependent Flows: Image Processing for the Dam-Break Problem},
+  author  = {Cochard, Sebastien and Ancey, Christophe},
+  journal = {Experiments in Fluids},
+  volume  = {44},
+  number  = {1},
+  pages   = {59--71},
+  year    = {2008},
+  doi     = {10.1007/s00348-007-0374-3}
+}
+
+@article{martin2010inverse,
+  title   = {Inverse Rheometry and Basal Properties Inference for Pseudoplastic Geophysical Flows},
+  author  = {Martin, Nicolas and Monnier, J{\'e}r{\^o}me},
+  journal = {Journal of Non-Newtonian Fluid Mechanics},
+  year    = {2014},
+  note    = {TODO: verify volume/issue/pages/DOI}
+}
+
+
+%% ----------------------------------------------------------------------
+%% §D.    Alternative paradigm — differentiable MPM / diff-physics
+%% ----------------------------------------------------------------------
+
+@inproceedings{hu2019chainqueen,
+  title     = {{ChainQueen}: A Real-Time Differentiable Physical Simulator for Soft Robotics},
+  author    = {Hu, Yuanming and Liu, Jiancheng and Spielberg, Andrew and Tenenbaum, Joshua B. and Freeman, William T. and Wu, Jiajun and Rus, Daniela and Matusik, Wojciech},
+  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
+  pages     = {6265--6271},
+  year      = {2019},
+  note      = {arXiv:1810.01054}
 }
 
 @inproceedings{hu2020difftaichi,
   title     = {{DiffTaichi}: Differentiable Programming for Physical Simulation},
   author    = {Hu, Yuanming and Anderson, Luke and Li, Tzu-Mao and Sun, Qi and Carr, Nathan and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
   booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
-  year      = {2020}
+  year      = {2020},
+  note      = {arXiv:1910.00935}
+}
+
+@inproceedings{huang2021plasticinelab,
+  title     = {{PlasticineLab}: A Soft-Body Manipulation Benchmark with Differentiable Physics},
+  author    = {Huang, Zhiao and Hu, Yuanming and Du, Tao and Zhou, Siyuan and Su, Hao and Tenenbaum, Joshua B. and Gan, Chuang},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  note      = {arXiv:2104.03311}
 }
 
 @inproceedings{murthy2021gradsim,
-  title     = {{gradSim}: Differentiable simulation for system identification and visuomotor control},
+  title     = {{gradSim}: Differentiable Simulation for System Identification and Visuomotor Control},
   author    = {Murthy, J. Krishna and Macklin, Miles and Golemo, Florian and Voleti, Vikram and Petrini, Linda and Weiss, Martin and Considine, Breandan and Parent-L{\'e}vesque, J{\'e}r{\^o}me and Xie, Kevin and Erleben, Kenny and others},
   booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
-  year      = {2021}
+  year      = {2021},
+  note      = {arXiv:2104.02646}
+}
+
+@inproceedings{li2023pacnerf,
+  title     = {{PAC-NeRF}: Physics Augmented Continuum Neural Radiance Fields for Geometry-Agnostic System Identification},
+  author    = {Li, Xuan and Qiao, Yi-Ling and Chen, Peter Yichen and Jatavallabhula, Krishna Murthy and Lin, Ming and Jiang, Chenfanfu and Gan, Chuang},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  note      = {arXiv:2303.05512}
+}
+
+@mastersthesis{eastman2024recovery,
+  title        = {Recovery of {H}erschel--{B}ulkley Fluid Parameters from Video via Differentiable Simulations},
+  author       = {Eastman, Robert},
+  school       = {Massachusetts Institute of Technology},
+  year         = {2024},
+  note         = {MIT DSpace 1721.1/157204; also APS DFD 2024}
+}
+
+@article{cheng2025structural,
+  title   = {Structural Identification of Material Properties and Load Parameters Using a Differentiable Material Point Method},
+  author  = {Cheng, Wei and others},
+  journal = {Computer-Aided Civil and Infrastructure Engineering},
+  year    = {2025},
+  doi     = {10.1111/mice.70042}
 }
 
 @inproceedings{liang2019differentiable,
@@ -439,4 +741,314 @@
   volume    = {32},
   pages     = {771--780},
   year      = {2019}
+}
+
+
+%% ----------------------------------------------------------------------
+%% §E.    Visual / video-based rheometry (task, not method)
+%% ----------------------------------------------------------------------
+
+@article{thakur2025learning,
+  title   = {Learning Rheological Parameters of Non-{N}ewtonian Fluids from Velocimetry Data},
+  author  = {Thakur, Pranav and Patel, Prashant and others},
+  journal = {Journal of Fluid Mechanics},
+  year    = {2025},
+  note    = {arXiv:2408.02604}
+}
+
+@article{rauzan2024protorheology,
+  title   = {Protorheology},
+  author  = {Rauzan, Benjamin M. and others},
+  journal = {Journal of Rheology},
+  volume  = {68},
+  number  = {1},
+  year    = {2024}
+}
+
+@article{takahashi2019video,
+  title   = {Video-Guided Real-to-Virtual Parameter Transfer for Viscous Fluids},
+  author  = {Takahashi, Tetsuya and Lin, Ming C.},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {38},
+  number  = {6},
+  pages   = {237:1--237:12},
+  year    = {2019},
+  doi     = {10.1145/3355089.3356551}
+}
+
+@article{rasheed2020visual,
+  title   = {A Visual Approach to Measure Cloth-Body and Cloth-Cloth Friction},
+  author  = {Rasheed, Abdullah-Haroon and Romero, Victor and Bertails-Descoubes, Florence and Wuhrer, Stefanie and Franco, Jean-S{\'e}bastien and Lazarus, Arnaud},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {44},
+  number  = {10},
+  pages   = {6683--6694},
+  year    = {2022},
+  doi     = {10.1109/TPAMI.2021.3097547}
+}
+
+
+%% ----------------------------------------------------------------------
+%% §F.    Foundation / textbook / HB original / Taichi runtime
+%% ----------------------------------------------------------------------
+
+@article{herschel1926konsistenzmessungen,
+  title   = {Konsistenzmessungen von {G}ummi-{B}enzoll{\"o}sungen},
+  author  = {Herschel, Winslow H. and Bulkley, Ronald},
+  journal = {Kolloid-Zeitschrift},
+  volume  = {39},
+  number  = {4},
+  pages   = {291--300},
+  year    = {1926},
+  doi     = {10.1007/BF01432034}
+}
+
+@book{bridson2015fluid,
+  title     = {Fluid Simulation for Computer Graphics},
+  author    = {Bridson, Robert},
+  publisher = {A K Peters/CRC Press},
+  year      = {2015},
+  edition   = {2nd}
+}
+
+@article{hu2019taichi,
+  title   = {{Taichi}: A Language for High-Performance Computation on Spatially Sparse Data Structures},
+  author  = {Hu, Yuanming and Li, Tzu-Mao and Anderson, Luke and Ragan-Kelley, Jonathan and Durand, Fr{\'e}do},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {38},
+  number  = {6},
+  pages   = {201:1--201:16},
+  year    = {2019},
+  doi     = {10.1145/3355089.3356506}
+}
+
+%% ----------------------------------------------------------------------
+%% §H.    Camera calibration pipeline (Stage 1: ChArUco ; Stage 2: edge refinement)
+%%        Cross-reference: Calibration/MATH.md in the code repo
+%% ----------------------------------------------------------------------
+
+%% -- §H.1 Fiducial marker detection (ChArUco) --
+
+@article{garrido2014automatic,
+  title   = {Automatic Generation and Detection of Highly Reliable Fiducial Markers under Occlusion},
+  author  = {Garrido-Jurado, Sergio and Mu{\~n}oz-Salinas, Rafael and Madrid-Cuevas, Francisco J. and Mar{\'\i}n-Jim{\'e}nez, Manuel J.},
+  journal = {Pattern Recognition},
+  volume  = {47},
+  number  = {6},
+  pages   = {2280--2292},
+  year    = {2014},
+  doi     = {10.1016/j.patcog.2014.01.005}
+}
+
+@article{garrido2016generation,
+  title   = {Generation of Fiducial Marker Dictionaries Using Mixed Integer Linear Programming},
+  author  = {Garrido-Jurado, Sergio and Mu{\~n}oz-Salinas, Rafael and Madrid-Cuevas, Francisco J. and Medina-Carnicer, Rafael},
+  journal = {Pattern Recognition},
+  volume  = {51},
+  pages   = {481--491},
+  year    = {2016},
+  doi     = {10.1016/j.patcog.2015.09.023}
+}
+
+@inproceedings{fiala2005artag,
+  title     = {{ARTag}, a Fiducial Marker System Using Digital Techniques},
+  author    = {Fiala, Mark},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  volume    = {2},
+  pages     = {590--596},
+  year      = {2005},
+  doi       = {10.1109/CVPR.2005.74}
+}
+
+@inproceedings{olson2011apriltag,
+  title     = {{AprilTag}: A Robust and Flexible Visual Fiducial System},
+  author    = {Olson, Edwin},
+  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
+  pages     = {3400--3407},
+  year      = {2011},
+  doi       = {10.1109/ICRA.2011.5979561}
+}
+
+@inproceedings{forstner1987fast,
+  title     = {A Fast Operator for Detection and Precise Location of Distinct Points, Corners and Centres of Circular Features},
+  author    = {F{\"o}rstner, Wolfgang and G{\"u}lch, Eberhard},
+  booktitle = {Proc. ISPRS Intercommission Conference on Fast Processing of Photogrammetric Data},
+  pages     = {281--305},
+  year      = {1987}
+}
+
+%% -- §H.2 Pinhole model / multi-view geometry (textbook) --
+
+@book{hartley2004multiple,
+  title     = {Multiple View Geometry in Computer Vision},
+  author    = {Hartley, Richard and Zisserman, Andrew},
+  publisher = {Cambridge University Press},
+  edition   = {2nd},
+  year      = {2004},
+  isbn      = {0521540518}
+}
+
+%% -- §H.3 Stage-1 optimization (Nelder--Mead simplex) --
+
+@article{nelder1965simplex,
+  title   = {A Simplex Method for Function Minimization},
+  author  = {Nelder, John A. and Mead, Roger},
+  journal = {The Computer Journal},
+  volume  = {7},
+  number  = {4},
+  pages   = {308--313},
+  year    = {1965},
+  doi     = {10.1093/comjnl/7.4.308}
+}
+
+@article{gao2012implementing,
+  title   = {Implementing the {N}elder--{M}ead Simplex Algorithm with Adaptive Parameters},
+  author  = {Gao, Fuchang and Han, Lixing},
+  journal = {Computational Optimization and Applications},
+  volume  = {51},
+  number  = {1},
+  pages   = {259--277},
+  year    = {2012},
+  doi     = {10.1007/s10589-010-9329-3}
+}
+
+%% -- §H.4 Stage-2 edges & distance field --
+
+@article{canny1986computational,
+  title   = {A Computational Approach to Edge Detection},
+  author  = {Canny, John},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {PAMI-8},
+  number  = {6},
+  pages   = {679--698},
+  year    = {1986},
+  doi     = {10.1109/TPAMI.1986.4767851}
+}
+
+@article{maurer2003linear,
+  title   = {A Linear Time Algorithm for Computing Exact {E}uclidean Distance Transforms of Binary Images in Arbitrary Dimensions},
+  author  = {Maurer, Calvin R. and Qi, Rensheng and Raghavan, Vijay},
+  journal = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume  = {25},
+  number  = {2},
+  pages   = {265--270},
+  year    = {2003},
+  doi     = {10.1109/TPAMI.2003.1177156}
+}
+
+@article{borgefors1986distance,
+  title   = {Distance Transformations in Digital Images},
+  author  = {Borgefors, Gunilla},
+  journal = {Computer Vision, Graphics, and Image Processing},
+  volume  = {34},
+  number  = {3},
+  pages   = {344--371},
+  year    = {1986},
+  doi     = {10.1016/S0734-189X(86)80047-0}
+}
+
+%% -- §H.5 Stage-2 Phase-1 optimizer (L-BFGS-B) --
+
+@article{byrd1995limited,
+  title   = {A Limited Memory Algorithm for Bound Constrained Optimization},
+  author  = {Byrd, Richard H. and Lu, Peihuang and Nocedal, Jorge and Zhu, Ciyou},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {16},
+  number  = {5},
+  pages   = {1190--1208},
+  year    = {1995},
+  doi     = {10.1137/0916069}
+}
+
+@article{zhu1997algorithm,
+  title   = {Algorithm 778: {L}-{BFGS}-{B}, {F}ortran Subroutines for Large-Scale Bound-Constrained Optimization},
+  author  = {Zhu, Ciyou and Byrd, Richard H. and Lu, Peihuang and Nocedal, Jorge},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {23},
+  number  = {4},
+  pages   = {550--560},
+  year    = {1997},
+  doi     = {10.1145/279232.279236}
+}
+
+%% -- §H.6 Stage-2 Phase-2 metric (IoU / Jaccard) & rotation param. --
+
+@article{jaccard1912distribution,
+  title   = {The Distribution of the Flora in the Alpine Zone},
+  author  = {Jaccard, Paul},
+  journal = {New Phytologist},
+  volume  = {11},
+  number  = {2},
+  pages   = {37--50},
+  year    = {1912},
+  doi     = {10.1111/j.1469-8137.1912.tb05611.x}
+}
+
+@article{rodrigues1840lois,
+  title   = {Des lois g{\'e}om{\'e}triques qui r{\'e}gissent les d{\'e}placements d'un syst{\`e}me solide dans l'espace},
+  author  = {Rodrigues, Olinde},
+  journal = {Journal de Math{\'e}matiques Pures et Appliqu{\'e}es},
+  volume  = {5},
+  pages   = {380--440},
+  year    = {1840}
+}
+
+%% -- §H.7 Binarisation / morphological image processing (textbook) --
+
+@book{gonzalez2018digital,
+  title     = {Digital Image Processing},
+  author    = {Gonzalez, Rafael C. and Woods, Richard E.},
+  publisher = {Pearson},
+  edition   = {4th},
+  year      = {2018},
+  isbn      = {9780133356724}
+}
+
+%% -- §H.8 Optional feature-based extrinsic prior (SIFT + PnP) --
+
+@article{lowe2004distinctive,
+  title   = {Distinctive Image Features from Scale-Invariant Keypoints},
+  author  = {Lowe, David G.},
+  journal = {International Journal of Computer Vision},
+  volume  = {60},
+  number  = {2},
+  pages   = {91--110},
+  year    = {2004},
+  doi     = {10.1023/B:VISI.0000029664.99615.94}
+}
+
+@article{lepetit2009epnp,
+  title   = {{EPnP}: An Accurate {O}({$n$}) Solution to the {PnP} Problem},
+  author  = {Lepetit, Vincent and Moreno-Noguer, Francesc and Fua, Pascal},
+  journal = {International Journal of Computer Vision},
+  volume  = {81},
+  number  = {2},
+  pages   = {155--166},
+  year    = {2009},
+  doi     = {10.1007/s11263-008-0152-6}
+}
+
+
+%% ----------------------------------------------------------------------
+%% §G.    Inverse physics from video (legacy — cited in §2 intro)
+%% ----------------------------------------------------------------------
+
+@inproceedings{bhat2002computing,
+  title     = {Computing the Physical Parameters of Rigid-Body Motion from Video},
+  author    = {Bhat, Kiran S. and Seitz, Steven M. and Popovi{\'c}, Jovan and Khosla, Pradeep K.},
+  booktitle = {Proceedings of the European Conference on Computer Vision (ECCV)},
+  pages     = {551--565},
+  year      = {2002},
+  doi       = {10.1007/3-540-47966-0_37}
+}
+
+@article{monszpart2016smash,
+  title   = {{SMASH}: Physics-Guided Reconstruction of Collisions from Videos},
+  author  = {Monszpart, {\'E}loi and Thuerey, Nils and Mitra, Niloy J.},
+  journal = {ACM Transactions on Graphics (TOG)},
+  volume  = {35},
+  number  = {6},
+  pages   = {1--14},
+  year    = {2016},
+  doi     = {10.1145/2980179.2982421}
 }

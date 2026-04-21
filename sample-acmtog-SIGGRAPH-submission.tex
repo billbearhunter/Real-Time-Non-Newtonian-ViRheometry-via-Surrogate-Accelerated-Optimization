@@ -117,30 +117,36 @@
 %\renewcommand\shortauthors{Zhou, G. et al}
 
 \begin{abstract}
-Video-based rheometry estimates the material parameters of non-Newtonian
-fluids by matching physical experiments with simulations, enabling the
-measurement of materials for which conventional rheometers are less
-effective.
-However, existing methods require iterative physics simulations during
-optimization, resulting in estimation times of several hours on high-end
-GPUs and limiting their practical use.
+Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian}
+estimates Herschel--Bulkley parameters $(\sigma_Y, \eta, n)$ of complex
+fluids by matching observed dam-break flows against physics-based
+simulation, enabling the characterization of materials---pastes, chunky
+sauces, granular fluids---that conventional rheometers cannot handle.
+However, inverting the material point method in the loop requires hours
+of GPU time per video, leaving this otherwise uniquely capable approach
+confined to offline research use.
 
-We propose a surrogate-accelerated framework for non-Newtonian
-viRheometry that replaces expensive simulation evaluations with a learned
-Mixture-of-Experts (MoE) Gaussian process surrogate.
-Our method consists of three stages:
-(1) efficient training data collection,
-(2) construction of a regime-aware surrogate in which a gating model
-assigns specialized GP experts to distinct flow behaviors, and
-(3) surrogate-driven CMA-ES optimization for fast parameter inference.
+We propose a surrogate-accelerated framework that compresses this
+inverse from hours to seconds per video. Our technical core couples two
+components. First, a regime-aware hierarchical Mixture-of-GP surrogate
+with 540 specialized sparse GP experts, routed by a two-level Bayesian
+Gaussian mixture gate over container geometry and observation
+signatures, and aggregated via the robust Bayesian Committee Machine.
+Second, an identifiability-aware inverse in which CMA-ES is warm-started
+from the routed expert's nearest training neighbor and anchored by a
+soft log-$\sigma_Y$ prior at that neighbor---resolving the
+yield-stress/consistency similarity degeneracy whose practical
+mitigation had previously been computationally out of reach.
 
-Our method achieves estimation accuracy comparable to a
-simulation-based baseline while substantially reducing optimization time.
-This acceleration moves inverse viRheometry toward real-time use and
-enables capabilities that are difficult to achieve with prior methods,
-including fresher parameter estimates for time-varying materials,
-repeated estimation in short operational cycles, and improved practical
-deployability.
+Evaluated against simulation-in-the-loop inversion on held-out synthetic
+samples and real non-Newtonian fluids, our method matches baseline
+accuracy at three orders of magnitude lower latency. This seconds-scale
+inversion unlocks three capabilities inaccessible to prior work:
+\emph{(i)} fresh parameter estimates for time-varying fluids,
+\emph{(ii)} practical characterization of materials conventional
+rheometers cannot measure, and \emph{(iii)} a multi-observation joint
+protocol that approaches parallel-plate rheometer precision from phone
+videos alone.
 \end{abstract}
 
 
@@ -206,9 +212,11 @@ deployability.
 %
 
 
-\keywords{Material parameter estimation, Herschel--Bulkley,
-surrogate model, Mixture-of-Experts, Gaussian process,
-Bayesian optimization, video-based rheometry}
+\keywords{Video-based rheometry, non-Newtonian fluids,
+Herschel--Bulkley, material parameter estimation,
+surrogate-accelerated inverse, hierarchical mixture of
+Gaussian-process experts, robust Bayesian Committee Machine,
+material point method, dam-break flow}
 
 
 

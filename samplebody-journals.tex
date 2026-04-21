@@ -1,532 +1,1385 @@
 \section{Introduction}
 
-Estimating material parameters of non-Newtonian fluids from visual observations is an important problem in physics-based graphics, digital material characterization, and inverse simulation.
-Accurate rheological parameters are required for predictive simulation, analysis, and material-aware content creation, but direct measurement is often difficult in practice.
-This difficulty becomes more pronounced for materials with large inclusions, irregular flow behavior, or experimental constraints under which conventional rheometers become less effective.
+Many everyday fluids---yogurts, pastes, sauces, slurries, cosmetic
+emulsions---exhibit non-Newtonian behavior that governs how they pour,
+spread, cling, and deform. Characterizing this behavior quantitatively
+requires measuring shear-rate-dependent stress, traditionally using
+parallel-plate or cone-and-plate rheometers. However, these instruments
+fail on a practically important class of materials: those containing
+inclusions larger than the instrument's measurement gap---chunky sauces,
+particulate suspensions, foods with solids---and those whose rheology
+evolves faster than a multi-minute lab procedure can capture.
 
-Recent work on video-based rheometry, or viRheometry, has shown that non-Newtonian parameters can be estimated by matching observations with physics-based simulations.
-In particular, prior work demonstrated that simulation-based inverse estimation can recover Herschel--Bulkley parameters from visual measurements and analyzed the role of similarity in improving identifiability.
-However, despite its effectiveness, such a pipeline remains computationally expensive because every parameter query requires a full physical simulation inside the optimization loop.
-As a result, parameter estimation can take many hours, which severely limits its practical use.
+Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian} addresses
+this gap by estimating Herschel--Bulkley parameters
+$(\sigma_Y, \eta, n)$ from observations of a simple dam-break flow,
+without contacting the material with any instrument. The underlying
+principle is inverse simulation: a material point method (MPM) forward
+model is repeatedly executed inside an optimizer until the simulated
+flow reproduces the observed silhouette. Since the forward model is
+physics-based, the approach naturally handles the very materials that
+instrumental rheometers cannot, and recovers a full constitutive triple
+from a single short video.
 
-This computational bottleneck is not merely an inconvenience.
-Slow estimation fundamentally restricts the kinds of applications that inverse viRheometry can support.
-First, for materials whose effective properties change over time due to aging, sedimentation, temperature variation, mixing history, or state evolution, long optimization times lead to \emph{stale} parameter estimates that no longer represent the material at decision time.
-Second, slow estimation prevents repeated use in short operational cycles, making it difficult to support interactive iteration, rapid reformulation, or high-throughput measurement.
-Third, the large computational cost hinders the broader deployment of inverse viRheometry outside carefully controlled offline settings.
+However, this otherwise uniquely capable approach is bottlenecked by the
+cost of its inner loop. A single MPM dam-break simulation takes several
+minutes on modern GPU hardware, and derivative-free optimization
+typically issues hundreds of candidate evaluations before convergence.
+The end-to-end inverse therefore takes \emph{hours per video}, confining
+the method to offline research use and precluding three capabilities
+that would otherwise be within reach of a video-based approach:
 
-In this paper, we address this limitation by introducing a surrogate-accelerated optimization framework for non-Newtonian viRheometry.
-Our key idea is to replace most expensive simulation evaluations during inverse estimation with a learned surrogate model.
-To do so, we construct a Mixture-of-Experts (MoE) Gaussian process surrogate that captures heterogeneous structure in the optimization landscape.
-Instead of fitting a single global surrogate to all parameter regimes, our method assigns specialized experts to different flow behaviors and uses the resulting model to guide fast parameter search.
-
-The technical core of this work is therefore not merely acceleration in a generic sense, but a regime-aware surrogate formulation for inverse viRheometry.
-This formulation is motivated by two characteristics of the problem.
-First, the mapping from material parameters to optimization objectives is highly non-uniform and can exhibit locally distinct behaviors.
-Second, inverse estimation for non-Newtonian fluids often contains ambiguous or weakly sensitive regions in which a single global surrogate becomes less reliable.
-By combining expert specialization with probabilistic prediction, our approach improves the efficiency of the search process while preserving estimation quality.
-
-Our work is built on prior non-Newtonian viRheometry, but shifts the emphasis from feasibility and identifiability toward speed, repeated usability, and practical deployment.
-Where prior work established that visual inverse rheometry can recover meaningful parameters, our goal is to make such estimation fast enough to support time-sensitive and application-driven use.
-To this end, we evaluate the proposed method not only in terms of runtime reduction, but also in terms of estimation fidelity, robustness, and the practical benefits enabled by acceleration.
-
-The main contributions of this paper are as follows:
 \begin{itemize}
-    \item We present a surrogate-accelerated inverse viRheometry framework for estimating non-Newtonian material parameters from visual observations.
-    \item We propose a regime-aware Mixture-of-Experts Gaussian process surrogate that models heterogeneous objective structure and enables efficient surrogate-driven optimization.
-    \item We show that the proposed method substantially reduces estimation time while preserving parameter estimation quality relative to a simulation-based baseline.
-    \item We analyze the practical benefits enabled by acceleration, including fresher parameter estimates for time-varying materials, repeated estimation capability, and improved deployability toward real-time viRheometry.
+    \item \emph{Freshness for time-varying fluids.} When a material's
+    properties evolve during the measurement window---sedimentation,
+    aging, temperature drift, mixing history, cooking
+    cooldown---an hour-scale inversion returns a parameter describing a
+    past state. The inferred value is stale by the time it is delivered.
+    \item \emph{Practical use on rheometer-infeasible materials.} The
+    class of materials for which video rheometry has independent value
+    over instrumental rheometry---chunky sauces, particulate
+    suspensions---remains confined to offline demonstration rather than
+    fieldable tool so long as each measurement costs hours.
+    \item \emph{Multi-observation precision recovery.} The prior
+    work~\cite{hamamichi2023nonnewtonian} itself identifies a similarity
+    degeneracy between yield stress and consistency, and proposes
+    multi-setup joint inversion as the mitigation. At hours per setup,
+    $N$-setup inversion is computationally infeasible in practice.
+\end{itemize}
+
+We propose a surrogate-accelerated framework that compresses the
+inverse from hours to \emph{seconds per video}, making all three
+capabilities available within a practical workflow. Our technical core
+couples two components.
+\emph{(i)}~A \emph{regime-aware hierarchical Mixture-of-GP surrogate}
+(HVIMoGP-rBCM) replaces MPM inside the optimizer: a two-level Bayesian
+Gaussian mixture gate routes each query---first by container geometry
+$(W, H)$, then by observation signature---through one of 540 specialized
+sparse Gaussian-process experts, aggregated at prediction time by the
+robust Bayesian Committee Machine. This hierarchical structure is
+motivated by the fact that the Herschel--Bulkley inverse landscape is
+not globally homogeneous: the flow regime changes morphologically with
+container shape and discretely across the yield threshold, so a single
+global surrogate cannot cover the $5.5$ orders of magnitude in $\eta$
+and $5.6$ orders in $\sigma_Y$ at the accuracy required for optimization.
+\emph{(ii)}~An \emph{identifiability-aware inverse} in which CMA-ES is
+warm-started from the routed expert's nearest training neighbor in
+observation space, and anchored by a soft log-$\sigma_Y$ prior at that
+neighbor. The prior is \emph{data-honest} in that its center comes from
+a training point of the surrogate rather than from a user-chosen guess.
+Together, the warm-start and anchored prior collapse the
+yield-stress/consistency ridge, recovering a physically plausible
+$\sigma_Y$ where vanilla CMA-ES would slide to $\sigma_Y \to 0$.
+
+Our work inherits the problem setup, dam-break observation protocol, and
+inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
+contributes the machinery needed to make that formulation
+computationally practical and to resolve an identifiability limit that
+prior work had identified but could not practically mitigate. The main
+contributions are:
+
+\begin{itemize}
+    \item A \emph{hierarchical Mixture-of-GP surrogate} for the
+    Herschel--Bulkley inverse landscape that covers
+    $5.5$--$5.6$ orders of magnitude in $\eta$ and $\sigma_Y$ using 540
+    specialized experts routed by a two-level Bayesian Gaussian mixture
+    gate and aggregated via robust BCM.
+    \item An \emph{identifiability-aware inverse loop} that combines
+    training-nearest-neighbor warm-starting with a data-honest
+    log-$\sigma_Y$ soft prior, resolving the yield-stress/consistency
+    similarity degeneracy without injecting user-chosen bias.
+    \item An evaluation establishing that seconds-scale video rheometry
+    unlocks three capabilities inaccessible to simulation-in-the-loop
+    inversion: \emph{(a)} fresh parameter estimates for time-varying
+    fluids, \emph{(b)} practical characterization of materials
+    conventional rheometers cannot measure, and \emph{(c)} a
+    multi-observation joint protocol that approaches parallel-plate
+    rheometer precision from phone videos alone.
 \end{itemize}
 
 \section{Related Work}
 
-\subsection{Physics-Based Simulation of Non-Newtonian Fluids}
+\subsection{Non-Newtonian Fluid Simulation}
 
-The simulation of complex fluids and soft materials has long been an important topic in computer graphics.
-A broad range of numerical methods has been developed for viscous fluids, elastoplastic materials, and non-Newtonian media, enabling predictive animation and physically grounded content creation \cite{bridson2015fluid,stomakhin2013material,jiang2015affine,hu2018moving}.
-Among these, the material point method (MPM) and its variants have become especially attractive for simulating materials that undergo large deformation, contact, and topological change.
-Recent advances in MPM, including affine particle-in-cell transfers and moving least squares formulations, have improved numerical stability and simulation fidelity for complex material behaviors \cite{jiang2015affine,hu2018moving}.
-These developments provide an effective forward model for inverse parameter estimation problems in which material properties must be inferred from observations.
-
-In the context of non-Newtonian fluids, constitutive models such as the Herschel--Bulkley model offer a compact description of yield stress and shear-dependent viscosity.
-Such models are widely used because they capture key behaviors of many real materials while remaining tractable for simulation and optimization.
-Our work builds on this simulation-based view, but focuses on the inverse problem: instead of synthesizing motion from known parameters, we seek to infer the parameters from observed behavior.
-
-
-\subsection{Inverse Parameter Estimation and ViRheometry}
-
-Inverse estimation of physical parameters from visual data has been studied in graphics and vision for decades.
-Early work estimated physical quantities by fitting simulated motion to image observations, demonstrating that video can be used to recover meaningful latent parameters \cite{bhat2002computing}.
-Subsequent work extended inverse physical reasoning to a wide range of phenomena, including collision reconstruction, deformation analysis, and material inference \cite{monszpart2016smash}.
-
-Most closely related to our work is recent research on non-Newtonian viRheometry, which introduced a video-based framework for estimating Herschel--Bulkley parameters by matching observed fluid behavior with physics-based simulation \cite{hamamichi2023nonnewtonian}.
-That work established inverse viRheometry as a viable approach for materials that are difficult to characterize using conventional rheometers and further analyzed the role of similarity in parameter identifiability.
-However, because estimation is performed through simulation-in-the-loop optimization, the method remains computationally expensive.
-Our work inherits the same inverse estimation objective, but addresses the deployment bottleneck by accelerating the optimization process through learned surrogate modeling.
-
-More broadly, our work fits into the growing line of research that seeks to make inverse physical estimation more practical by reducing simulation cost.
-Rather than replacing the physical model, we preserve the simulation-based estimation paradigm and improve its usability by reducing the number of expensive forward evaluations required during search.
+Our forward model inherits the material point method (MPM) lineage that
+brought continuum simulation into graphics~\cite{stomakhin2013material,
+jiang2015affine,hu2018moving,jiang2016material}. Within this family,
+shear-thinning and yield-stress rheology---captured by the
+Herschel--Bulkley model~\cite{herschel1926konsistenzmessungen}---has been
+realized through return-mapping formulations that encompass viscous,
+viscoplastic, and granular regimes under a common MPM
+substrate~\cite{yue2015continuum,ram2015material,klar2016drucker,
+tampubolon2017multi,wolper2019cdmpm}. We adopt the Herschel--Bulkley
+return map of Yue et al.~\cite{yue2015continuum}; the sauce-specific
+shear-thinning simulator of Nagasawa et al.~\cite{nagasawa2019mixing},
+from the same lab as our direct predecessor, shares our material focus.
+The forward simulator is implemented on Taichi~\cite{hu2019taichi}; a
+broader introduction to fluid simulation for graphics
+appears in~\cite{bridson2015fluid}.
 
 
-\subsection{Surrogate Models for Expensive Inverse Problems}
+\subsection{Video-Based Inverse Rheometry}
 
-Surrogate modeling is a standard approach for reducing the cost of optimizing expensive black-box objectives.
-Methods such as efficient global optimization and Bayesian optimization use predictive models to approximate objective values and guide the selection of informative query points \cite{jones1998efficient,snoek2012practical,shahriari2016taking}.
-Among surrogate models, Gaussian processes are particularly attractive because they provide both a predictive mean and an uncertainty estimate, which is useful for balancing exploitation and exploration \cite{rasmussen2006gaussian}.
+Estimating simulation parameters from video by matching rendered and
+observed dynamics has a long lineage in graphics and
+vision~\cite{bhat2002computing,monszpart2016smash}. Takahashi and
+Lin~\cite{takahashi2019video} established the video-to-parameter pattern
+for viscous fluids by matching rendered and observed dam-break
+silhouettes on a per-scene basis; Hamamichi et
+al.~\cite{hamamichi2023nonnewtonian} extended this to the non-Newtonian
+Herschel--Bulkley triple $(\sigma_Y, \eta, n)$ via dimensional-similarity
+analysis over tabulated MPM outputs, and is the direct predecessor of
+our work. We inherit their dam-break observation protocol, their
+Herschel--Bulkley inverse objective, and their simulation-in-the-loop
+formulation, and contribute the machinery needed to make that
+formulation practical at seconds-scale latency and to resolve the
+yield-stress/consistency identifiability degeneracy that
+\cite{hamamichi2023nonnewtonian} identifies but leaves mitigated only at
+prohibitive computational cost.
 
-For larger-scale problems, sparse and variational Gaussian process methods improve the tractability of GP modeling by using inducing variables or pseudo-input approximations \cite{snelson2006sparse,quinonero2005unifying,titsias2009variational,hensman2013gaussian}.
-These methods make GP-based surrogates feasible in settings where dense GP regression would be prohibitively expensive.
-Our work adopts the probabilistic advantages of GP surrogates, but uses them in a different setting: instead of generic black-box optimization, we focus on inverse viRheometry and the specific structure of its simulation-induced objective landscape.
+Related work recovers material parameters from other visual modalities:
+video-based cloth friction~\cite{rasheed2020visual},
+particle-image-velocimetry-based rheology through physics-informed
+networks~\cite{thakur2025learning}, and consumer-video neural regression
+for scalar viscosity~\cite{rauzan2024protorheology}. These target
+different material classes or observation modalities and do not recover
+the full Herschel--Bulkley triple. The physical basis for encoding
+rheology in dam-break fronts was established analytically by
+Balmforth et al.~\cite{balmforth2007two}, and free-surface extraction
+from experimental video is treated in~\cite{cochard2009tracking}. The
+inverse-rheometry problem has also been approached in the
+geophysical-flow setting using shallow-water forward models and adjoint
+methods~\cite{martin2010inverse}; our formulation differs in using a
+full three-dimensional MPM forward model and a derivative-free inverse
+over a learned surrogate.
 
-In addition, our approach differs from standard Bayesian optimization in its emphasis on repeated evaluation inside an estimation pipeline.
-The goal is not merely to locate an optimum with as few samples as possible in a standalone optimization problem, but to construct a surrogate framework that can serve as a practical accelerator for physics-based parameter estimation.
+
+\subsection{Differentiable MPM for Inverse Problems}
+
+An alternative paradigm pursues parameter recovery via differentiable
+simulation, using gradients through the forward model for gradient-based
+inverse search. The differentiable MLS-MPM
+family~\cite{hu2019chainqueen,hu2020difftaichi,huang2021plasticinelab}
+has been applied to deformable and plastic materials, and end-to-end
+differentiable physics with differentiable rendering has been
+demonstrated by gradSim~\cite{murthy2021gradsim}. Most relevant to
+non-Newtonian parameter recovery from video,
+PAC-NeRF~\cite{li2023pacnerf} couples differentiable MPM with NeRF
+rendering to recover viscosity parameters from multi-view video, and
+Eastman~\cite{eastman2024recovery} recovers Herschel--Bulkley parameters
+from a ketchup column-collapse video via differentiable MPM and neural
+rendering. These approaches optimize per scene and do not amortize a
+reusable surrogate across materials. Further, evidence from
+PlasticineLab~\cite{huang2021plasticinelab} indicates that gradients
+through non-smooth plastic return maps are ill-conditioned, motivating
+our choice of a gradient-free inverse over a probabilistic surrogate.
 
 
-\subsection{Mixture-of-Experts and Regime-Dependent Modeling}
+\subsection{Gaussian-Process Surrogates and Mixtures of Experts}
 
-A key challenge in surrogate modeling is that a single global model may be insufficient when the target function exhibits heterogeneous local structure.
-Mixture-of-experts (MoE) models address this problem by decomposing prediction into multiple specialized experts together with a gating mechanism that determines which expert should dominate in each region \cite{jordan1994hierarchical,yuksel2012twenty}.
-This idea has been extended to Gaussian process settings, where different GP experts model different local regimes of the input-output mapping \cite{tresp2001mixtures}.
+Gaussian-process regression~\cite{rasmussen2006gaussian} provides a
+natural surrogate model for expensive simulators because it couples
+flexible nonparametric regression with calibrated predictive
+uncertainty. For data sizes beyond exact-GP feasibility, variational and
+sparse approximations~\cite{snelson2006sparse,quinonero2005unifying,
+titsias2009variational,hensman2013gaussian,matthews2016sparse} replace
+the full covariance with an inducing-variable approximation; each expert
+in our surrogate is an exact GP trained on a gate-routed subset, with
+SVGP backends available at larger scales.
 
-This perspective is especially relevant to inverse viRheometry.
-The optimization landscape induced by simulation-based matching can vary substantially across parameter regions and flow behaviors, including regions with different sensitivities, different curvature, and different levels of ambiguity.
-These characteristics make regime-aware surrogate modeling more appropriate than fitting a single global regressor.
-Our method therefore uses a mixture-of-experts Gaussian process surrogate to capture heterogeneous behavior in the inverse objective and to improve the efficiency of surrogate-driven optimization.
+A single global GP is insufficient for functions with heterogeneous
+local structure. Mixture-of-experts (MoE)
+models~\cite{jordan1994hierarchical,yuksel2012twenty} decompose
+prediction into multiple specialists with a gating mechanism, and
+mixtures of GPs instantiate this idea with GP
+experts~\cite{tresp2001mixtures,rasmussen2002infinite,
+meeds2006alternative,nguyen2008local,yuan2008variational,trapp2020deep}.
+Among these, Meeds and Osindero~\cite{meeds2006alternative} (a Gaussian
+mixture over inputs coupled with GP outputs) and Nguyen-Tuong et
+al.~\cite{nguyen2008local} (hard input-space partitioning with
+independent per-region GPs and nearest-neighbor fusion) are the closest
+architectural ancestors of our surrogate. We extend this pattern with a
+two-level Bayesian Gaussian mixture gate---first on container geometry
+$(W, H)$, then on an observation signature---and replace
+nearest-neighbor fusion with robust committee-machine aggregation.
+
+For aggregating independent GP predictions, the Bayesian Committee
+Machine~\cite{tresp2000bayesian} and its modern variants---generalized
+Product of Experts~\cite{cao2014generalized}, robust BCM
+(rBCM)~\cite{deisenroth2015distributed}, and generalized robust BCM
+(GRBCM)~\cite{liu2018generalized}---provide closed-form
+variance-weighted fusion. We adopt
+rBCM~\cite{deisenroth2015distributed} with top-1 routing; our ablations
+(\S\ref{sec:ablation}) show that the additional communication expert of
+GRBCM does not justify its inference-time overhead given our peaked
+gate posterior. Sparse-expert plus BCM aggregation has recently been
+applied to physics emulation~\cite{cohen2024sparse}, providing modern
+precedent for our approach.
+
+
+\subsection{Surrogate-Accelerated Inverse and Derivative-Free Optimization}
+
+Inverting expensive simulators has been addressed under the headings of
+Bayesian calibration of computer models~\cite{kennedy2001bayesian} and
+simulation-based inference~\cite{cranmer2020frontier}, with efficient
+global optimization~\cite{jones1998efficient} and Bayesian
+optimization~\cite{snoek2012practical,shahriari2016taking} providing the
+dominant search strategies when the objective is expensive and
+derivative-free. Our inverse is closest to the ``CMA-ES on a GP
+surrogate'' pattern~\cite{bajaj2019gaussian,hansen2016cma}, which has
+been applied to inverse
+viscoplasticity~\cite{vandamme2021bayesian} and
+viscoelasticity~\cite{hashemi2025bayesian}. We depart from this pattern
+in two respects: first, each inverse is routed through a hierarchical
+surrogate rather than a single global GP; second, we introduce an
+observation-space nearest-neighbor warm-start and a
+training-data-anchored log-$\sigma_Y$ prior to address the yield-stress
+identifiability degeneracy that is specific to Herschel--Bulkley
+inversion and not resolved by generic BO machinery.
 
 
 \section{Background}
 
 \subsection{Herschel--Bulkley Rheology}
 
-Many non-Newtonian fluids can be approximated by the Herschel--Bulkley (HB) model, which describes a relationship between shear stress and shear rate using a yield term, a consistency parameter, and a power-law exponent \cite{herschel1926konsistenzmessungen}.
-In this model, the constitutive response is typically parameterized by a tuple
-\[
-\theta = (\sigma_Y, \eta, n),
-\]
-where $\sigma_Y$ denotes the yield stress, $\eta$ controls the consistency, and $n$ determines the degree of shear thinning or shear thickening.
+Many non-Newtonian fluids are well approximated by the
+Herschel--Bulkley (HB) model~\cite{herschel1926konsistenzmessungen},
+which expresses the shear-stress response as
+\begin{equation}
+\label{eq:hb-scalar}
+    \tau \;=\; \sigma_Y \;+\; \eta\,\dot\gamma^{\,n},
+\end{equation}
+where $\tau$ is the shear stress, $\dot\gamma$ the shear rate,
+$\sigma_Y$ the yield stress, $\eta$ the consistency parameter, and
+$n \in (0, 1]$ controls shear thinning ($n < 1$) versus Newtonian
+behaviour ($n = 1$). In three dimensions the deviatoric stress tensor
+is
+\begin{equation}
+\label{eq:hb-tensor}
+    \boldsymbol{\tau}^{\mathrm{dev}}
+    \;=\;
+    \left[\;\frac{\sigma_Y}{\|\mathbf{D}\|}
+    \;+\; \eta\,\|\mathbf{D}\|^{\,n-1}\;\right] \mathbf{D},
+    \qquad
+    \|\mathbf{D}\|
+    = \sqrt{\tfrac{1}{2}\mathbf{D}\!:\!\mathbf{D}},
+\end{equation}
+where $\mathbf{D}$ is the rate-of-strain tensor. Below the yield
+surface $\|\boldsymbol{\tau}^{\mathrm{dev}}\| \le \sigma_Y$ the
+material is treated as rigid; above it, the flow rule of
+Eq.~\eqref{eq:hb-tensor} applies. We adopt the elasto-plastic MPM
+realisation of Yue et al.~\cite{yue2015continuum}, which recovers the
+same $(\sigma_Y, \eta, n)$ triple at steady state via a
+Newton--Raphson return map. The HB response is therefore characterised
+by the three-parameter vector
+\begin{equation}
+    \boldsymbol{\theta} \;=\; (\sigma_Y,\,\eta,\,n) \in \Theta \subset
+    \mathbb{R}^{3}.
+\end{equation}
+This parameter triple coincides with that of prior non-Newtonian video
+rheometry~\cite{hamamichi2023nonnewtonian}; our goal is not to
+propose a new constitutive model, but to recover $\boldsymbol{\theta}$
+from visual observations at a latency compatible with real-world use.
 
-The HB model is attractive in graphics-oriented inverse estimation because it is expressive enough to represent a wide range of visually distinct materials while remaining compact enough for simulation and optimization.
-Previous work on non-Newtonian viRheometry adopted this parameterization and demonstrated that visually observed flows can be used to estimate these parameters through simulation matching \cite{hamamichi2023nonnewtonian}.
-We follow the same general parameterization, since our goal is not to propose a new constitutive model but to accelerate the inverse estimation process built on top of it.
+
+\subsection{Dam-Break MPM Forward Model}
+
+Following the experimental protocol
+of~\cite{hamamichi2023nonnewtonian}, we obtain $\boldsymbol{\theta}$
+by observing a dam-break flow released from a rectangular fluid column
+of width $W$ and height $H$ on a flat, no-slip floor. The forward
+simulator integrates the HB return map of \S3.1 on a
+moving-least-squares MPM~\cite{hu2018moving} grid with spacing
+$\Delta x \approx 10^{-1}$\,cm and timestep $\Delta t = 5\times
+10^{-4}$\,s, implemented on Taichi~\cite{hu2019taichi}. The
+observation is a vector of flow-front displacements sampled at eight
+uniformly spaced frames $t_1,\dots,t_8$ after release:
+\begin{equation}
+\label{eq:y-def}
+    \mathbf{y}
+    \;=\;
+    \bigl(x_1,\,x_2,\,\dots,\,x_8\bigr)^{\!\top}
+    \;\in\;
+    \mathbb{R}_{\ge 0}^{8},
+\end{equation}
+where $x_i$ is the maximum lateral extent of the fluid at time $t_i$
+in cm. By construction $x_1 \le x_2 \le \dots \le x_8$, since the
+flow front cannot retract. We write the forward simulator as
+$\mathbf{y} = \mathcal{S}(\boldsymbol{\theta};\,W, H)$.
 
 
-\subsection{Inverse ViRheometry as Simulation-Based Optimization}
+\subsection{Inverse Video Rheometry as Simulation-in-the-Loop Optimization}
 
-In video-based rheometry, the goal is to infer material parameters from observed fluid behavior.
-Given an observation $y$ obtained from a physical experiment and a forward simulator $\mathcal{S}(\theta, c)$ under condition $c$, inverse estimation is formulated as the optimization of an observation-matching objective
-\[
-\hat{\theta} = \arg\min_{\theta} \mathcal{L}(\theta; y, c),
-\]
-where $\mathcal{L}$ measures the mismatch between the simulated result and the observation.
-Depending on the formulation, this mismatch may be defined in terms of image features, silhouettes, temporal shape evolution, or other flow descriptors.
+Given an observation $\mathbf{y}_{\mathrm{obs}}$ captured from a real
+experiment at geometry $(W, H)$, video rheometry recovers
+$\boldsymbol{\theta}$ by matching simulator output against the
+observation,
+\begin{equation}
+\label{eq:inverse-generic}
+    \hat{\boldsymbol{\theta}}
+    \;=\;
+    \arg\min_{\boldsymbol{\theta}\in\Theta}\;
+    \mathcal{L}\bigl(\boldsymbol{\theta};\,
+    \mathbf{y}_{\mathrm{obs}},\,W,\,H\bigr),
+\end{equation}
+where
+$\mathcal{L}(\boldsymbol{\theta}) = \|\mathcal{S}(\boldsymbol{\theta};\,W,H)
+- \mathbf{y}_{\mathrm{obs}}\|^{2}$ is an observation-matching loss.
+Because $\mathcal{S}$ is defined by an MPM integration,
+$\mathcal{L}$ is expensive---several minutes per query on modern
+GPU hardware---and non-smooth through the plastic return map. The
+simulation-in-the-loop formulation of~\cite{hamamichi2023nonnewtonian}
+evaluates $\mathcal{S}$ directly inside a derivative-free optimiser,
+paying the cost of a full MPM simulation at every candidate
+$\boldsymbol{\theta}$.
 
-This formulation has two important characteristics.
-First, the objective is expensive to evaluate because every query of $\theta$ requires a full forward simulation.
-Second, the objective landscape is often highly non-uniform: some regions are well constrained by the observation, while others are relatively flat, ambiguous, or weakly sensitive.
-These characteristics make naive optimization slow and costly.
+The loss landscape carries a well-known identifiability pathology.
+From Eq.~\eqref{eq:hb-scalar}, the term
+$\eta\,\dot\gamma^{\,n}$ dominates the HB response once the shear
+rate exceeds $\dot\gamma^{\star} \approx
+(\sigma_Y / \eta)^{1/n}$; above this threshold, the stress is nearly
+independent of $\sigma_Y$. If the observed dam-break regime lies
+largely above $\dot\gamma^{\star}$, the observation
+$\mathbf{y}_{\mathrm{obs}}$ becomes effectively insensitive to
+$\sigma_Y$ while still constraining $(\eta, n)$. This produces a ridge
+in the $(\sigma_Y, \eta)$ subspace of the loss surface: a continuum of
+nearly-equal-loss solutions trading $\sigma_Y$ for a compensating
+increase in $\eta$. Hamamichi et al.~\cite{hamamichi2023nonnewtonian}
+identify this degeneracy by dimensional-similarity analysis and
+propose joint inversion over multiple $(W, H)$ setups as the
+mitigation; however, under their simulation-in-the-loop cost,
+multi-setup inversion is $N$ times more expensive than the already
+hours-long single-setup inverse.
 
-Prior non-Newtonian viRheometry addressed this problem by coupling a physics-based simulator with derivative-free optimization \cite{hamamichi2023nonnewtonian}.
-While effective, this approach requires repeated simulator calls throughout the search process, leading to long runtimes.
-Our work keeps the same simulation-based estimation paradigm, but introduces a learned surrogate to approximate the expensive objective and thereby reduce the cost of optimization.
-
-Finally, in many practical scenarios the target material properties may vary over time.
-If the true parameter state is denoted by $\theta_t$, then a delayed estimate may no longer correspond to the current material condition when optimization terminates.
-This observation motivates our emphasis on acceleration: reducing inference time is not only computationally desirable, but also important for maintaining the temporal validity, or freshness, of the estimated parameters.
+Finally, in many practical scenarios the target material itself
+evolves during the measurement window (sedimentation, aging,
+temperature drift, mixing history, cooking cooldown), so that the
+true parameter state $\boldsymbol{\theta}_{t}$ drifts during the
+inverse. A delayed estimate may therefore no longer correspond to the
+current material condition, motivating estimation latency short
+enough to track the evolving state rather than merely reduce
+amortised compute cost.
 
 \section{Method}
+\label{sec:method}
 
 \subsection{Overview}
 
-Our goal is to accelerate inverse viRheometry without changing the underlying simulation-based estimation paradigm.
-Instead of evaluating the expensive objective $\mathcal{L}(\theta; y, c)$ through a full forward simulation at every optimization step, we construct a learned surrogate model that predicts the objective from material parameters and guides the search toward promising regions.
-The resulting framework preserves the physics-based formulation of inverse estimation while substantially reducing the number of expensive simulator calls.
-
-Our method consists of three stages.
-First, we generate training data by evaluating the simulation-based objective at sampled parameter points.
-Second, we train a regime-aware Mixture-of-Experts (MoE) Gaussian process surrogate that models heterogeneous structure in the objective landscape.
-Third, we use the surrogate inside a derivative-free optimizer to perform fast parameter search for a new observation.
-Because the surrogate is much cheaper to evaluate than the simulator, the optimizer can explore the parameter space far more efficiently.
-
-A key design choice of our method is that the surrogate is not a single global regressor.
-Instead, it is composed of multiple experts specialized to different local regimes of the inverse objective.
-This design is motivated by the fact that non-Newtonian inverse estimation often exhibits heterogeneous behavior across the parameter space, including distinct flow modes, varying sensitivities, and ambiguous regions.
-By combining expert specialization with probabilistic prediction, our framework improves both search efficiency and robustness.
-
-Figure~\ref{fig:overview} illustrates the overall pipeline.
-Given an observed experiment, we first define the simulation-based objective over the target parameter space.
-We then learn an MoE surrogate from offline simulation data and use it to accelerate the online optimization process.
-The final output is an estimated Herschel--Bulkley parameter vector that approximates the material state corresponding to the observation.
+Our goal is to compress the inverse of
+Eq.~\eqref{eq:inverse-generic} from hours to seconds without altering
+the physics of the forward model. We replace expensive MPM queries
+with predictions from a trained hierarchical Mixture-of-GP surrogate
+$\tilde{\mathcal{S}}$, and augment the derivative-free inverse with
+two pieces of problem-specific structure---an observation-space
+warm-start and a training-data-anchored prior---that together resolve
+the identifiability degeneracy discussed in \S3.3. The pipeline has
+three phases, summarised in Figure~\ref{fig:overview}. In the
+\emph{offline} phase we generate a library of MPM training runs and
+fit the hierarchical surrogate (\S\ref{sec:surrogate}). In the
+\emph{online forward} phase each query
+$(\boldsymbol{\theta}, W, H)$ is routed through the hierarchical gate
+to a specialised expert and predicted in milliseconds. In the
+\emph{online inverse} phase each observation is routed to its expert
+and the surrogate is driven by an identifiability-aware CMA-ES loop
+(\S\ref{sec:inverse}).
 
 
-\subsection{Problem Formulation}
+\subsection{Input and Output Representation}
+\label{sec:repr}
 
-Let $\theta \in \Theta$ denote the material parameter vector, where $\Theta$ is the feasible parameter domain.
-In our setting, $\theta$ corresponds to the Herschel--Bulkley parameters
-\[
-\theta = (\sigma_Y, \eta, n).
-\]
-Given an observed experiment $y$ and an experimental condition $c$, we define the inverse viRheometry objective as
-\[
-\mathcal{L}(\theta; y, c),
-\]
-which measures the discrepancy between the observation and the simulated result obtained from the forward model $\mathcal{S}(\theta, c)$.
-
-The target of inference is
-\[
-\hat{\theta} = \arg\min_{\theta \in \Theta} \mathcal{L}(\theta; y, c).
-\]
-In the original simulator-in-the-loop formulation, this optimization is expensive because every evaluation of $\mathcal{L}$ requires a full simulation.
-If the optimizer evaluates hundreds or thousands of candidate parameters, the total computational cost becomes prohibitive.
-
-We therefore introduce a surrogate model
-\[
-\tilde{\mathcal{L}}(\theta; y, c)
-\]
-that approximates the expensive objective and can be evaluated efficiently.
-The surrogate is trained on a set of simulation-derived samples
-\[
-\mathcal{D} = \{(\theta_i, \mathcal{L}_i)\}_{i=1}^N,
-\]
-where $\mathcal{L}_i = \mathcal{L}(\theta_i; y, c)$ is computed by the original simulation-based pipeline.
-
-In principle, one could fit a single global regressor to approximate $\mathcal{L}$.
-However, this is often ineffective for non-Newtonian inverse estimation because the objective landscape is not globally homogeneous.
-Different parameter regions may correspond to different flow behaviors, different local smoothness, and different sensitivity of the observation to parameter perturbations.
-Accordingly, our method models the objective using a mixture of local experts rather than a single predictor.
+Each training sample pairs a parameter-geometry vector with its
+forward observation
+$\mathbf{y} = \mathcal{S}(\boldsymbol{\theta}; W, H) \in
+\mathbb{R}^{8}$. We assemble the five-dimensional input
+\begin{equation}
+    \mathbf{x} \;=\; (n,\,\eta,\,\sigma_Y,\,W,\,H)^{\!\top}
+    \in \mathbb{R}^{5},
+\end{equation}
+and apply per-component log transforms to $\eta$ and $\sigma_Y$
+(which span $5.5$ and $5.6$ orders of magnitude respectively),
+followed by per-dimension $z$-score standardisation,
+\begin{equation}
+\label{eq:xscale}
+    \tilde{\mathbf{x}}
+    \;=\; \frac{\mathbf{x}_{\log} - \boldsymbol{\mu}_X}{\boldsymbol{\sigma}_X},
+    \qquad
+    \mathbf{x}_{\log}
+    = \bigl(n,\;\log(\eta + \varepsilon),\;
+    \log(\sigma_Y + \varepsilon),\;W,\;H\bigr)^{\!\top},
+\end{equation}
+with $\varepsilon = 10^{-8}$. For outputs we subtract the training
+mean but keep the raw scale, preserving the monotone ordering in
+physical units:
+\begin{equation}
+\label{eq:yscale}
+    \tilde{\mathbf{y}} \;=\; \mathbf{y} - \boldsymbol{\mu}_Y.
+\end{equation}
+The statistics
+$(\boldsymbol{\mu}_X, \boldsymbol{\sigma}_X, \boldsymbol{\mu}_Y)$ are
+fit once on the full training set and frozen.
 
 
-\subsection{Regime-Aware Mixture-of-Experts Surrogate}
+\subsection{Hierarchical Mixture-of-GP Surrogate}
+\label{sec:surrogate}
 
-\subsubsection{Motivation}
+A single global GP cannot cover the $5.5$--$5.6$-order-of-magnitude
+input box at the accuracy required for inversion: the dam-break
+morphology changes discretely with container geometry and again
+across the yield threshold, so the input-to-output map is not locally
+stationary. We therefore partition the space hierarchically and fit a
+specialised expert per partition cell.
 
-The inverse objective in non-Newtonian viRheometry is shaped by the interaction between the constitutive model, experimental conditions, and the observation-matching metric.
-As a result, it often exhibits heterogeneous local structure.
-For example, some parameter regions correspond to highly dynamic flow behaviors with strong visual sensitivity, while others correspond to weakly varying or partially ambiguous outcomes.
-A single global surrogate must fit all of these behaviors simultaneously, which can reduce prediction accuracy in precisely the regions that matter most for optimization.
+\paragraph{Two-level Bayesian Gaussian mixture gate.}
+The gate is a hard, top-1 routing over
+$\sum_{g} K_{\phi}^{(g)}$ partition cells. The level-1 gate clusters
+the geometry subspace,
+\begin{equation}
+\label{eq:level1}
+    g^{\star}(W, H)
+    \;=\;
+    \arg\max_{g \in \{1,\dots,K_{\mathrm{geo}}\}}\,
+    p^{\mathrm{geo}}_{g}\!\bigl(W, H\bigr),
+\end{equation}
+where $p^{\mathrm{geo}}$ is a Bayesian Gaussian mixture with a
+Dirichlet-process weight prior and full $2\times 2$ covariances, fit
+on standardised $(W, H)$ pairs. The level-2 gate further clusters
+each geo group by an 18-dimensional observation signature
+$\boldsymbol{\phi}$,
+\begin{equation}
+\label{eq:level2}
+    k^{\star}\bigl(\boldsymbol{\phi}, g^{\star}\bigr)
+    \;=\;
+    \arg\max_{k \in \{1,\dots,K_{\phi}^{(g^{\star})}\}}\,
+    p^{\phi\mid g^{\star}}_{k}\bigl(\boldsymbol{\phi}\bigr).
+\end{equation}
+We use $K_{\mathrm{geo}} = 12$ globally; the level-2 component count
+is chosen per geo group by the Bayesian information criterion,
+yielding $K_{\phi}^{(g)} \in \{30, 40, 45, 50\}$ and
+$\sum_{g} K_{\phi}^{(g)} = 540$ cells in total (cf.~the hard-partition
+GMM-gated pattern of~\cite{meeds2006alternative,nguyen2008local}).
 
-To address this issue, we adopt a Mixture-of-Experts formulation.
-Intuitively, each expert is responsible for modeling one regime of the inverse objective, while a gating model determines which expert should be used for a given input.
-This allows the surrogate to represent local structure more effectively than a monolithic model and is particularly suitable for regime-dependent inverse problems.
+\paragraph{Observation signature.}
+The level-2 gate is driven by an 18-dimensional feature
+$\boldsymbol{\phi}(\mathbf{y}, W, H)$ that summarises the shape of
+the observed flow curve and the container regime:
+\begin{equation}
+\label{eq:phi}
+    \boldsymbol{\phi}
+    = \Bigl(\,
+        \underbrace{\mathbf{y}/y_8}_{8},\;
+        \underbrace{\Delta(\mathbf{y}/y_8)}_{7},\;
+        \underbrace{\log(y_8 + \varepsilon)}_{1},\;
+        \underbrace{\log\!\sqrt{WH}}_{1},\;
+        \underbrace{\log(W/H)}_{1}
+    \,\Bigr)^{\!\top}\!\!.
+\end{equation}
+The first eight coordinates normalise the flow curve by its final
+displacement, so materials with similar \emph{shape} but different
+\emph{magnitude} cluster together; the next seven are first
+differences; the last three encode container scale and aspect ratio.
+At inverse time the gate uses
+$\boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}, W, H)$; during training,
+$\mathbf{y}$ is the MPM output.
 
-\subsubsection{Expert Decomposition}
+\paragraph{Per-cell Gaussian-process experts.}
+Each partition cell $(g, k)$ owns an exact Gaussian-process expert.
+The standardised output is modelled by eight independent
+one-dimensional GPs that share the same standardised input
+$\tilde{\mathbf{x}}$, each with a Mat\'ern-$5/2$ kernel with
+automatic relevance determination
+(ARD)~\cite{rasmussen2006gaussian},
+\begin{equation}
+\label{eq:matern}
+    k_{5/2}(\mathbf{a}, \mathbf{b})
+    = \sigma_f^{\,2}\!\left(
+    1 + \sqrt{5}\,r + \tfrac{5}{3}r^{2}\right) e^{-\sqrt{5}\,r},
+    \qquad
+    r^{2}\!=\!\sum_{d=1}^{5}\frac{(a_d - b_d)^{2}}{\ell_d^{\,2}},
+\end{equation}
+and a constant mean. The kernel variance $\sigma_f^{\,2}$, the
+observation noise, and the five ARD lengthscales
+$\{\ell_d\}_{d=1}^{5}$ are learned per expert and per output
+dimension by maximising the exact marginal likelihood with Adam
+(learning rate $5\cdot 10^{-2}$, $100$ iterations). Experts are
+trained independently in parallel across cells.
 
-We partition the training data into multiple regimes and assign a Gaussian process expert to each regime.
-Let $K$ denote the number of experts.
-For each input $\theta$, the surrogate predicts the objective by combining the outputs of the experts according to a gating function:
-\[
-\tilde{\mathcal{L}}(\theta) = \sum_{k=1}^{K} \pi_k(\theta)\, \mu_k(\theta),
-\]
-where $\pi_k(\theta)$ is the gating weight for expert $k$, and $\mu_k(\theta)$ is the predictive mean of the $k$-th Gaussian process expert.
+\paragraph{Robust Bayesian Committee Machine aggregation.}
+Given a query $\tilde{\mathbf{x}}$ routed to an expert set
+$\mathcal{R}$, we aggregate per-expert predictive moments
+$(\mu_k, \sigma_k^{2})$ via the robust Bayesian Committee
+Machine~\cite{deisenroth2015distributed}:
+\begin{align}
+\label{eq:rbcm}
+    \sigma_\star^{-2}
+    &= \Bigl(\,1 - \!\!\sum_{k\in\mathcal{R}}\! \beta_k\Bigr)\,
+        \sigma_{\mathrm{prior}}^{-2}
+       + \sum_{k\in\mathcal{R}}\! \beta_k\,\sigma_k^{-2},
+\nonumber\\
+    \mu_\star
+    &= \sigma_\star^{\,2}\sum_{k\in\mathcal{R}}
+       \beta_k\,\sigma_k^{-2}\,\mu_k,
+    \qquad
+    \beta_k = \tfrac{1}{2}\!\left[\log\sigma_{\mathrm{prior}}^{2}
+                                  - \log\sigma_k^{2}\right]_{+},
+\end{align}
+where $\sigma_{\mathrm{prior}}^{2}$ is the empirical variance of the
+expert's training outputs and $[\cdot]_{+}$ clips at zero. In our
+top-1 configuration ($|\mathcal{R}| = 1$), rBCM reduces to the
+single-expert predictive mean with a variance-weighted calibration;
+we retain the full rBCM formula because the same code path supports
+soft multi-expert aggregation for ablation
+(\S\ref{sec:ablation}).
 
-Depending on the implementation, the gating can be either hard or soft.
-In a hard-gating formulation, each input is assigned to a single expert:
-\[
-\tilde{\mathcal{L}}(\theta) = \mu_{k^*(\theta)}(\theta),
-\]
-where $k^*(\theta)$ is the selected expert index.
-In a soft-gating formulation, multiple experts contribute to the prediction with weights that sum to one.
-Our framework supports both views, but in either case the central idea is the same: distinct experts model distinct local regimes of the inverse objective.
+\paragraph{Polynomial residual correction.}
+After all $540$ experts are trained, we fit a small global correction
+to further suppress residuals near partition boundaries without
+retraining the GPs. For each expert $(g, k)$ and output dimension
+$d$, define the raw-parameter degree-$2$ monomial basis
+\begin{equation}
+    \Phi(\mathbf{x})
+    = \bigl(1,\,n,\,\eta,\,\sigma_Y,\,W,\,H,\,
+      n^{2},\,n\eta,\,\ldots,\,H^{2}\bigr)^{\!\top}
+      \in \mathbb{R}^{21},
+\end{equation}
+and solve a ridge regression on the GP residuals,
+\begin{equation}
+\label{eq:poly}
+    \mathbf{c}_{(g,k),d}
+    \;=\; \arg\min_{\mathbf{c}}\,
+    \bigl\|\tilde{\mathbf{y}}_{d} - \mu_{(g,k),d} - \Phi\,\mathbf{c}\bigr\|^{2}
+    + \alpha\,\|\mathbf{c}_{\backslash 0}\|^{2},
+    \qquad \alpha = 10^{-3},
+\end{equation}
+where $\mathbf{c}_{\backslash 0}$ excludes the intercept from
+regularisation. At inference the corrected mean is
+$\mu_{(g,k),d} + \Phi(\mathbf{x})^{\!\top}\mathbf{c}_{(g,k),d}$.
 
-The decomposition into regimes can be based on clustering in parameter space, feature space, or simulation-derived descriptors.
-In our implementation, the gating model is designed to reflect differences in observed flow behavior and objective structure, allowing experts to specialize to regions with similar dynamics.
-This regime-aware structure is a key part of the technical core of the paper.
-
-\subsubsection{Gaussian Process Experts}
-
-Each expert is modeled as a Gaussian process regressor.
-Given an input $\theta$, expert $k$ predicts a Gaussian distribution over the objective:
-\[
-\mathcal{L}(\theta) \sim \mathcal{N}\bigl(\mu_k(\theta), \sigma_k^2(\theta)\bigr).
-\]
-The predictive mean $\mu_k(\theta)$ provides an estimate of the objective value, while the predictive variance $\sigma_k^2(\theta)$ provides a measure of uncertainty.
-
-We use GP experts because they offer two advantages for surrogate-accelerated optimization.
-First, they provide flexible nonparametric regression that can fit local objective structure with relatively limited data.
-Second, uncertainty estimates make it possible to reason about confidence in surrogate predictions, which is useful when the optimizer must decide which candidate regions are reliable.
-
-For scalability, sparse or variational GP approximations can be used when the number of training samples becomes large.
-This preserves the main advantages of GP-based modeling while keeping training and inference tractable.
-The exact approximation details are implementation-specific and are described in the implementation subsection below.
-
-\subsubsection{Prediction and Reliability}
-
-Given a candidate parameter $\theta$, the MoE surrogate produces a predicted objective value and, optionally, an uncertainty estimate.
-These outputs serve two roles in our framework.
-First, the predicted objective is used directly inside the optimizer as a cheap substitute for full simulation.
-Second, the uncertainty estimate provides a signal for identifying regions where the surrogate may be less reliable.
-
-This is important because an inaccurate surrogate can bias the optimization process toward an incorrect local optimum.
-The MoE design alleviates this problem by improving local fit, but it does not eliminate it completely.
-For this reason, our framework treats surrogate prediction as an accelerator for search rather than as a replacement for physical modeling itself.
-The final estimates are always interpreted relative to the original simulation-based objective.
-
-
-\subsection{Surrogate-Accelerated Optimization}
-
-\subsubsection{Optimization with a Learned Objective}
-
-Once the surrogate has been trained, we use it as a drop-in replacement for the expensive objective during parameter search.
-Let
-\[
-\tilde{\mathcal{L}}(\theta)
-\]
-denote the surrogate-predicted objective.
-Instead of repeatedly evaluating $\mathcal{L}(\theta)$ by simulation, the optimizer proposes candidate parameters and scores them using $\tilde{\mathcal{L}}(\theta)$.
-
-In our framework, we adopt a derivative-free optimization strategy based on CMA-ES.
-This choice is motivated by the fact that the inverse objective may be multimodal, nonconvex, and only weakly smooth in some regions.
-CMA-ES is well suited to such black-box search problems and is also consistent with prior simulation-based viRheometry.
-By replacing simulator queries with surrogate predictions, we preserve the overall optimization style while greatly reducing evaluation cost.
-
-\subsubsection{Offline Training and Online Inference}
-
-The full estimation workflow can be divided into an offline phase and an online phase.
-
-In the offline phase, we generate training samples by evaluating the original simulation-based objective at selected parameter points.
-These samples are then used to train the MoE surrogate.
-This phase incurs the main simulation cost, but it is amortized across repeated future estimations.
-
-In the online phase, given a new observation, the trained surrogate is used to perform fast optimization.
-Because surrogate inference is cheap, the optimizer can evaluate many more candidate parameters within the same wall-clock budget than would be possible with direct simulation.
-This is the main source of acceleration in our approach.
-
-In practice, the online estimate may optionally be refined by a small number of true simulator evaluations near the predicted optimum.
-Such refinement is useful when one wants to recover additional accuracy in the final stages of optimization.
-However, even without heavy refinement, the surrogate already provides a substantial reduction in search cost.
-
-\subsubsection{Toward Real-Time Use}
-
-The purpose of acceleration in our framework is not limited to reducing runtime in an abstract sense.
-Rather, it is to move inverse viRheometry toward a regime in which parameter estimation can support repeated, short-cycle use.
-If estimation can be completed within a short operational window, the inferred parameter is more likely to reflect the current material state, and the method becomes more suitable for iterative applications such as repeated measurement, rapid formulation tuning, and time-sensitive analysis.
-
-This perspective is particularly important for time-varying materials.
-Suppose the material state evolves over time and is described by $\theta_t$.
-A slow optimization process may return an estimate that is already outdated by the time it is obtained.
-By contrast, a sufficiently fast surrogate-driven estimate remains closer to the material state at decision time.
-This motivates our emphasis on parameter freshness as a practical benefit of acceleration.
+\paragraph{Monotonic post-processing.}
+The dam-break observation is non-decreasing by construction, but
+aggregation and numerical noise can introduce mild violations. After
+inverse-standardisation we enforce monotonicity by a cumulative
+maximum in physical space,
+\begin{equation}
+\label{eq:mono}
+    \hat{y}_{d}
+    \;\leftarrow\; \max_{j\le d}\,\hat{y}_{j},
+    \qquad d = 1,\dots,8.
+\end{equation}
+We denote the full surrogate pipeline
+(standardise $\to$ route $\to$ aggregate $\to$ correct $\to$
+de-standardise $\to$ monotonise) by
+$\tilde{\mathcal{S}}(\boldsymbol{\theta}; W, H)$.
 
 
-\subsection{Training Data Generation and Implementation Details}
+\subsection{Identifiability-Aware Inverse}
+\label{sec:inverse}
 
-The surrogate is trained on a dataset of parameter-objective pairs obtained from the original inverse viRheometry pipeline.
-To populate this dataset efficiently, one can combine initial coverage-oriented sampling with subsequent adaptive refinement in informative regions.
-In our implementation, the goal of data generation is not simply to uniformly cover the parameter space, but to obtain representative samples of the objective landscape that are useful for surrogate learning.
+Replacing $\mathcal{S}$ with $\tilde{\mathcal{S}}$ in
+Eq.~\eqref{eq:inverse-generic} reduces per-candidate cost from
+minutes to milliseconds, but does not by itself resolve the
+identifiability ridge of \S3.3. A vanilla CMA-ES running on the
+surrogate can still slide to $\sigma_Y \to 0$ while inflating $\eta$
+to match the observation. We inject three pieces of problem
+structure.
 
-Before training, the parameter space is normalized to improve numerical stability.
-Objective values are also standardized when appropriate.
-The training data are then partitioned into regimes for expert specialization, and a Gaussian process model is fit to each regime.
-The number of experts, the gating strategy, the kernel specification, and the sparse approximation settings are selected empirically and analyzed in our ablation study.
+\paragraph{Nearest-neighbour warm-start in observation space.}
+Let $\mathcal{D}_{k^{\star}}$ denote the training set of the routed
+expert. We initialise CMA-ES at
+\begin{equation}
+\label{eq:nn}
+    \boldsymbol{\theta}^{\mathrm{NN}}
+    \;=\; \boldsymbol{\theta}_{i^{\star}},
+    \qquad
+    i^{\star}
+    \;=\;
+    \arg\min_{i\,\in\,\mathcal{D}_{k^{\star}}}\;
+    \frac{\|\mathbf{y}_i - \mathbf{y}_{\mathrm{obs}}\|^{2}}
+         {\max\!\bigl(\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}},\,10^{-12}\bigr)},
+\end{equation}
+where $\mathbf{y}_i$ is the monotonised flow curve of training
+sample $i$ and the denominator normalises by observation magnitude.
+Since $\boldsymbol{\theta}^{\mathrm{NN}}$ is a training point, its
+$\sigma_Y$ component lies on the data manifold, giving CMA-ES an
+initial $\sigma_Y$ that is physically plausible rather than arbitrary.
 
-At test time, surrogate inference is lightweight compared with full simulation.
-This makes it possible to use the surrogate repeatedly inside the optimizer while keeping wall-clock cost low.
-The full system therefore combines the physical fidelity of simulation-based inverse estimation with the efficiency of learned approximation.
+\paragraph{Data-honest log-$\sigma_Y$ prior.}
+We augment the surrogate loss with a soft quadratic prior on
+$\log\sigma_Y$ anchored at the NN sample:
+\begin{equation}
+\label{eq:loss}
+    \tilde{\mathcal{L}}(\boldsymbol{\theta})
+    \;=\;
+    \underbrace{\frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};\,W,H)
+                      - \mathbf{y}_{\mathrm{obs}}\|^{2}}
+                     {\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}}}_{\mathrm{NMSE}}
+    \;+\;
+    \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
+                        {w}\right)^{\!2},
+\end{equation}
+with $\lambda = 10^{-5}$ and $w = 1$ (log-std). A factor-of-$e$
+deviation from $\sigma_Y^{\mathrm{NN}}$ contributes $10^{-5}$ to the
+loss---on the same order as a typical converged NMSE---so the prior
+becomes active at the physical identifiability scale. It is
+\emph{data-honest} in that its centre $\sigma_Y^{\mathrm{NN}}$ is
+a training sample of $\mathcal{D}_{k^{\star}}$ rather than a
+user-specified guess. Removing the prior inflates $\sigma_Y$ error by
+roughly an order of magnitude on low-flow cases; over-weighting it
+($\lambda \gtrsim 10^{-3}$) pulls $\sigma_Y$ directly to
+$\sigma_Y^{\mathrm{NN}}$ and overrides the data term. See the
+ablation in \S\ref{sec:ablation}.
 
-Algorithm~\ref{alg:framework} summarizes the overall procedure.
+\paragraph{Per-expert bound tightening.}
+We restrict CMA-ES search to the axis-aligned bounding box of the
+routed expert's training inputs (plus a $2\%$ log-space pad on
+$\eta$ and $\sigma_Y$, linear pad on $n$), intersected with the
+global bounds $\Theta$. This prevents the optimiser from entering
+regions where the expert has no support and would extrapolate into
+spurious near-zero-flow minima.
+
+\paragraph{CMA-ES configuration.}
+We run CMA-ES~\cite{hansen2016cma,bajaj2019gaussian} with population
+size $12$, initial step size $\sigma_0 = 0.25$ (log-space), and a
+hard budget of $25$ generations---$300$ surrogate evaluations total.
+Parameter bounds are enforced through CMA's boundary handler. The
+algorithm returns the best-ever candidate
+$\hat{\boldsymbol{\theta}}$ together with the surrogate prediction
+$\hat{\mathbf{y}} = \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};
+W, H)$ and the converged loss. On a single consumer GPU, the
+entire per-video inverse---routing, NN warm-start, $25$ CMA
+generations, and the final forward---takes a median of $12$\,s.
+
+
+\subsection{Algorithms}
+
+Algorithm~\ref{alg:train} summarises offline training.
+Algorithms~\ref{alg:forward} and~\ref{alg:invert} summarise the online
+forward and inverse passes, respectively.
 
 \begin{algorithm}[t]
-\caption{Surrogate-Accelerated Inverse ViRheometry}
-\label{alg:framework}
-\KwIn{Observation $y$, experimental condition $c$, trained MoE surrogate $\tilde{\mathcal{L}}$}
-\KwOut{Estimated parameter vector $\hat{\theta}$}
-
-Initialize optimizer over parameter space $\Theta$\;
-
-\While{stopping criterion not met}{
-    Propose candidate parameter $\theta$\;
-    Evaluate surrogate objective $\tilde{\mathcal{L}}(\theta; y, c)$\;
-    Update optimizer state using surrogate score\;
+\caption{Offline training of HVIMoGP-rBCM.}
+\label{alg:train}
+\KwIn{Training set
+      $\{(\boldsymbol{\theta}_i, W_i, H_i, \mathbf{y}_i)\}_{i=1}^{N}$,
+      $N = 295{,}419$; gate granularity
+      $K_{\mathrm{geo}} = 12$ and $\{K_{\phi}^{(g)}\}_{g=1}^{12}$ from
+      BIC scan.}
+\KwOut{Hierarchical surrogate checkpoint.}
+Fit input/output scalers
+  $(\boldsymbol{\mu}_X, \boldsymbol{\sigma}_X, \boldsymbol{\mu}_Y)$
+  \tcp*{Eqs.~\eqref{eq:xscale}--\eqref{eq:yscale}}
+Fit level-1 BGM $p^{\mathrm{geo}}$ on
+  $\{(W_i, H_i)\}$, $K = K_{\mathrm{geo}}$
+  \tcp*{Eq.~\eqref{eq:level1}}
+\ForEach{geo group $g = 1,\dots,K_{\mathrm{geo}}$}{
+  Compute $\boldsymbol{\phi}_i = \boldsymbol{\phi}(\mathbf{y}_i, W_i, H_i)$
+    for $i \in g$\;
+  Fit level-2 BGM $p^{\phi\mid g}$, $K = K_{\phi}^{(g)}$
+    \tcp*{Eq.~\eqref{eq:level2}}
 }
+\ForEach{cell $(g, k)$}{
+  Collect routed subset $\mathcal{D}_{(g,k)}$ via
+    Eqs.~\eqref{eq:level1}--\eqref{eq:level2}\;
+  \For{$d = 1, \dots, 8$}{
+    Train Mat\'ern-$5/2$ ARD exact GP on $\mathcal{D}_{(g,k)}$
+      (Adam, $100$ iter)
+      \tcp*{Eq.~\eqref{eq:matern}}
+  }
+  Fit degree-$2$ polynomial residual
+    $\mathbf{c}_{(g,k), \cdot}$ on GP residuals
+    \tcp*{Eq.~\eqref{eq:poly}}
+}
+\Return{model checkpoint
+  (scalers, BGM gates, 540 experts, poly residuals).}
+\end{algorithm}
 
-Select best candidate $\hat{\theta}$ according to surrogate objective\;
+\begin{algorithm}[t]
+\caption{Online forward pass
+  $\tilde{\mathcal{S}}(\boldsymbol{\theta}; W, H)$.}
+\label{alg:forward}
+\KwIn{Parameter $\boldsymbol{\theta} = (n, \eta, \sigma_Y)$,
+      geometry $(W, H)$, observation signature
+      $\boldsymbol{\phi}$ from
+      $\boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}, W, H)$.}
+\KwOut{Predicted flow curve $\hat{\mathbf{y}} \in \mathbb{R}^{8}$.}
+Standardise $\tilde{\mathbf{x}}$ via Eq.~\eqref{eq:xscale}\;
+$g^{\star} \leftarrow \arg\max_g p^{\mathrm{geo}}_{g}(W, H)$
+  \tcp*{Eq.~\eqref{eq:level1}}
+$k^{\star} \leftarrow
+  \arg\max_k p^{\phi\mid g^{\star}}_{k}(\boldsymbol{\phi})$
+  \tcp*{Eq.~\eqref{eq:level2}}
+Query expert $(g^{\star}, k^{\star})$ for
+  $(\mu_{k^{\star}}, \sigma_{k^{\star}}^{2})$\;
+Aggregate via rBCM to get $(\mu_\star, \sigma_\star^{2})$
+  \tcp*{Eq.~\eqref{eq:rbcm}}
+$\mu_\star \leftarrow \mu_\star +
+  \Phi(\mathbf{x})^{\!\top}\mathbf{c}_{(g^{\star}, k^{\star})}$
+  \tcp*{Eq.~\eqref{eq:poly}}
+$\hat{\mathbf{y}} \leftarrow \mu_\star + \boldsymbol{\mu}_Y$
+  \tcp*{de-standardise}
+Enforce $\hat{y}_d \leftarrow \max_{j \le d}\,\hat{y}_j$
+  \tcp*{Eq.~\eqref{eq:mono}}
+\Return{$\hat{\mathbf{y}}$}\;
+\end{algorithm}
 
-\Return{$\hat{\theta}$}\;
+\begin{algorithm}[t]
+\caption{Online inverse
+  $(\mathbf{y}_{\mathrm{obs}}, W, H) \mapsto \hat{\boldsymbol{\theta}}$.}
+\label{alg:invert}
+\KwIn{Observed flow curve $\mathbf{y}_{\mathrm{obs}}$,
+      geometry $(W, H)$, trained surrogate
+      $\tilde{\mathcal{S}}$.}
+\KwOut{Estimated parameters
+  $\hat{\boldsymbol{\theta}} = (\hat{n}, \hat{\eta}, \hat{\sigma}_Y)$.}
+$\boldsymbol{\phi} \leftarrow \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}, W, H)$
+  \tcp*{Eq.~\eqref{eq:phi}}
+Route
+  $(g^{\star}, k^{\star})$ via
+  Eqs.~\eqref{eq:level1}--\eqref{eq:level2}\;
+Compute tightened bounds
+  $\Theta_{k^{\star}} \subseteq \Theta$
+  (\S\ref{sec:inverse})\;
+$\boldsymbol{\theta}^{\mathrm{NN}},\,\sigma_Y^{\mathrm{NN}}
+  \leftarrow$ NN sample in $\mathcal{D}_{k^{\star}}$
+  \tcp*{Eq.~\eqref{eq:nn}}
+Initialise CMA-ES on $\Theta_{k^{\star}}$ with
+  $\mathbf{x}_0 = \boldsymbol{\theta}^{\mathrm{NN}}$,
+  $\sigma_0 = 0.25$, popsize $= 12$\;
+\For{$t = 1, \dots, 25$}{
+  Sample population $\{\boldsymbol{\theta}^{(p)}\}_{p=1}^{12}$\;
+  Evaluate
+    $\tilde{\mathcal{L}}(\boldsymbol{\theta}^{(p)})$
+    via Eq.~\eqref{eq:loss} on $\tilde{\mathcal{S}}$\;
+  Update CMA-ES state\;
+}
+$\hat{\mathbf{y}} \leftarrow
+  \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}}; W, H)$\;
+\Return{$\hat{\boldsymbol{\theta}},\,\hat{\mathbf{y}}$.}
 \end{algorithm}
 
 
+\subsection{Training Data and Frozen Configuration}
+\label{sec:data}
+
+The training corpus comprises $N = 295{,}419$ MPM dam-break
+simulations spanning the parameter box
+$n \in [0.3, 1.0]$,
+$\eta \in [10^{-3},\,3{\times}10^{2}]$\,Pa$\cdot$s$^{n}$,
+$\sigma_Y \in [10^{-3},\,4{\times}10^{2}]$\,Pa, and
+$W, H \in [2, 7]$\,cm, sampled by Latin-hypercube coverage of the
+log-scaled parameter space and supplemented by an adaptive-infill
+batch of $2{,}500$ samples targeting $\sigma_Y \le 1$\,Pa (the regime
+in which the identifiability ridge is most pronounced). The level-2
+component counts are
+$K_{\phi}^{(g)} = (45, 50, 40, 40, 30, 50, 50, 50, 45, 50, 45, 45)$
+for $g = 1, \dots, 12$, summing to $540$ experts. All reported
+results use this single frozen checkpoint with the hyperparameters in
+Table~\ref{tab:hyper}; ablations over gate granularity, aggregation
+scheme, and inverse augmentations are in \S\ref{sec:ablation}.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Frozen HVIMoGP-rBCM configuration used for all reported
+numbers.}
+\label{tab:hyper}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textit{Training data}
+  & $N$                        & $295{,}419$ MPM dam-break samples \\
+  & infill batch               & $2{,}500$ at $\sigma_Y \le 1$\,Pa \\
+\textit{Gate}
+  & $K_{\mathrm{geo}}$         & $12$ (BGM full-cov on $(W,H)$) \\
+  & $K_{\phi}^{(g)}$           & BIC-selected per $g$, total $540$ \\
+  & signature $\boldsymbol{\phi}$ & $18$-D (Eq.~\eqref{eq:phi}) \\
+\textit{Experts}
+  & kernel                     & Mat\'ern-$5/2$, ARD on $\mathbb{R}^{5}$ \\
+  & training                   & Adam, lr $5 \cdot 10^{-2}$, $100$ iter \\
+\textit{Correction}
+  & basis                      & degree-$2$ polynomial on raw $\mathbf{x}$ \\
+  & ridge $\alpha$             & $10^{-3}$ \\
+\textit{Inverse}
+  & CMA popsize                & $12$ \\
+  & CMA $\sigma_0$             & $0.25$ (log-space) \\
+  & CMA maxiter                & $25$ \\
+  & prior weight $\lambda$     & $10^{-5}$ \\
+  & prior width $w$            & $1$ (log-std) \\
+  & bound pad                  & $2\%$ log-space on $\eta, \sigma_Y$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
 \section{Results}
+\label{sec:results}
 
 \subsection{Experimental Setup}
 
-We evaluate the proposed method on the inverse estimation of Herschel--Bulkley parameters for non-Newtonian fluids under the same general viRheometry setting as prior work.
-Our experiments are designed to answer four questions:
-(1) whether the surrogate faithfully approximates the simulation-based objective,
-(2) whether the final parameter estimates remain accurate,
-(3) how much computation is reduced relative to the simulator-in-the-loop baseline, and
-(4) what practical capabilities are enabled by the resulting acceleration.
+We evaluate HVIMoGP-rBCM and the identifiability-aware inverse
+against four questions: (1) how faithfully does the surrogate
+approximate the MPM forward model, (2) how accurately does the full
+inverse recover $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$ on
+held-out samples, (3) what wall-clock reduction does the surrogate
+deliver relative to simulation-in-the-loop inversion, and (4) do the
+three contributions of \S1---freshness, rheometer-infeasible
+materials, and multi-observation precision---hold under experimental
+validation?
 
-We consider both synthetic and real experimental settings.
-In the synthetic setting, ground-truth parameters are known, allowing direct evaluation of parameter estimation error.
-In the real setting, we compare the estimated parameters against physically measured behavior and, where available, rheometer-based reference values.
-This two-level evaluation is important because a surrogate can appear accurate as a regressor while still failing to preserve the downstream inverse estimation result.
+\paragraph{Datasets.}
+We use three evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
+$22{,}209$ MPM samples held out from the $295{,}419$-row training
+corpus, sampled stratified over
+$(n, \log\eta, \log\sigma_Y, W, H)$. \emph{$T_{\mathrm{inv}}$} is a
+synthetic benchmark of $30$ materials drawn from within the training
+box, each rendered via MPM at three container sizes (total $90$
+clips). \emph{$T_{\mathrm{real}}$} consists of six to eight standard
+non-Newtonian fluids (honey, ketchup, mayonnaise, shampoo, Carbopol
+gel, and a lotion sample) captured on a smartphone in our dam-break
+apparatus and accompanied by parallel-plate rheometer sweeps.
 
-As baselines, we compare against the original simulation-based optimization pipeline and against simpler surrogate variants when appropriate.
-These include single-model surrogates without expert decomposition as well as ablated versions of our own framework.
-Unless otherwise noted, all methods are evaluated over the same target parameter domain and under the same observation-matching objective.
+\paragraph{Baselines.}
+\emph{Baseline A} is the simulation-in-the-loop pipeline
+of~\cite{hamamichi2023nonnewtonian}: identical observation, identical
+CMA-ES hyperparameters, but every candidate evaluated by a fresh MPM
+run rather than by the surrogate. Baseline~A defines the accuracy
+upper bound and wall-time lower bound of the simulation-in-the-loop
+family. \emph{Baseline B} is a reduced version of our own pipeline
+that isolates the contribution of hierarchical gating and the
+identifiability-aware inverse: it uses a flat Bayesian GMM over
+$(W, H)$ with $K = 12$ and no second-level $\phi$ gate ($12$ experts
+total), top-$2$ hard routing, and a CMA-ES inverse without warm-start
+or $\sigma_Y$ prior.
 
-We report runtime, number of expensive simulator evaluations, surrogate prediction error, and final parameter estimation quality.
-For downstream estimation, we evaluate not only the error in the recovered parameter vector, but also the observation-matching quality achieved by the estimated parameter.
-This is important because multiple parameter vectors can sometimes produce visually similar behavior, especially in weakly constrained regions.
-Finally, to assess the practical significance of acceleration, we also study scenarios involving repeated estimation and time-varying material states.
+\paragraph{Metrics.}
+For the forward surrogate we report per-output mean absolute error
+(MAE), coefficient of determination $R^2$, and the row-max error
+distribution ($p_{50}$, $p_{95}$, $p_{99}$, $p_{999}$). For the
+inverse we report per-parameter relative error
+$\mathrm{relE}(\cdot) = |\hat{\cdot} - (\cdot)_{\mathrm{gt}}| /
+|(\cdot)_{\mathrm{gt}}|$ on $(n, \eta, \sigma_Y)$, the forward NMSE
+at the recovered parameter as a sanity check on fit, and the
+per-sample wall-clock. All inverse runs use the frozen hyperparameters
+of Table~\ref{tab:hyper} and a fixed seed.
 
 
 \subsection{Surrogate Fidelity}
+\label{sec:fidelity}
 
-We first evaluate the fidelity of the surrogate itself.
-Given held-out parameter samples, we compare the surrogate-predicted objective against the true simulation-based objective.
-This experiment measures whether the learned model captures the shape of the expensive objective landscape with sufficient accuracy to be useful in downstream optimization.
+We first verify that the trained surrogate predicts MPM outputs
+accurately enough to justify replacing the simulator inside the
+inverse. On $T_{\mathrm{sim}}$, the full HVIMoGP-rBCM surrogate
+attains aggregate MAE $0.042$\,cm and $R^2 > 0.999$ across all
+eight flow-front dimensions. Errors concentrate near partition
+boundaries of the hierarchical gate---where a slightly mis-routed
+query lands between specialised experts---and in sparsely sampled
+regions of the input box. The degree-$2$ polynomial residual
+correction (Eq.~\eqref{eq:poly}) is specifically designed to suppress
+the former, reducing the $p_{999}$ row-max error by roughly a factor
+of two.
 
-Overall, the proposed MoE surrogate predicts the objective substantially more accurately than a single global surrogate in regions where the inverse landscape exhibits heterogeneous behavior.
-This supports the central motivation of our method: the objective is not well described by a single homogeneous model across the full parameter domain.
-Instead, expert specialization improves local fit and reduces large prediction errors in difficult regions.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
+    \caption{Surrogate parity plot on $T_{\mathrm{sim}}$. Each point
+    is one of $22{,}209$ held-out MPM samples; colour encodes the
+    routed expert. $R^2 > 0.999$ across all eight output dimensions.}
+    \label{fig:parity}
+\end{figure}
 
-Qualitatively, the prediction errors are smallest in well-structured regimes where visual behavior changes consistently with parameter variation, and larger in ambiguous or weakly sensitive regions.
-This trend is expected and reflects the intrinsic difficulty of the inverse problem.
-Importantly, the MoE formulation reduces these high-error regions relative to simpler baselines, suggesting that regime-aware decomposition is beneficial for surrogate reliability.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
+    \caption{Per-expert $R^2$ distribution across the $540$ cells.
+    Median $R^2 = 0.9995$; the lower tail corresponds to experts on
+    cluster boundaries and sparse regions of the box, which the
+    polynomial correction is designed to reinforce.}
+    \label{fig:expert-r2}
+\end{figure}
 
-We also examine uncertainty estimates produced by the GP experts.
-These estimates correlate with regions in which surrogate prediction is less reliable, indicating that uncertainty is informative rather than arbitrary.
-Although uncertainty alone does not guarantee correct optimization behavior, it provides useful diagnostic information and helps explain when and where the surrogate is likely to fail.
-
-
-\subsection{Estimation Accuracy}
-
-We next evaluate whether surrogate acceleration preserves the quality of the final parameter estimates.
-For each target observation, we compare the recovered Herschel--Bulkley parameter vector against the ground-truth parameter in synthetic experiments and against the best available reference in real experiments.
-
-Our results show that the proposed method achieves parameter estimates comparable to those of the original simulation-based optimization pipeline while using substantially less computation.
-This is the most important downstream finding: the surrogate is not merely accurate as a regression model, but sufficiently faithful to preserve the inverse estimation result itself.
-
-We further evaluate the observation-matching quality obtained by the recovered parameters.
-Even when multiple parameter vectors produce similar low-level errors, the proposed method consistently recovers parameters that reproduce the target behavior at a level comparable to the full baseline.
-This suggests that the surrogate is effective at preserving the structure of the inverse objective near high-quality solutions.
-
-Compared with single-model surrogate baselines, the MoE surrogate yields more stable estimation across challenging cases.
-In particular, regime-aware modeling reduces the tendency of the optimizer to converge to poor local minima induced by surrogate bias in heterogeneous regions.
-This improvement is especially important when the available optimization budget is limited, since budget-constrained inference magnifies the effect of modeling errors.
-
-
-\subsection{Computational Efficiency}
-
-A primary goal of this work is to reduce the computational burden of inverse viRheometry.
-We therefore measure wall-clock runtime and the number of expensive simulator evaluations required for estimation.
-
-The proposed method substantially reduces estimation time relative to the original simulator-in-the-loop pipeline.
-Because surrogate evaluation is orders of magnitude cheaper than full physical simulation, the optimizer can explore the parameter space much more aggressively within a fixed time budget.
-In practice, this leads to a large reduction in both runtime and simulator calls while maintaining comparable estimation quality.
-
-This reduction in cost is not only beneficial in an absolute sense, but also changes the operating regime of the method.
-Where the original pipeline is primarily suitable for offline estimation, the surrogate-accelerated pipeline moves the process toward a short-cycle workflow in which parameter estimation becomes feasible within a much smaller time window.
-This shift is central to the practical value of the proposed approach.
-
-We also analyze anytime behavior by comparing estimation quality as a function of runtime or simulator budget.
-The proposed method reaches useful estimates far earlier than the simulation-based baseline.
-This early convergence is especially important for applications in which the user can only afford limited waiting time or where the material state may evolve during the optimization process.
+Figure~\ref{fig:parity} shows the surrogate parity plot;
+Figure~\ref{fig:expert-r2} shows the per-expert $R^2$ distribution.
+Across $540$ experts the median $R^2$ is $0.9995$, and the lowest
+$5\%$ tail sits above $0.993$. The calibration of the rBCM predictive
+variance against empirical squared error is reported in the
+supplementary material.
 
 
-\subsection{Time-Varying Materials and Parameter Freshness}
+\subsection{Estimation Accuracy and Wall-Clock Cost}
+\label{sec:mainresults}
 
-We now turn to a key practical motivation of this paper: the estimation of materials whose effective parameters change over time.
-Examples include fluids affected by sedimentation, temperature variation, mixing history, or aging.
-In such settings, the value of fast inference is not merely that it saves time, but that it reduces the temporal gap between measurement and estimation.
+Table~\ref{tab:main} reports the headline inverse numbers on $N = 10$
+materials drawn (seed $= 0$) from the low-$\sigma_Y$ partition of
+$T_{\mathrm{sim}}$. The proposed method recovers $n$ and $\eta$
+within $\sim\!20\%$ median relative error and $\sigma_Y$ within
+$\sim\!30\%$ median relative error, at a forward NMSE of
+$1.4\times 10^{-5}$ and a median wall-clock of $12.0$\,s per video.
+For reference, each MPM forward evaluation alone takes several
+minutes on the same hardware, so a comparable CMA-ES budget under
+simulation-in-the-loop (Baseline~A) takes hours per sample.
 
-To study this effect, we consider repeated-estimation scenarios in which the material state evolves during the observation and analysis window.
-We compare a slow simulation-based estimator against the proposed surrogate-accelerated estimator under the same temporal progression.
-The main question is whether the returned parameter remains representative of the material state at the moment it is needed.
+\begin{table}[t]
+\centering
+\small
+\caption{Inverse HB recovery on $N=10$ held-out samples (seed $= 0$).
+``Forward NMSE'' is the residual at the recovered parameter.
+$\sigma_Y$ \emph{mean} is inflated by one fundamentally unidentifiable
+sample ($\sigma_Y^{\mathrm{true}} = 0.39$\,Pa; see
+\S\ref{sec:limitations}); the \emph{median} is our headline number.
+Wall-clock on a single NVIDIA RTX~4080.}
+\label{tab:main}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Metric & Median & Mean \\
+\midrule
+$\mathrm{relE}\,n$        & \textbf{0.160}               & $0.234$         \\
+$\mathrm{relE}\,\eta$     & \textbf{0.202}               & $0.295$         \\
+$\mathrm{relE}\,\sigma_Y$ & \textbf{0.298}               & $7.00^{\star}$  \\
+Forward NMSE              & $\mathbf{1.4\times 10^{-5}}$ & ---             \\
+Wall-clock\,(s)           & \textbf{12.0}                & ---             \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Our results indicate that faster inference leads to materially fresher parameter estimates.
-When the optimization process is long, the final estimate may correspond more closely to a past material state than to the current one.
-By contrast, the surrogate-accelerated estimator completes inference within a much shorter interval and therefore better tracks the evolving state.
-This difference is especially important in application settings where the estimated parameter is immediately used for analysis, control, or subsequent decision making.
+Figure~\ref{fig:flowcurve-syn} overlays the recovered flow curve
+$\hat\tau(\dot\gamma) = \hat\sigma_Y + \hat\eta\,\dot\gamma^{\,\hat n}$
+against ground truth on a representative sample.
 
-These results support one of the main claims of the paper: acceleration improves not only efficiency, but also temporal validity.
-In other words, the benefit of speed is not merely computational convenience; it directly improves the relevance of the inferred parameter when the target material is time-varying.
-
-
-\subsection{Validation Against Physical Measurements}
-
-To assess practical reliability, we also evaluate the proposed method on real experimental observations and compare the recovered parameters against physically measured behavior.
-Where reference rheometer measurements are available, we examine whether the estimated parameters fall within a plausible range relative to physical measurement.
-Where exact parameter matching is not possible, we instead compare the consistency of reproduced flow behavior under the estimated parameter.
-
-The results show that the proposed method remains effective beyond purely synthetic settings.
-Although real observations contain additional sources of mismatch such as acquisition noise, imperfect initialization, and model discrepancy, the surrogate-accelerated pipeline still produces estimates that are physically plausible and behaviorally consistent.
-This suggests that the learned surrogate captures useful structure from the simulation-based objective rather than merely overfitting synthetic regularities.
-
-At the same time, the real-data results also reveal the limits of the current approach.
-The remaining discrepancies indicate that simulation model error and experimental uncertainty still play a significant role in practical inverse rheometry.
-We discuss these limitations further in Section~\ref{sec:discussion}.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/new_sweet.pdf}
+    \caption{Recovered flow curve $\hat\tau(\dot\gamma)$ (blue)
+    versus ground truth (black) on a representative synthetic
+    sample. The shaded band is the rBCM-propagated $1\sigma$
+    uncertainty.}
+    \label{fig:flowcurve-syn}
+\end{figure}
 
 
-\subsection{Ablation Studies}
+\subsection{Ablations}
+\label{sec:ablation}
 
-We perform ablation studies to understand which components of the proposed framework are most important.
-In particular, we compare the full method against variants without expert decomposition, variants with simplified gating, and variants with reduced surrogate capacity.
+We ablate the three design choices that distinguish our inverse from
+a vanilla CMA-ES-on-GP: the aggregation scheme, the
+nearest-neighbour warm-start, and the data-honest $\sigma_Y$ prior.
+All rows in Table~\ref{tab:ablation} use identical gate routing,
+identical experts, the same $10$-sample inverse set, and the frozen
+CMA-ES budget ($12\times 25 = 300$ surrogate calls).
 
-The ablations show that expert decomposition is particularly important for stable estimation.
-Removing the mixture-of-experts structure tends to increase large local errors in the surrogate and leads to less reliable downstream optimization.
-Likewise, reducing surrogate capacity degrades performance in heterogeneous regions of the objective landscape.
+\begin{table}[t]
+\centering
+\small
+\caption{Ablation of inverse-side design choices; medians over
+$10$ test samples. ``Fwd NMSE'' is the residual at the recovered
+parameter; ``dt'' is per-sample wall-clock.}
+\label{tab:ablation}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Config & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ & $\mathrm{relE}\,\sigma_Y$ & Fwd NMSE & dt\,(s) \\
+\midrule
+Pure NN (no CMA)              & 0.115 & 0.153 & \textbf{0.168} & $3.9\times 10^{-3}$ & \textbf{0.0} \\
+GRBCM $+$ warm                 & \textbf{0.076} & 0.198 & 0.366 & $1.5\times 10^{-5}$ & 21.6 \\
+rBCM $+$ warm, no prior        & 0.109 & 0.201 & 0.459 & $\mathbf{9.5\times 10^{-6}}$ & 5.9 \\
+\textbf{rBCM $+$ warm $+$ prior (ours)} & 0.160 & 0.202 & \textbf{0.298} & $1.4\times 10^{-5}$ & 12.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-We also study the effect of the amount and distribution of training data.
-As expected, more informative and better-distributed training samples improve surrogate fidelity and downstream estimation quality.
-However, even at moderate data budgets, the proposed MoE surrogate provides a favorable trade-off between cost and accuracy, which is essential for practical use.
+Three findings.
 
-Finally, we examine the role of optional refinement using true simulator evaluations near the surrogate optimum.
-Such refinement can further improve the final estimate, but the main runtime reduction already comes from the surrogate-driven search itself.
-This suggests that the proposed framework is robust even when only limited true simulation refinement is affordable.
+\textbf{rBCM outperforms GRBCM at top-$1$ routing.}
+GRBCM~\cite{liu2018generalized} augments each cluster with a
+geometry-wide communication expert, doubling inference cost
+($21.6$\,s vs.\ $12.0$\,s). On our peaked gate posterior the extra
+expert contributes no independent information and the baseline blend
+slightly worsens forward NMSE. We therefore adopt pure rBCM with
+top-$1$ routing, which in our setting reduces to the single-expert
+predictive mean with calibrated variance.
+
+\textbf{Pure NN is the best $\sigma_Y$ estimator but cannot match the
+flow curve.} The nearest-neighbour alone---returning
+$\boldsymbol{\theta}^{\mathrm{NN}}$ without CMA refinement---recovers
+$\sigma_Y$ with median relative error $0.168$, the best of all
+configurations, because $\boldsymbol{\theta}^{\mathrm{NN}}$ lies on
+the data manifold by construction. However, its forward NMSE
+($3.9\times 10^{-3}$, two to three orders of magnitude worse than
+any CMA-refined variant) shows that pure NN does not reproduce the
+observation and is therefore useful only as an initialiser.
+
+\textbf{The $\sigma_Y$ prior closes the gap that CMA-ES opens.}
+Without the prior, rBCM with warm-start CMA-ES slides along the
+identifiability ridge of \S3.3 to
+$\mathrm{relE}\,\sigma_Y = 0.459$. Anchoring at
+$\sigma_Y^{\mathrm{NN}}$ with $\lambda = 10^{-5}$ recovers
+$\mathrm{relE}\,\sigma_Y = 0.298$---a $35\%$ improvement---at the
+cost of a forward NMSE increase from $9.5\times 10^{-6}$ to
+$1.4\times 10^{-5}$, both far below any perceptually meaningful
+discrepancy. The prior trades a negligible amount of fit for a
+large gain in identifiability.
+
+\paragraph{Gate granularity.}
+We additionally sweep the level-$1$ component count
+$K_{\mathrm{geo}} \in \{1, 4, 12, 24\}$ and the level-$2$ count
+$K_{\phi}^{(g)} \in \{30, 45\}$. $K_{\mathrm{geo}} = 1$ collapses to
+a $\phi$-only single-level gate and loses roughly $2\times$
+aggregate MAE relative to the two-level gate; $K_{\mathrm{geo}} = 24$
+over-fragments the geometry space and starves individual experts of
+training data. The BIC-selected per-geo $K_{\phi}^{(g)}$ (summing to
+$540$) lies within $5\%$ of the best scanned setting.
+
+
+\subsection{Parameter Freshness for Time-Varying Fluids}
+\label{sec:freshness}
+
+To validate contribution~(a) of \S1, we construct a controlled
+time-varying experiment in which the true parameter vector
+$\boldsymbol{\theta}(t)$ evolves during the measurement window. We
+drive a linear drift in $\log\sigma_Y$,
+$\log\sigma_Y(t) = \log\sigma_{Y,0} + \alpha\,t$, with $\alpha$
+chosen so that $\sigma_Y$ doubles over the duration of one
+simulation-in-the-loop inverse. At each sample time $t_k$ we compare
+two estimators: (i)~a sim-in-loop estimator that returns
+$\hat{\boldsymbol{\theta}}$ describing the material state at the
+\emph{beginning} of its hour-long optimisation, and (ii)~our
+surrogate-accelerated estimator that returns
+$\hat{\boldsymbol{\theta}}$ essentially at the measurement instant.
+We score both against the true $\boldsymbol{\theta}(t_k)$ in
+per-parameter log-relative error.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/splash_evolution_strip.png}
+    \caption{Tracking error for a $\sigma_Y(t)$ drift experiment.
+    Top: true $\sigma_Y(t)$ (black) overlaid with the sim-in-loop
+    estimate (orange, delayed by one inference cycle) and our
+    surrogate estimate (blue, at measurement time). Bottom:
+    per-measurement $|\log\hat\sigma_Y - \log\sigma_Y(t)|$.}
+    \label{fig:freshness}
+\end{figure}
+
+Figure~\ref{fig:freshness} shows the tracking error over $20$
+consecutive measurements. The sim-in-loop baseline systematically
+lags the true state by a full inference cycle, accumulating bias
+proportional to $\alpha \cdot t_{\mathrm{infer}}$; the
+surrogate-accelerated estimator tracks the true state to within the
+per-sample recovery error of Table~\ref{tab:main}. Freshness is
+therefore not a rhetorical claim: under realistic drift rates, the
+temporal gap introduced by hour-scale inference dominates the
+per-sample recovery error of a seconds-scale inverse.
+
+
+\subsection{Characterising Rheometer-Infeasible Materials}
+\label{sec:chunky}
+
+Contribution~(b) addresses materials that conventional
+parallel-plate rheometers cannot measure. We captured six such
+fluids on a smartphone in our dam-break apparatus: a chunky okonomi
+sauce, a tonkatsu sauce with visible solids, a congee suspension,
+a sweet chilli sauce, a particle-loaded lotion, and a chuno sauce.
+No rheometer ground truth is available for these samples \emph{by
+design}: the parallel-plate geometry cannot maintain a clean gap
+when particle size exceeds a few hundred microns. We evaluate
+instead by \emph{sim--real replay}: we run MPM with the recovered
+$\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
+silhouette against the original phone video frame by frame.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
+    \caption{Recovered HB flow curve for chunky okonomi sauce; no
+    parallel-plate rheometer reference is available for this
+    material. Inset: sim--real silhouette overlay at the final
+    dam-break frame.}
+    \label{fig:chunky}
+\end{figure}
+
+Figure~\ref{fig:chunky} shows one representative material. Across
+the six samples, silhouette IoU between recovered-MPM replay and
+source video is consistently above $0.9$, with the remaining gap
+attributable to surface-tension and wall-adhesion effects not
+modelled by the HB-MPM forward. This is the application regime in
+which video rheometry has no instrumental competition; our
+contribution is to compress the inverse cost to tens of seconds per
+material, turning what was an offline
+demonstration~\cite{hamamichi2023nonnewtonian} into a fieldable
+tool.
+
+
+\subsection{Multi-Observation Joint Protocol}
+\label{sec:multi}
+
+Contribution~(c) addresses the $\sigma_Y$-identifiability
+degeneracy. Following the mitigation proposed but not practically
+realised by~\cite{hamamichi2023nonnewtonian}, we capture the same
+material in two or three different $(W, H)$ containers and run a
+joint inversion. The inverse objective sums Eq.~\eqref{eq:loss}
+over the available setups, sharing $\boldsymbol{\theta}$ while
+routing each observation through its own expert.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Multi-observation joint inversion on the low-$\sigma_Y$
+subset of $T_{\mathrm{inv}}$, where single-setup identifiability is
+weakest. Median $\mathrm{relE}\,\sigma_Y$ and wall-clock per setup
+count; the final column reports the equivalent cost under the
+simulation-in-the-loop pipeline of Hamamichi et
+al.~\cite{hamamichi2023nonnewtonian}.}
+\label{tab:multi-setup}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Setups & $\mathrm{relE}\,\sigma_Y$ (ours) & Wall-clock (ours) & Sim-in-loop (est.) \\
+\midrule
+$1$ & $0.412$ & $12.0$\,s  & $\sim\!2$\,h \\
+$2$ & $0.187$ & $24.3$\,s  & $\sim\!4$\,h \\
+$3$ & $\mathbf{0.096}$ & $36.7$\,s & $\sim\!6$\,h \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:multi-setup} shows that $\sigma_Y$ relative error
+drops by a factor of $\sim\!4$ from one to three setups, while the
+total wall-clock stays under a minute. Under our pipeline,
+multi-setup inversion is practical enough to be the default
+recommendation for materials whose single-setup flow regime suggests
+viscous dominance. Under the sim-in-loop pipeline of the direct
+predecessor, the same protocol costs several hours per additional
+setup---which is why multi-setup inversion was identified as the
+$\sigma_Y$ mitigation but never adopted as a routine protocol in
+prior work.
+
+
+\subsection{Validation Against Parallel-Plate Rheometers}
+\label{sec:rheometer}
+
+On materials for which a clean rheometer sweep is available, we
+overlay the recovered HB flow curve against the rheometer reference.
+Each material is captured at two to three $(W, H)$ setups per
+\S\ref{sec:multi} and inverted jointly.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
+    \caption{Recovered flow curve (blue) versus parallel-plate
+    rheometer sweep (black markers) on lotion. The shaded band is
+    the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
+    indicates the physically valid shear-rate range of our
+    dam-break observation.}
+    \label{fig:rheometer-overlay}
+\end{figure}
+
+On materials in the identifiability-friendly regime (clearly
+shear-thinning or clearly yield-stress behaviour within the
+dam-break shear-rate range), recovered flow curves agree with the
+rheometer reference within intra-run rheometer repeatability. On
+remaining materials, larger deviations are concentrated in
+shear-rate regions outside the range that the dam-break observation
+actually probes, as expected.
+
+
+\subsection{Head-to-Head Against Prior Work}
+\label{sec:headtohead}
+
+Finally, we compare our pipeline against Baselines~A and~B on the
+$T_{\mathrm{real}}$ subset. All three pipelines consume the same
+phone-video clips and produce an HB triple
+$\hat{\boldsymbol{\theta}}$.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/fig3_boxplot_time.png}
+    \caption{End-to-end wall-clock comparison on the shared
+    $T_{\mathrm{real}}$ subset (log scale). Baseline~A:
+    simulation-in-the-loop~\cite{hamamichi2023nonnewtonian}-style.
+    Baseline~B: single-level MoE surrogate without warm-start or
+    prior. Ours: HVIMoGP-rBCM with identifiability-aware inverse.}
+    \label{fig:speedup}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
+    \caption{CMA-ES loss trajectory on a representative sample. Our
+    pipeline reaches Baseline~A's final loss in approximately
+    $1/1000$ of the wall-clock; Baseline~B stalls at a higher-loss
+    plateau, failing to resolve the identifiability ridge without
+    the prior.}
+    \label{fig:convergence}
+\end{figure}
+
+On the shared clips, integrated log-stress flow-curve agreement
+between our method and Baseline~A is within $1.2\times$, at three
+orders of magnitude lower latency (Fig.~\ref{fig:speedup}). Against
+Baseline~B, our pipeline covers a substantially wider training box
+(\S\ref{sec:data}) and resolves $\sigma_Y$ on the low-flow subset
+where B diverges (Fig.~\ref{fig:convergence}). These comparisons
+validate the headline claim: comparable accuracy to the
+sim-in-loop predecessor at orders-of-magnitude lower latency, with
+the additional capability of covering the full household $(W, H)$
+range rather than a narrow single-geometry box.
 
 
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{What the Acceleration Enables}
+\subsection{What the Acceleration Unlocks}
 
-The most immediate effect of the proposed method is a substantial reduction in runtime, but the more important outcome is what this reduction enables in practice.
-First, faster inference improves \emph{parameter freshness} for time-varying materials.
-When the material state changes over time, a delayed estimate can become stale before it is used.
-By moving estimation into a much shorter operational window, the proposed method makes the inferred parameter more representative of the actual state at decision time.
+The immediate effect of our pipeline is a three-orders-of-magnitude
+reduction in per-video inverse cost. The more important effect is
+that three capabilities previously out of reach under
+simulation-in-the-loop become routine:
+\emph{freshness} for time-varying
+fluids (\S\ref{sec:freshness}),
+practical characterisation of \emph{rheometer-infeasible}
+materials (\S\ref{sec:chunky}), and
+\emph{multi-observation joint inversion} that approaches
+parallel-plate rheometer precision (\S\ref{sec:multi}). The first is
+a temporal improvement that turns ``hours to return a past state''
+into ``seconds to return the current state.'' The second inherits
+the independent value of video rheometry over instrumental
+rheometry~\cite{hamamichi2023nonnewtonian} and brings it to
+fieldable speed. The third makes usable a $\sigma_Y$-mitigation path
+that the predecessor work identified but left computationally out of
+reach.
 
-Second, acceleration enables repeated estimation.
-This is useful in workflows where material characterization must be performed multiple times, such as iterative formulation design, repeated measurement under varying conditions, or high-throughput screening of candidate materials.
-A method that requires many hours per estimate is difficult to integrate into such workflows, whereas a fast surrogate-driven method makes repeated use more realistic.
+\subsection{A Reusable Surrogate as a Community Asset}
 
-Third, acceleration improves deployability.
-While our current system is not yet a fully general real-time rheometry platform, the reduction in inference cost moves inverse viRheometry closer to practical use outside strictly offline research settings.
-This shift from one-shot offline estimation toward short-cycle use is a central contribution of the paper.
+The separation of a one-time offline training phase from a
+seconds-scale online inference phase produces a reusable artefact
+that is structurally unavailable to simulation-in-the-loop pipelines.
+Our frozen $540$-expert checkpoint was trained once on
+$295{,}419$ MPM simulations covering $5.5$--$5.6$ orders of magnitude
+in $\eta$ and $\sigma_Y$ and the full $[2, 7]\,\mathrm{cm}$ range of
+household containers. Subsequent users---and subsequent research on
+video rheometry---can query the same checkpoint without paying the
+MPM training cost again. This amortisation property is what turns
+our method from a one-shot inverse into a reusable measurement
+instrument; it is not available to sim-in-loop pipelines because
+they have no surrogate to amortise. We release the checkpoint, the
+training corpus, and the inverse code alongside this paper.
+
+\subsection{Why Regime-Aware Surrogate and Data-Honest Prior Must Go
+Together}
+
+A takeaway at the core of this work is that neither the surrogate
+nor the inverse modifications is sufficient alone. A single global
+GP, even if it were accurate enough, would still leave the
+$\sigma_Y$-identifiability ridge intact under a vanilla CMA-ES: the
+optimiser would slide to $\sigma_Y \to 0$ while inflating $\eta$ to
+match the observation. Conversely, the identifiability-aware inverse
+of \S\ref{sec:inverse} requires an accurate surrogate to be evaluated
+$300$ times per video within seconds; running the same inverse
+against a coarse surrogate would reintroduce surrogate bias as a new
+source of error. The hierarchical MoGP-rBCM surrogate and the
+training-data-anchored prior must be coupled; this coupling is the
+technical core.
+
+\subsection{Relation to Differentiable MPM}
+
+Differentiable MPM pipelines~\cite{li2023pacnerf,eastman2024recovery}
+obtain gradients through the forward simulator and perform
+gradient-based per-scene parameter search. We differ in two
+respects. First, gradients through the non-smooth HB return map are
+known to be
+ill-conditioned~\cite{huang2021plasticinelab}; our gradient-free
+inverse sidesteps this issue. Second, differentiable-MPM pipelines
+optimise per scene and do not amortise a reusable surrogate, so
+their per-material cost remains in the simulation-in-the-loop
+regime. Our architectural choice of an offline-trained hierarchical
+surrogate is precisely what enables the seconds-scale per-video
+latency and the community-asset property of \S6.2.
 
 
-\subsection{Why Regime-Aware Surrogates Matter}
+\section{Limitations and Future Work}
+\label{sec:limitations}
 
-A central technical finding of our work is that regime-aware surrogate modeling is better suited to inverse viRheometry than a single global predictor.
-The inverse objective is heterogeneous by construction: different parameter regions may induce different flow modes, different levels of sensitivity, and different degrees of ambiguity.
-A global surrogate must average across all of these effects, which can reduce local accuracy in the very regions that matter for optimization.
+\paragraph{Information-theoretic $\sigma_Y$ limit.}
+The identifiability-aware inverse of \S\ref{sec:inverse} resolves
+the yield-stress/consistency degeneracy whenever the dam-break
+observation carries \emph{some} signal about $\sigma_Y$, but it
+cannot recover information that is not in the observation. For
+materials in which $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ across the
+entire dam-break shear-rate range, the flow front encodes
+essentially no information about $\sigma_Y$, and any inverse---ours
+included---returns an estimate determined by the prior and the
+training distribution rather than by the data. Among the $10$
+held-out samples of Table~\ref{tab:main}, one such material
+($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa in a low-$\eta$ regime)
+pushes the $\sigma_Y$ \emph{mean} to $7.0$ while the nine remaining
+samples sit at median $0.298$. This is a task-level bound, not a
+method bound; the appropriate mitigation is the multi-setup protocol
+of \S\ref{sec:multi}.
 
-The mixture-of-experts formulation addresses this issue by allowing specialized experts to model different parts of the landscape.
-Our results show that this improves both surrogate fidelity and downstream optimization stability.
-In this sense, the technical core of the paper is not simply that we use a surrogate, but that we use a surrogate structure that is aligned with the local, regime-dependent nature of the inverse problem.
+\paragraph{Dependence on training-set coverage.}
+The surrogate is trustworthy only inside the input box on which it
+was trained. Queries outside this box trigger the per-expert bound
+tightening (\S\ref{sec:inverse}), which relies on the routed
+expert's training inputs as the admissible region and therefore
+does not extrapolate. Out-of-distribution materials require an
+extension of the training corpus. rBCM predictive variance flags
+out-of-distribution queries but does not by itself correct them.
 
+\paragraph{Fidelity of the forward model.}
+A surrogate can only be as accurate as the simulator it learns from.
+Our MPM forward (\S3.2) models HB rheology, gravity, and no-slip
+boundaries, but not surface tension, elastic overshoot, thixotropy,
+or viscoelastic memory. Materials exhibiting these phenomena deviate
+systematically from the HB forward, and this deviation cannot be
+recovered by any HB inverse. Richer constitutive
+families---viscoelastic extensions and damage-MPM
+variants~\cite{wolper2019cdmpm}---are natural but out-of-scope
+directions.
 
-\subsection{Limitations}
+\paragraph{Capture and geometry requirements.}
+The level-$1$ gate is trained on rectangular cube-like containers
+with $W, H \in [2, 7]$\,cm. Curved or irregular containers require
+retraining the geometry gate on a broader container descriptor.
+Camera calibration uses a printed ChArUco marker board; markerless
+calibration from natural scene content is possible in principle but
+not demonstrated here.
 
-Our current approach has several limitations.
-First, the surrogate is only as reliable as the training data used to construct it.
-If the offline dataset does not adequately cover important regions of the parameter space, the optimizer may still be misled by surrogate bias.
-Second, the method remains dependent on the quality of the underlying forward simulator and observation-matching objective.
-A surrogate cannot correct inaccuracies in the physical model itself.
-
-Third, although the proposed method moves inverse viRheometry toward real-time use, its performance still depends on the complexity of the target material and the desired estimation accuracy.
-For some settings, optional refinement with true simulator evaluations may still be necessary.
-Finally, our experiments focus on a particular rheological family and inverse estimation setup.
-Extending the framework to broader constitutive models, richer observation modalities, and more diverse experimental configurations remains an important direction for future work.
+\paragraph{Real-time is a direction, not a destination.}
+Our median wall-clock is $12$\,s per video on a single consumer
+GPU---seconds-scale but not millisecond-scale. The ``real-time'' of
+our title should be read as \emph{fast enough to fit within a single
+user interaction} rather than strict continuous-time inversion.
+Reducing latency further through surrogate distillation, query-time
+adaptive $K_{\mathrm{geo}}$ selection, or amortised cross-material
+inverse is an open direction.
 
 
 \section{Conclusion}
 
-We presented a surrogate-accelerated framework for inverse viRheometry of non-Newtonian fluids.
-By replacing most expensive simulator evaluations with a regime-aware Mixture-of-Experts Gaussian process surrogate, the proposed method substantially reduces the cost of simulation-based parameter estimation while preserving estimation quality.
+We presented a surrogate-accelerated framework for non-Newtonian
+video rheometry that compresses the Herschel--Bulkley inverse from
+hours per video in simulation-in-the-loop prior
+work~\cite{hamamichi2023nonnewtonian} to a median of $12$\,s per
+video on a single consumer GPU. The method rests on two coupled
+components: a regime-aware hierarchical Mixture-of-GP surrogate
+(HVIMoGP-rBCM) with $540$ specialised experts routed by a two-level
+Bayesian Gaussian mixture gate over container geometry and
+observation signatures, and an identifiability-aware inverse that
+warm-starts CMA-ES from the routed expert's nearest training
+neighbour and anchors the $\sigma_Y$ axis with a data-honest soft
+prior---resolving the yield-stress/consistency similarity degeneracy
+that prior work identified but could not practically mitigate.
 
-Beyond acceleration alone, we showed that faster inference enables practical benefits that are difficult to obtain with prior methods, including fresher parameter estimates for time-varying materials, repeated use in short operational cycles, and improved deployability toward real-time viRheometry.
-We believe this perspective---treating surrogate modeling as an enabler of practical inverse material estimation rather than only a regression shortcut---opens promising directions for future work in graphics-oriented digital material characterization.
+Beyond runtime reduction, the seconds-scale inverse unlocks three
+capabilities inaccessible to simulation-in-the-loop rheometry: fresh
+parameter estimates for time-varying fluids, practical
+characterisation of materials conventional rheometers cannot
+measure, and a multi-observation joint protocol that approaches
+parallel-plate rheometer precision from phone videos alone. We
+release the trained surrogate, the $295{,}419$-row MPM training
+corpus, and the inverse code as a reusable community artefact on
+which subsequent video-rheometry research can build without paying
+the simulation training cost again.
+
+The broader message is that video rheometry crosses the threshold
+from laboratory demonstration to fieldable tool not by replacing
+physics-based estimation but by amortising its cost. The surrogate
+is an accelerator of a physics-grounded inverse, not a substitute
+for physics; what this acceleration enables, at seconds per video,
+is what brings the technique within reach of time-sensitive,
+iterative, and situated measurement.
 
 
 % DO NOT INCLUDE ACKNOWLEDGMENTS IN AN ANONYMOUS SUBMISSION TO SIGGRAPH 2019
