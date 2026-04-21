@@ -264,14 +264,19 @@ is
     \|\mathbf{D}\|
     = \sqrt{\tfrac{1}{2}\mathbf{D}\!:\!\mathbf{D}},
 \end{equation}
-where $\mathbf{D}$ is the rate-of-strain tensor. Below the yield
-surface $\|\boldsymbol{\tau}^{\mathrm{dev}}\| \le \sigma_Y$ the
-material is treated as rigid; above it, the flow rule of
-Eq.~\eqref{eq:hb-tensor} applies. We adopt the elasto-plastic MPM
-realisation of Yue et al.~\cite{yue2015continuum}, which recovers the
-same $(\sigma_Y, \eta, n)$ triple at steady state via a
-Newton--Raphson return map. The HB response is therefore characterised
-by the three-parameter vector
+where $\mathbf{D}$ is the rate-of-strain tensor. The admissible
+stress region is delimited by the von~Mises yield function
+\begin{equation}
+\label{eq:hb-yield}
+    \Phi(\boldsymbol{\tau})
+    \;=\; \|\boldsymbol{\tau}^{\mathrm{dev}}\| \;-\; \sigma_Y \;\le\; 0,
+\end{equation}
+with the plastic flow rule of Eq.~\eqref{eq:hb-tensor} activated only
+when $\Phi > 0$. We adopt the elasto-plastic MPM realisation of Yue
+et al.~\cite{yue2015continuum}, which recovers the same
+$(\sigma_Y, \eta, n)$ triple at steady state via a Newton--Raphson
+return map that enforces $\Phi \le 0$ on each plastic step. The HB
+response is therefore characterised by the three-parameter vector
 \begin{equation}
     \boldsymbol{\theta} \;=\; (\sigma_Y,\,\eta,\,n) \in \Theta \subset
     \mathbb{R}^{3}.
@@ -334,22 +339,46 @@ paying the cost of a full MPM simulation at every candidate
 $\boldsymbol{\theta}$.
 
 The loss landscape carries a well-known identifiability pathology.
-From Eq.~\eqref{eq:hb-scalar}, the term
-$\eta\,\dot\gamma^{\,n}$ dominates the HB response once the shear
-rate exceeds $\dot\gamma^{\star} \approx
-(\sigma_Y / \eta)^{1/n}$; above this threshold, the stress is nearly
-independent of $\sigma_Y$. If the observed dam-break regime lies
-largely above $\dot\gamma^{\star}$, the observation
-$\mathbf{y}_{\mathrm{obs}}$ becomes effectively insensitive to
-$\sigma_Y$ while still constraining $(\eta, n)$. This produces a ridge
-in the $(\sigma_Y, \eta)$ subspace of the loss surface: a continuum of
-nearly-equal-loss solutions trading $\sigma_Y$ for a compensating
-increase in $\eta$. Hamamichi et al.~\cite{hamamichi2023nonnewtonian}
-identify this degeneracy by dimensional-similarity analysis and
-propose joint inversion over multiple $(W, H)$ setups as the
-mitigation; however, under their simulation-in-the-loop cost,
-multi-setup inversion is $N$ times more expensive than the already
-hours-long single-setup inverse.
+Define the \emph{characteristic shear rate} that separates the
+yield-dominated from the viscous-dominated regime,
+\begin{equation}
+\label{eq:gammastar}
+    \dot\gamma^{\star}(\sigma_Y, \eta, n)
+    \;=\; \bigl(\sigma_Y / \eta\bigr)^{1/n}.
+\end{equation}
+Rewriting Eq.~\eqref{eq:hb-scalar} as
+\begin{equation}
+\label{eq:hb-factored}
+    \tau(\dot\gamma)
+    \;=\; \eta\,\dot\gamma^{\,n}\left[\,1
+    \;+\; \left(\frac{\dot\gamma^{\star}}{\dot\gamma}\right)^{\!n}\,\right],
+\end{equation}
+shows that as $\dot\gamma / \dot\gamma^{\star} \to \infty$ the
+second bracket tends to $1$ and the stress becomes asymptotically
+governed by $(\eta, n)$ alone; formally
+\begin{equation}
+\label{eq:ridge}
+    \left.
+      \frac{\partial \tau}{\partial \sigma_Y}
+    \right/\!
+    \left.
+      \frac{\partial \tau}{\partial \eta}
+    \right|_{\dot\gamma \gg \dot\gamma^{\star}}
+    \;=\;
+    \frac{1}{\dot\gamma^{\,n}}
+    \;\longrightarrow\; 0.
+\end{equation}
+If the observed dam-break regime lies largely above
+$\dot\gamma^{\star}$, the observation $\mathbf{y}_{\mathrm{obs}}$
+becomes effectively insensitive to $\sigma_Y$ while still constraining
+$(\eta, n)$, producing a continuum of nearly-equal-loss solutions
+that trade $\sigma_Y$ for a compensating increase in $\eta$.
+Hamamichi et al.~\cite{hamamichi2023nonnewtonian} identify this
+degeneracy by dimensional-similarity analysis and propose joint
+inversion over multiple $(W, H)$ setups as the mitigation; however,
+under their simulation-in-the-loop cost, multi-setup inversion is
+$N$ times more expensive than the already hours-long single-setup
+inverse.
 
 Finally, in many practical scenarios the target material itself
 evolves during the measurement window (sedimentation, aging,
@@ -385,7 +414,18 @@ and the surrogate is driven by an identifiability-aware CMA-ES loop
 
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=\textwidth]{figs/method_overview.pdf}
+    \iffigplaceholder
+      \figplaceholderwide[6cm]{Placeholder: end-to-end pipeline
+      block diagram with three panels (offline training, online
+      forward, online inverse). Show 295{,}419 MPM samples $\to$
+      two-level BGM gate ($K_{\mathrm{geo}}{=}12$, $\sum K_\phi{=}540$)
+      $\to$ 540 Matern-5/2 GP experts $\to$ rBCM aggregation $\to$
+      poly-residual correction $\to$ NN warm-start $\to$ CMA-ES
+      $\to$ $\hat{\boldsymbol{\theta}}$ in $\sim$12\,s.
+      To be redrawn in TikZ or Inkscape.}
+    \else
+      \includegraphics[width=\textwidth]{figs/method_overview.pdf}
+    \fi
     \caption{End-to-end pipeline. \textbf{Offline}
     (\S\ref{sec:surrogate}): $295{,}419$ MPM dam-break samples train a
     two-level Bayesian Gaussian mixture gate
@@ -576,18 +616,30 @@ specialised expert per partition cell.
 
 \paragraph{Two-level Bayesian Gaussian mixture gate.}
 The gate is a hard, top-1 routing over
-$\sum_{g} K_{\phi}^{(g)}$ partition cells. The level-1 gate clusters
-the geometry subspace,
+$\sum_{g} K_{\phi}^{(g)}$ partition cells. The level-1 gate models
+the density of the standardised geometry subspace as a Bayesian
+Gaussian mixture with a Dirichlet-process weight prior and full
+$2 \times 2$ covariances,
+\begin{equation}
+\label{eq:bgm-geo}
+    p^{\mathrm{geo}}(W, H)
+    \;=\; \sum_{g=1}^{K_{\mathrm{geo}}}
+    \pi_{g}^{\mathrm{geo}}\,
+    \mathcal{N}\!\bigl((W, H);\,
+    \boldsymbol{\mu}_{g}^{\mathrm{geo}},\,
+    \boldsymbol{\Sigma}_{g}^{\mathrm{geo}}\bigr),
+\end{equation}
+and routes each query to its maximum-likelihood component,
 \begin{equation}
 \label{eq:level1}
     g^{\star}(W, H)
     \;=\;
     \arg\max_{g \in \{1,\dots,K_{\mathrm{geo}}\}}\,
-    p^{\mathrm{geo}}_{g}\!\bigl(W, H\bigr),
-\end{equation}
-where $p^{\mathrm{geo}}$ is a Bayesian Gaussian mixture with a
-Dirichlet-process weight prior and full $2\times 2$ covariances, fit
-on standardised $(W, H)$ pairs. The level-2 gate further clusters
+    \pi_{g}^{\mathrm{geo}}\,
+    \mathcal{N}\!\bigl((W, H);\,
+    \boldsymbol{\mu}_{g}^{\mathrm{geo}},\,
+    \boldsymbol{\Sigma}_{g}^{\mathrm{geo}}\bigr).
+\end{equation} The level-2 gate further clusters
 each geo group by an 18-dimensional observation signature
 $\boldsymbol{\phi}$,
 \begin{equation}
@@ -641,12 +693,41 @@ automatic relevance determination
     \qquad
     r^{2}\!=\!\sum_{d=1}^{5}\frac{(a_d - b_d)^{2}}{\ell_d^{\,2}},
 \end{equation}
-and a constant mean. The kernel variance $\sigma_f^{\,2}$, the
-observation noise, and the five ARD lengthscales
-$\{\ell_d\}_{d=1}^{5}$ are learned per expert and per output
-dimension by maximising the exact marginal likelihood with Adam
-(learning rate $5\cdot 10^{-2}$, $100$ iterations). Experts are
-trained independently in parallel across cells.
+and a constant mean. Given training inputs $\mathbf{X}_{k}$ of
+cell $k = (g, k)$ with standardised outputs
+$\tilde{\mathbf{y}}_{k,d} \in \mathbb{R}^{|\mathbf{X}_{k}|}$ for each
+output dimension $d$, the predictive distribution at a query
+$\tilde{\mathbf{x}}$ is Gaussian with mean and variance
+\begin{align}
+\label{eq:gp-predictive}
+    \mu_{k,d}(\tilde{\mathbf{x}})
+    &= \mathbf{k}_{*}^{\!\top}
+       (K_{k} + \sigma_{n,k,d}^{\,2} I)^{-1}\,
+       \tilde{\mathbf{y}}_{k,d},
+\nonumber\\
+    \sigma_{k,d}^{\,2}(\tilde{\mathbf{x}})
+    &= k_{5/2}(\tilde{\mathbf{x}}, \tilde{\mathbf{x}})
+       - \mathbf{k}_{*}^{\!\top}
+       (K_{k} + \sigma_{n,k,d}^{\,2} I)^{-1}\,\mathbf{k}_{*},
+\end{align}
+where $[\mathbf{k}_{*}]_{i} = k_{5/2}(\tilde{\mathbf{x}},
+\tilde{\mathbf{x}}_{k,i})$ and $[K_{k}]_{ij} = k_{5/2}(\tilde{\mathbf{x}}_{k,i},
+\tilde{\mathbf{x}}_{k,j})$. The kernel variance $\sigma_f^{\,2}$, the
+five ARD lengthscales $\{\ell_d\}_{d=1}^{5}$, and the observation
+noise $\sigma_{n,k,d}^{\,2}$ are learned per expert and per output
+dimension by maximising the exact log marginal likelihood
+\begin{equation}
+\label{eq:gp-mll}
+    \log p(\tilde{\mathbf{y}}_{k,d} \mid \mathbf{X}_{k})
+    = -\tfrac{1}{2}\,
+        \tilde{\mathbf{y}}_{k,d}^{\!\top}
+        (K_{k} + \sigma_{n,k,d}^{\,2} I)^{-1}
+        \tilde{\mathbf{y}}_{k,d}
+      -\tfrac{1}{2}\log\!\bigl|K_{k} + \sigma_{n,k,d}^{\,2} I\bigr|
+      -\tfrac{|\mathbf{X}_{k}|}{2}\log 2\pi
+\end{equation}
+with Adam (learning rate $5\cdot 10^{-2}$, $100$ iterations).
+Experts are trained independently in parallel across cells.
 
 \paragraph{Robust Bayesian Committee Machine aggregation.}
 Given a query $\tilde{\mathbf{x}}$ routed to an expert set
@@ -696,7 +777,17 @@ and solve a ridge regression on the GP residuals,
     \qquad \alpha = 10^{-3},
 \end{equation}
 where $\mathbf{c}_{\backslash 0}$ excludes the intercept from
-regularisation. At inference the corrected mean is
+regularisation. The closed-form solution is
+\begin{equation}
+\label{eq:poly-closed}
+    \mathbf{c}_{(g,k),d}
+    \;=\;
+    \bigl(\Phi^{\!\top}\Phi + \alpha\,\mathbf{D}\bigr)^{\!-1}\,
+    \Phi^{\!\top}\!\bigl(\tilde{\mathbf{y}}_{d} - \mu_{(g,k),d}\bigr),
+    \qquad
+    \mathbf{D} = \mathrm{diag}(0, 1, \dots, 1).
+\end{equation}
+At inference the corrected mean is
 $\mu_{(g,k),d} + \Phi(\mathbf{x})^{\!\top}\mathbf{c}_{(g,k),d}$.
 
 \paragraph{Monotonic post-processing.}
@@ -766,9 +857,26 @@ $\sigma_Y^{\mathrm{NN}}$ and overrides the data term
 We restrict CMA-ES search to the axis-aligned bounding box of the
 routed expert's training inputs (plus a $2\%$ log-space pad on
 $\eta$ and $\sigma_Y$, linear pad on $n$), intersected with the
-global bounds $\Theta$. This prevents the optimiser from entering
-regions where the expert has no support and would extrapolate into
-spurious near-zero-flow minima.
+global bounds $\Theta$. Let $\theta_d^{\,k^{\star},\min}$ and
+$\theta_d^{\,k^{\star},\max}$ denote the per-dimension extrema of
+$\mathcal{D}_{k^{\star}}$ along axis $d \in \{n, \eta, \sigma_Y\}$.
+The tightened search box is
+\begin{equation}
+\label{eq:tight-box}
+    \Theta_{k^{\star}}
+    \;=\;
+    \Theta
+    \;\cap\;
+    \left(
+    \bigotimes_{d}\!\left[\,
+      \theta_d^{\,k^{\star},\min}\!\cdot(1 - p_d),\;
+      \theta_d^{\,k^{\star},\max}\!\cdot(1 + p_d)
+    \,\right]\right),
+\end{equation}
+with $p_{\eta} = p_{\sigma_Y} = 0.02$ applied in log-space and
+$p_{n} = 0.02$ applied linearly. This prevents the optimiser from
+entering regions where the expert has no support and would
+extrapolate into spurious near-zero-flow minima.
 
 \paragraph{CMA-ES configuration.}
 We run CMA-ES~\cite{hansen2016cma,bajaj2019gaussian} with population
@@ -986,14 +1094,40 @@ or $\sigma_Y$ prior.
 
 \paragraph{Metrics.}
 For the forward surrogate we report per-output mean absolute error
-(MAE), coefficient of determination $R^2$, and the row-max error
-distribution ($p_{50}$, $p_{95}$, $p_{99}$, $p_{999}$). For the
-inverse we report per-parameter relative error
-$\mathrm{relE}(\cdot) = |\hat{\cdot} - (\cdot)_{\mathrm{gt}}| /
-|(\cdot)_{\mathrm{gt}}|$ on $(n, \eta, \sigma_Y)$, the forward NMSE
-at the recovered parameter as a sanity check on fit, and the
-per-sample wall-clock. All inverse runs use the frozen hyperparameters
-of Table~\ref{tab:hyper} and a fixed seed.
+\begin{equation}
+\label{eq:mae}
+    \mathrm{MAE}(\hat{\mathbf{y}}, \mathbf{y})
+    \;=\; \frac{1}{D_Y}\sum_{d=1}^{D_Y}|\hat y_d - y_d|,
+\end{equation}
+coefficient of determination $R^{2} = 1 - \sum_{i}
+\|\hat{\mathbf{y}}_i - \mathbf{y}_i\|^2 / \sum_i \|\mathbf{y}_i -
+\bar{\mathbf{y}}\|^2$, and the row-max error distribution
+($p_{50}, p_{95}, p_{99}, p_{999}$). For the inverse we report
+per-parameter relative error
+\begin{equation}
+\label{eq:relE}
+    \mathrm{relE}(\hat\theta_d;\,\theta_d^{\mathrm{gt}})
+    \;=\; \frac{|\hat\theta_d - \theta_d^{\mathrm{gt}}|}
+               {|\theta_d^{\mathrm{gt}}|},
+    \qquad d \in \{n, \eta, \sigma_Y\},
+\end{equation}
+the forward NMSE at the recovered parameter as a sanity check on
+fit, and the per-sample wall-clock. For comparisons against
+parallel-plate reference sweeps (\S\ref{sec:rheometer}) we further
+report the integrated log-stress error over the experimentally valid
+shear-rate interval $\Gamma = [\dot\gamma_{\min}, \dot\gamma_{\max}]$,
+\begin{equation}
+\label{eq:E}
+    \mathcal{E}(\hat{\boldsymbol{\theta}}, \boldsymbol{\theta}_{\mathrm{gt}})
+    \;=\;
+    \left(\frac{1}{|\Gamma|}
+    \int_{\Gamma}
+      \bigl[\log\hat\tau(\dot\gamma)
+          - \log\tau_{\mathrm{gt}}(\dot\gamma)\bigr]^{2}
+    \,d\log\dot\gamma\right)^{\!1/2}.
+\end{equation}
+All inverse runs use the frozen hyperparameters of
+Table~\ref{tab:hyper} and a fixed seed.
 
 
 \subsection{Surrogate Fidelity}
@@ -1013,7 +1147,15 @@ of two.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder: parity plot of surrogate
+      prediction $\hat{\mathbf{y}}$ versus MPM ground truth
+      $\mathbf{y}$ across $22{,}209$ held-out $T_{\mathrm{sim}}$
+      samples, coloured by routed expert id. To be regenerated with
+      frozen checkpoint \texttt{rbcm\_v1\_hotfix\_poly/model.pt}.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
+    \fi
     \caption{Surrogate parity plot on $T_{\mathrm{sim}}$. Each point
     is one of $22{,}209$ held-out MPM samples; colour encodes the
     routed expert. $R^2 > 0.999$ across all eight output dimensions.}
@@ -1026,7 +1168,14 @@ of two.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
+    \iffigplaceholder
+      \figplaceholder[5.5cm]{Placeholder: per-expert $R^{2}$
+      distribution across $540$ GP cells, grouped by geometry
+      cluster $g = 1, \ldots, 12$ (violin or boxplot). Horizontal
+      line at median $R^{2} = 0.9995$ and marker at $p_{5}$ tail.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
+    \fi
     \caption{Per-expert $R^2$ distribution across the $540$ cells.
     Median $R^2 = 0.9995$; the lower tail corresponds to experts on
     cluster boundaries and sparse regions of the box, which the
@@ -1088,7 +1237,16 @@ against ground truth on a representative sample.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/new_sweet.pdf}
+    \iffigplaceholder
+      \figplaceholder[5.5cm]{Placeholder: recovered versus
+      ground-truth Herschel--Bulkley flow curve
+      $\tau(\dot\gamma) = \sigma_Y + \eta\,\dot\gamma^{n}$ on a
+      representative $T_{\mathrm{sim}}$ sample (log-log).
+      Shaded rBCM $1\sigma$ band; dashed extension marks
+      dam-break-covered shear-rate range $\Gamma$.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/new_sweet.pdf}
+    \fi
     \caption{Recovered flow curve $\hat\tau(\dot\gamma)$ (blue)
     versus ground truth (black) on a representative synthetic
     sample. The shaded band is the rBCM-propagated $1\sigma$
@@ -1134,13 +1292,28 @@ rBCM $+$ warm, no prior        & 0.109 & 0.201 & 0.459 & $\mathbf{9.5\times 10^{
 Three findings.
 
 \textbf{rBCM outperforms GRBCM at top-$1$ routing.}
-GRBCM~\cite{liu2018generalized} augments each cluster with a
-geometry-wide communication expert, doubling inference cost
-($21.6$\,s vs.\ $12.0$\,s). On our peaked gate posterior the extra
-expert contributes no independent information and the baseline blend
-slightly worsens forward NMSE. We therefore adopt pure rBCM with
-top-$1$ routing, which in our setting reduces to the single-expert
-predictive mean with calibrated variance.
+GRBCM~\cite{liu2018generalized} augments our aggregation with an
+additional geometry-wide baseline expert indexed by $0$ with
+predictive moments $(\mu_0, \sigma_0^{2})$:
+\begin{equation}
+\label{eq:grbcm}
+    \sigma_{\mathrm{GRBCM}}^{-2}
+    = \sigma_0^{-2}
+      + \sum_{k \in \mathcal{R}} \beta_k\,\sigma_k^{-2},
+    \qquad
+    \mu_{\mathrm{GRBCM}}
+    = \sigma_{\mathrm{GRBCM}}^{\,2}\!
+       \left[\sigma_0^{-2}\,\mu_0
+           + \sum_{k \in \mathcal{R}}
+               \beta_k\,\sigma_k^{-2}\,\mu_k\right].
+\end{equation}
+Computing $(\mu_0, \sigma_0^2)$ requires a second GP query per
+sample, doubling inference cost ($21.6$\,s vs.\ $12.0$\,s). On our
+peaked gate posterior the baseline blend contributes no independent
+information and slightly worsens forward NMSE. We therefore adopt
+pure rBCM with top-$1$ routing, which in our setting reduces
+Eq.~\eqref{eq:rbcm} to the single-expert predictive mean with
+calibrated variance.
 
 \textbf{Pure NN is the best $\sigma_Y$ estimator but cannot match the
 flow curve.} The nearest-neighbour alone---returning
@@ -1194,7 +1367,18 @@ per-parameter log-relative error.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/splash_evolution_strip.png}
+    \iffigplaceholder
+      \figplaceholder[6.5cm]{Placeholder: two-panel tracking figure
+      for the $\sigma_Y(t)$ drift experiment.
+      \emph{Top:} true $\sigma_Y(t)$ trajectory (black) over $20$
+      consecutive measurements, plus sim-in-loop estimate (orange,
+      lagging by one inference cycle) and our surrogate estimate
+      (blue, at measurement time).
+      \emph{Bottom:} $|\log\hat\sigma_Y - \log\sigma_Y(t)|$ per
+      measurement for both estimators.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/splash_evolution_strip.png}
+    \fi
     \caption{Tracking error for a $\sigma_Y(t)$ drift experiment.
     Top: true $\sigma_Y(t)$ (black) overlaid with the sim-in-loop
     estimate (orange, delayed by one inference cycle) and our
@@ -1238,7 +1422,15 @@ silhouette against the original phone video frame by frame.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
+      chunky okonomi sauce (no parallel-plate reference available).
+      Right-side inset: sim--real silhouette overlay at the final
+      dam-break frame to be produced from a fresh smartphone capture
+      plus MPM replay with $\hat{\boldsymbol{\theta}}$.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
+    \fi
     \caption{Recovered HB flow curve for chunky okonomi sauce; no
     parallel-plate rheometer reference is available for this
     material. Inset: sim--real silhouette overlay at the final
@@ -1318,7 +1510,16 @@ Each material is captured at two to three $(W, H)$ setups per
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder: recovered HB flow curve
+      (blue, with rBCM $1\sigma$ band) overlaid on parallel-plate
+      rheometer sweep (black markers) for a representative
+      $T_{\mathrm{real}}$ material (e.g.~lotion or Carbopol gel).
+      Dashed extension marks extrapolation beyond the dam-break
+      shear-rate range.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
+    \fi
     \caption{Recovered flow curve (blue) versus parallel-plate
     rheometer sweep (black markers) on lotion. The shaded band is
     the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
@@ -1352,7 +1553,16 @@ $\hat{\boldsymbol{\theta}}$.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/fig3_boxplot_time.png}
+    \iffigplaceholder
+      \figplaceholder[5.5cm]{Placeholder: wall-clock comparison on
+      the shared $T_{\mathrm{real}}$ subset (log scale). Three boxes
+      side-by-side: Baseline~A (sim-in-loop,
+      $\sim O(\mathrm{hours})$), Baseline~B (single-level MoE,
+      $\sim O(\mathrm{s})$ but narrow box), Ours
+      ($\sim 12$\,s median).}
+    \else
+      \includegraphics[width=\columnwidth]{figs/fig3_boxplot_time.png}
+    \fi
     \caption{End-to-end wall-clock comparison on the shared
     $T_{\mathrm{real}}$ subset (log scale). Baseline~A:
     simulation-in-the-loop~\cite{hamamichi2023nonnewtonian}-style.
@@ -1367,7 +1577,16 @@ $\hat{\boldsymbol{\theta}}$.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
+    \iffigplaceholder
+      \figplaceholder[5.5cm]{Placeholder: CMA-ES loss versus
+      wall-clock trajectory (log-log) on one representative sample,
+      for all three pipelines aligned on the time axis. Our method
+      reaches Baseline~A's converged loss at roughly $10^{-3}\times$
+      its wall-clock; Baseline~B plateaus above the identifiability
+      ridge.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
+    \fi
     \caption{CMA-ES loss trajectory on a representative sample. Our
     pipeline reaches Baseline~A's final loss in approximately
     $1/1000$ of the wall-clock; Baseline~B stalls at a higher-loss
