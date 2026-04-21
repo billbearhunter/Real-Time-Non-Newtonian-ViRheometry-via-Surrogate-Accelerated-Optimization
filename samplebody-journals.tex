@@ -409,6 +409,126 @@ and the surrogate is driven by an identifiability-aware CMA-ES loop
 \end{figure*}
 
 
+\subsection{Problem Statement}
+\label{sec:problem}
+
+We frame the entire paper around a single inverse problem and its
+two successively more tractable forms. The canonical
+simulation-in-the-loop inverse
+of~\cite{hamamichi2023nonnewtonian} reads
+\begin{equation}
+\label{eq:P}
+    \hat{\boldsymbol{\theta}}
+    \;=\;
+    \arg\min_{\boldsymbol{\theta}\in\Theta}
+    \bigl\|\mathcal{S}(\boldsymbol{\theta};\,W, H)
+           - \mathbf{y}_{\mathrm{obs}}\bigr\|^{2},
+    \tag{P}
+\end{equation}
+and leaves three practical difficulties unaddressed:
+\emph{(i)}~each evaluation of $\mathcal{S}$ requires a full MPM
+integration, $O(\mathrm{minutes})$ per query;
+\emph{(ii)}~the map $\mathcal{S}(\cdot;W,H)$ changes morphologically
+with container geometry and discretely across the yield threshold,
+so a single global surrogate or a single optimisation trajectory
+cannot cover $\Theta$ at the accuracy required for inversion; and
+\emph{(iii)}~the loss surface carries a $(\sigma_Y, \eta)$ ridge
+whenever the observed shear-rate range is dominated by
+$\eta\,\dot\gamma^{\,n}$ (\S3.3).
+
+We transform (\ref{eq:P}) into the surrogate-driven form
+\begin{equation}
+\label{eq:Pprime}
+    \hat{\boldsymbol{\theta}}
+    \;=\;
+    \arg\min_{\boldsymbol{\theta}\in\Theta_{k^{\star}}}\,
+    \underbrace{\frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)
+                       - \mathbf{y}_{\mathrm{obs}}\|^{2}}
+                      {\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}}}_{\mathrm{NMSE}}
+    \;+\;
+    \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
+                        {w}\right)^{\!2},
+    \tag{P$'$}
+\end{equation}
+through four substitutions, each addressing a specific difficulty
+above; Table~\ref{tab:subs} summarises the mapping and points to the
+subsection that supplies each piece of machinery.
+
+\begin{table}[t]
+\centering
+\small
+\caption{The four substitutions that transform the canonical inverse
+(\ref{eq:P}) into the tractable form~(\ref{eq:Pprime}).}
+\label{tab:subs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Difficulty & Substitution & Section \\
+\midrule
+(i) Forward cost
+  & $\mathcal{S} \mapsto \tilde{\mathcal{S}}$
+    (hierarchical MoGP-rBCM)
+  & \S\ref{sec:surrogate} \\
+(ii) Non-stationarity
+  & $\Theta \mapsto \Theta_{k^{\star}}$
+    (per-expert box)
+  & \S\ref{sec:surrogate},\ \S\ref{sec:inverse} \\
+Scale dependence
+  & $\|\cdot\|^{2} \mapsto \mathrm{NMSE}$
+  & \S\ref{sec:inverse} \\
+(iii) Identifiability
+  & add $\lambda\!\left(\tfrac{\log\sigma_Y -
+    \log\sigma_Y^{\mathrm{NN}}}{w}\right)^{\!2}$
+  & \S\ref{sec:inverse} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In~(\ref{eq:Pprime}), the learned surrogate
+$\tilde{\mathcal{S}}$ is a hierarchical Mixture-of-GP with robust
+Bayesian Committee Machine aggregation (\S\ref{sec:surrogate}); the
+anchor $\sigma_Y^{\mathrm{NN}}$ is the yield stress of the nearest
+training neighbour in observation space
+(\S\ref{sec:inverse}); the box $\Theta_{k^{\star}}$ is the
+axis-aligned hull of that neighbour's routed-expert training inputs;
+and the prior coefficients are $\lambda = 10^{-5}$, $w = 1$
+(log-std).
+
+When multiple observations
+$\{(W_{s}, H_{s}, \mathbf{y}_{\mathrm{obs}}^{(s)})\}_{s=1}^{S}$
+of the same material are available---a protocol identified
+in~\cite{hamamichi2023nonnewtonian} as the mitigation for
+difficulty~(iii) but left computationally out of reach---our
+surrogate makes it practical, and the inverse becomes
+\begin{equation}
+\label{eq:Pstar}
+    \hat{\boldsymbol{\theta}}
+    \;=\;
+    \arg\min_{\boldsymbol{\theta}\in\bigcap_{s}\Theta_{k_{s}^{\star}}}\,
+    \sum_{s=1}^{S}\,
+    \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta}; W_{s}, H_{s})
+          - \mathbf{y}_{\mathrm{obs}}^{(s)}\|^{2}}
+         {\overline{(\mathbf{y}_{\mathrm{obs}}^{(s)})^{2}}}
+    \;+\;
+    \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
+                        {w}\right)^{\!2}.
+    \tag{P$^{\star}$}
+\end{equation}
+Sharing $\boldsymbol{\theta}$ across setups while each setup is
+routed through its own expert tightens
+(\ref{eq:Pstar}) along the $\sigma_Y$ axis in exact proportion to the
+information the additional setups contribute
+(\S\ref{sec:multi}).
+
+The remainder of this section describes the machinery needed to
+solve (\ref{eq:Pprime}) and (\ref{eq:Pstar}) at seconds-per-video
+latency: the input and output representation (\S\ref{sec:repr}), the
+hierarchical MoGP-rBCM surrogate (\S\ref{sec:surrogate}), the
+identifiability-aware inverse (\S\ref{sec:inverse}), the algorithm
+pseudocode (\S\ref{sec:algs}), and the training data and frozen
+configuration that produces a single reusable checkpoint
+(\S\ref{sec:data}).
+
+
 \subsection{Input and Output Representation}
 \label{sec:repr}
 
@@ -628,30 +748,19 @@ $\sigma_Y$ component lies on the data manifold, giving CMA-ES an
 initial $\sigma_Y$ that is physically plausible rather than arbitrary.
 
 \paragraph{Data-honest log-$\sigma_Y$ prior.}
-We augment the surrogate loss with a soft quadratic prior on
-$\log\sigma_Y$ anchored at the NN sample:
-\begin{equation}
-\label{eq:loss}
-    \tilde{\mathcal{L}}(\boldsymbol{\theta})
-    \;=\;
-    \underbrace{\frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};\,W,H)
-                      - \mathbf{y}_{\mathrm{obs}}\|^{2}}
-                     {\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}}}_{\mathrm{NMSE}}
-    \;+\;
-    \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
-                        {w}\right)^{\!2},
-\end{equation}
-with $\lambda = 10^{-5}$ and $w = 1$ (log-std). A factor-of-$e$
-deviation from $\sigma_Y^{\mathrm{NN}}$ contributes $10^{-5}$ to the
-loss---on the same order as a typical converged NMSE---so the prior
-becomes active at the physical identifiability scale. It is
-\emph{data-honest} in that its centre $\sigma_Y^{\mathrm{NN}}$ is
-a training sample of $\mathcal{D}_{k^{\star}}$ rather than a
+The second additive term of~(\ref{eq:Pprime}) is a soft quadratic
+prior on $\log\sigma_Y$ anchored at $\sigma_Y^{\mathrm{NN}}$, with
+coefficients $\lambda = 10^{-5}$ and $w = 1$ (log-std). A factor of
+$e$ deviation from $\sigma_Y^{\mathrm{NN}}$ contributes $10^{-5}$ to
+the loss---on the same order as a typical converged NMSE---so the
+prior becomes active precisely at the physical identifiability scale.
+It is \emph{data-honest} in that its centre $\sigma_Y^{\mathrm{NN}}$
+is a training sample of $\mathcal{D}_{k^{\star}}$, not a
 user-specified guess. Removing the prior inflates $\sigma_Y$ error by
 roughly an order of magnitude on low-flow cases; over-weighting it
 ($\lambda \gtrsim 10^{-3}$) pulls $\sigma_Y$ directly to
-$\sigma_Y^{\mathrm{NN}}$ and overrides the data term. See the
-ablation in \S\ref{sec:ablation}.
+$\sigma_Y^{\mathrm{NN}}$ and overrides the data term
+(ablation in \S\ref{sec:ablation}).
 
 \paragraph{Per-expert bound tightening.}
 We restrict CMA-ES search to the axis-aligned bounding box of the
@@ -675,6 +784,7 @@ generations, and the final forward---takes a median of $12$\,s.
 
 
 \subsection{Algorithms}
+\label{sec:algs}
 
 Algorithm~\ref{alg:train} summarises offline training.
 Algorithms~\ref{alg:forward} and~\ref{alg:invert} summarise the online
@@ -773,7 +883,7 @@ Initialise CMA-ES on $\Theta_{k^{\star}}$ with
   Sample population $\{\boldsymbol{\theta}^{(p)}\}_{p=1}^{12}$\;
   Evaluate
     $\tilde{\mathcal{L}}(\boldsymbol{\theta}^{(p)})$
-    via Eq.~\eqref{eq:loss} on $\tilde{\mathcal{S}}$\;
+    via Eq.~\eqref{eq:Pprime} on $\tilde{\mathcal{S}}$\;
   Update CMA-ES state\;
 }
 $\hat{\mathbf{y}} \leftarrow
@@ -1161,7 +1271,7 @@ Contribution~(c) addresses the $\sigma_Y$-identifiability
 degeneracy. Following the mitigation proposed but not practically
 realised by~\cite{hamamichi2023nonnewtonian}, we capture the same
 material in two or three different $(W, H)$ containers and run a
-joint inversion. The inverse objective sums Eq.~\eqref{eq:loss}
+joint inversion. The inverse objective sums Eq.~\eqref{eq:Pprime}
 over the available setups, sharing $\boldsymbol{\theta}$ while
 routing each observation through its own expert.
 
