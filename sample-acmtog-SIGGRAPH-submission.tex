@@ -16,18 +16,30 @@
 \SetAlCapNameFnt{\small}
 \SetAlCapHSkip{0pt}
 
-% --- Tagged equation helper (fix hyperref duplicate destinations) -----------
-% amsmath's \tag{...} updates the visible equation label but NOT the
-% internal counter-based hyperref destination \@currentHref; the result
-% is that several \tag'd equations that all sit on the same equation
-% counter value collide on the same hyperref name (e.g. equation.24),
-% and pdfTeX reports "destination with the same identifier has been
-% already used, duplicate ignored" for every collision. \taglabel
-% below both calls \tag and forces a fresh \@currentHref that the
-% following \label captures, so each tagged equation gets a unique
-% hyperref target (equation.P, equation.Pprime, equation.Pstar, ...).
+% --- Tagged equation environment (fix hyperref duplicate destinations) -----
+% amsmath's \tag{...} replaces the visible equation number but rolls the
+% equation counter back at \end{equation}, so multiple \tag-labelled
+% equations all end up placing their hyperref anchor at the SAME
+% counter value (e.g. equation.24), triggering pdfTeX's "destination
+% with the same identifier has been already used, duplicate ignored"
+% warnings and breaking \ref navigation to the later tagged eqs.
+%
+% Workaround: use equation* (unnumbered, no counter anchor) and manually
+% set \@currentlabel so \ref prints the custom tag. \phantomsection
+% creates a unique hyperref destination right before the equation so
+% each \label binds to its own fresh anchor. Usage:
+%     \begin{taggedeqn}{P}{P}
+%         \hat{\boldsymbol{\theta}} = \arg\min ...
+%     \end{taggedeqn}
+% First arg is the visible tag text, second is the slug for eq:<slug>.
 \makeatletter
-\newcommand{\taglabel}[2]{\tag{#1}\def\@currentHref{equation.#2}\label{eq:#2}}
+\newenvironment{taggedeqn}[2]{%
+    \gdef\@currentlabel{#1}%
+    \phantomsection\label{eq:#2}%
+    \begin{equation*}\tag*{(#1)}%
+}{%
+    \end{equation*}%
+}
 \makeatother
 
 % --- Typography relief -----------------------------------------------------

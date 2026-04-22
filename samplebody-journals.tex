@@ -475,8 +475,8 @@ Stage~1 is typically accurate to a few pixels but can leave a small
 residual offset, since the ChArUco board is not rigidly coupled to
 the container. Stage~2 \emph{fixes} $K_{0}$ and refines only the
 extrinsic parameters so that a rendered container silhouette
-aligns with the dam-break frame $I_{0}$ (the
-\texttt{config\_00} photo). We use a two-phase schedule.
+aligns with the reference frame $I_{0}$ captured at the instant
+of dam release. We use a two-phase schedule.
 
 \emph{Phase~A (smooth chamfer).}
 A Canny edge detector~\cite{canny1986computational} applied to
@@ -540,7 +540,8 @@ the ChArUco extrinsic. This guards against strong local minima in
 either phase, particularly when ChArUco board placement is sloppy.
 
 \paragraph{Flow-front extraction.}
-Each subsequent frame \texttt{config\_01}, \dots, \texttt{config\_08}
+Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
+$t_{1}, \dots, t_{8}$
 is binarised by HSV-intensity thresholding (threshold $128$, black
 foreground by default) followed by morphological opening and closing
 on a $3\times 3$ kernel~\cite{gonzalez2018digital}; only the largest
@@ -623,7 +624,7 @@ $s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
 \caption{Two-stage camera calibration.}
 \label{alg:calib}
 \KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
-  dam-break frame $I_{0}=\texttt{config\_00}$;
+  reference frame $I_{0}$ at dam-release instant;
   container dimensions $(W, H)$; image size $(W, H)$;
   safety thresholds
   $\Delta_{\mathrm{rot}}^{\max}=2.5^{\circ}$,
@@ -835,14 +836,13 @@ We frame the entire paper around a single inverse problem and its
 two successively more tractable forms. The canonical
 simulation-in-the-loop inverse
 of~\cite{hamamichi2023nonnewtonian} reads
-\begin{equation}
-\taglabel{P}{P}
+\begin{taggedeqn}{P}{P}
     \hat{\boldsymbol{\theta}}
     \;=\;
     \arg\min_{\boldsymbol{\theta}\in\Theta}
     \bigl\|\mathcal{S}(\boldsymbol{\theta};\,W, H)
            - \mathbf{y}_{\mathrm{obs}}\bigr\|^{2},
-\end{equation}
+\end{taggedeqn}
 and leaves three practical difficulties unaddressed:
 \emph{(i)}~each evaluation of $\mathcal{S}$ requires a full MPM
 integration, $O(\mathrm{minutes})$ per query;
@@ -855,8 +855,7 @@ whenever the observed shear-rate range is dominated by
 $\eta\,\dot\gamma^{\,n}$ (\S3.3).
 
 We transform (\ref{eq:P}) into the surrogate-driven form
-\begin{equation}
-\taglabel{P$'$}{Pprime}
+\begin{taggedeqn}{P$'$}{Pprime}
     \hat{\boldsymbol{\theta}}
     \;=\;
     \arg\min_{\boldsymbol{\theta}\in\Theta_{k^{\star}}}\,
@@ -866,7 +865,7 @@ We transform (\ref{eq:P}) into the surrogate-driven form
     \;+\;
     \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
                         {w}\right)^{\!2},
-\end{equation}
+\end{taggedeqn}
 through four substitutions, each addressing a specific difficulty
 above; Table~\ref{tab:subs} summarises the mapping and points to the
 subsection that supplies each piece of machinery.
@@ -916,8 +915,7 @@ of the same material are available---a protocol identified
 in~\cite{hamamichi2023nonnewtonian} as the mitigation for
 difficulty~(iii) but left computationally out of reach---our
 surrogate makes it practical, and the inverse becomes
-\begin{equation}
-\taglabel{P$^{\star}$}{Pstar}
+\begin{taggedeqn}{P$^{\star}$}{Pstar}
 \begin{aligned}
     \hat{\boldsymbol{\theta}}
     \;=\;
@@ -931,7 +929,7 @@ surrogate makes it practical, and the inverse becomes
     \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
                         {w}\right)^{\!2}.
 \end{aligned}
-\end{equation}
+\end{taggedeqn}
 Sharing $\boldsymbol{\theta}$ across setups while each setup is
 routed through its own expert tightens
 (\ref{eq:Pstar}) along the $\sigma_Y$ axis in exact proportion to the
