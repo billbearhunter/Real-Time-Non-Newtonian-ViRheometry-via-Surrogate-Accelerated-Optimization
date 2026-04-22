@@ -344,9 +344,8 @@ smartphone video of the dam-break flow into the observation vector
 $\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8}) \in
 \mathbb{R}_{\ge 0}^{8}$ of Eq.~\eqref{eq:y-def}. We use a two-stage
 camera calibration followed by silhouette-based flow-front
-extraction (\texttt{Calibration/pipeline.py} and
-\texttt{Calibration/extract\_flow\_distance.py}). The whole
-pipeline is summarised in Algorithm~\ref{alg:calib}.
+extraction; the full pipeline is summarised in
+Algorithm~\ref{alg:calib}.
 
 \paragraph{Stage 1: ChArUco prior.}
 A printed ChArUco
@@ -621,8 +620,7 @@ $s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
 \end{algorithm}
 
 \begin{algorithm}[t]
-\caption{Two-stage camera calibration
-  (\texttt{Calibration/pipeline.py}).}
+\caption{Two-stage camera calibration.}
 \label{alg:calib}
 \KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
   dam-break frame $I_{0}=\texttt{config\_00}$;
@@ -920,16 +918,19 @@ difficulty~(iii) but left computationally out of reach---our
 surrogate makes it practical, and the inverse becomes
 \begin{equation}
 \taglabel{P$^{\star}$}{Pstar}
+\begin{aligned}
     \hat{\boldsymbol{\theta}}
     \;=\;
-    \arg\min_{\boldsymbol{\theta}\in\bigcap_{s}\Theta_{k_{s}^{\star}}}\,
+    &\arg\min_{\boldsymbol{\theta}\in\bigcap_{s}\Theta_{k_{s}^{\star}}}\,
     \sum_{s=1}^{S}\,
     \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta}; W_{s}, H_{s})
           - \mathbf{y}_{\mathrm{obs}}^{(s)}\|^{2}}
          {\overline{(\mathbf{y}_{\mathrm{obs}}^{(s)})^{2}}}
-    \;+\;
+    \\
+    &\qquad\;+\;
     \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
                         {w}\right)^{\!2}.
+\end{aligned}
 \end{equation}
 Sharing $\boldsymbol{\theta}$ across setups while each setup is
 routed through its own expert tightens
@@ -1096,13 +1097,17 @@ noise $\sigma_{n,k,d}^{\,2}$ are learned per expert and per output
 dimension by maximising the exact log marginal likelihood
 \begin{equation}
 \label{eq:gp-mll}
+\begin{aligned}
     \log p(\tilde{\mathbf{y}}_{k,d} \mid \mathbf{X}_{k})
-    = -\tfrac{1}{2}\,
+    =\;
+    &-\tfrac{1}{2}\,
         \tilde{\mathbf{y}}_{k,d}^{\!\top}
         (K_{k} + \sigma_{n,k,d}^{\,2} I)^{-1}
         \tilde{\mathbf{y}}_{k,d}
-      -\tfrac{1}{2}\log\!\bigl|K_{k} + \sigma_{n,k,d}^{\,2} I\bigr|
-      -\tfrac{|\mathbf{X}_{k}|}{2}\log 2\pi
+    \\
+    &-\tfrac{1}{2}\log\!\bigl|K_{k} + \sigma_{n,k,d}^{\,2} I\bigr|
+    \;-\; \tfrac{|\mathbf{X}_{k}|}{2}\log 2\pi
+\end{aligned}
 \end{equation}
 with Adam (learning rate $5\cdot 10^{-2}$, $100$ iterations).
 Experts are trained independently in parallel across cells.
@@ -1260,14 +1265,13 @@ extrapolate into spurious near-zero-flow minima.
 We use CMA-ES~\cite{hansen2016cma,bajaj2019gaussian} with a small
 log-space population, initial step size $\sigma_{0} = 0.5$, and
 early stopping on CMA's tol-x / tol-f criteria under a bounded
-maximum-generation budget. The benchmark pipeline used for our
-headline synthetic numbers in \S\ref{sec:mainresults}
-(\texttt{vi\_mogp.invert\_rbcm}) runs with popsize $P = 12$ and
-$T_{\mathrm{cma}} = 60$ (i.e.\ up to $720$ surrogate evaluations);
-the user-facing single-setup entry point
-(\texttt{optimize\_1setup.py}) defaults to the looser $P = 16$,
-$T_{\mathrm{cma}} = 700$, which rarely matters because early
-stopping fires well before the budget. Parameter bounds are
+maximum-generation budget. The benchmark configuration used for our
+headline synthetic numbers in \S\ref{sec:mainresults} runs with
+population $P = 12$ and $T_{\mathrm{cma}} = 60$ (up to $720$
+surrogate evaluations); a user-facing single-setup configuration
+uses the looser $P = 16$ and $T_{\mathrm{cma}} = 700$, which rarely
+matters in practice because early stopping fires well before the
+budget. Parameter bounds are
 enforced through CMA's boundary handler. On a single consumer GPU,
 the full single-setup inverse---routing, NN warm-start, the bounded
 CMA loop, and the final forward---takes a median of $12$\,s per
@@ -1613,55 +1617,49 @@ scheme, and inverse augmentations are in \S\ref{sec:ablation}.
 \begin{table}[t]
 \centering
 \small
-\caption{Frozen HVIMoGP-rBCM configuration used for all reported
-numbers. Values match the release checkpoint
-\texttt{Models/rbcm\_v2/model.pt} and the pipeline defaults in
-\texttt{vi\_mogp/config.py}.}
+\caption{Frozen configuration used throughout the evaluation. All
+reported numbers use this single fixed setting.}
 \label{tab:hyper}
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}ll@{}}
 \toprule
-\textit{Training data}
-  & $N$                        & $295{,}419$ MPM dam-break samples \\
-  & infill batch               & $2{,}500$ at $\sigma_Y\le 1$\,Pa \\
-\textit{Gate}
-  & $K_{\mathrm{geo}}$         & $12$ (BGM, full cov., DP prior) \\
-  & $K_{\phi}^{(g)}$           & BIC-selected per $g$,
-                                 $\sum_{g}K_{\phi}^{(g)}=540$ \\
-  & signature $\boldsymbol{\phi}$ & $18$-D (Eq.~\eqref{eq:phi}) \\
-\textit{Experts}
-  & kernel                     & Mat\'ern-$5/2$ ARD on $\mathbb{R}^{5}$ \\
-  & training                   & Adam, lr $5\cdot 10^{-2}$,
-                                 $100$ iter \\
-  & cell-size bounds           & $|\mathcal{D}_{(g,k)}|\in[30, 2500]$
-                                 (stratified subsample)\\
-\textit{Hotfix}
-  & MAE threshold $\tau_{\mathrm{mae}}$ & $0.15$ (isotropic-baseline retrain) \\
-  & retrain iters              & $300$ with Adam \\
-\textit{Correction}
-  & basis                      & degree-$2$ monomials on raw $\mathbf{x}$,
-                                 $\Phi\in\mathbb{R}^{21}$ \\
-  & ridge $\alpha$             & $10^{-3}$ (intercept unregularised) \\
-\textit{Aggregation}
-  & paper configuration        & rBCM top-$1$ (\texttt{{-}{-}no-baseline}
-                                 \texttt{{-}{-}top-k-phi 1}) \\
-  & code default               & GRBCM + geo baseline expert \\
-\textit{Inverse CMA-ES}
-  & popsize $P$                & $12$ (benchmark,
-                                 \texttt{vi\_mogp.invert\_rbcm}) \\
-  & popsize $P$ (user-facing)  & $16$ (\texttt{optimize\_1setup.py}) \\
-  & $\sigma_{0}$               & $0.5$ (log-space) \\
-  & $T_{\mathrm{cma}}$         & $60$ (benchmark) / $700$ (user) \\
-  & early stopping             & CMA tol-x $/$ tol-f (fires long
-                                 before $T_{\mathrm{cma}}$) \\
-  & bound pad                  & $2\%$ log on $\eta,\sigma_{Y}$;
-                                 $2\%$ linear on $n$ \\
-\textit{Priors}
-  & single-setup $\lambda$     & $10^{-5}$ (data-honest anchor at
-                                 $\sigma_{Y}^{\mathrm{NN}}$) \\
-  & joint-stage $\lambda_{\mathrm{joint}}$
-                               & $5\cdot 10^{-2}$ (stage-coupling;
-                                 anchor at $\sigma_{Y}^{(1)}$) \\
-  & prior width $w$            & $1$ (log-std) \\
+\textit{Training data} & \\
+\quad $N$                           & $295{,}419$ MPM dam-break samples \\
+\quad infill batch                  & $2{,}500$ at $\sigma_Y\le 1$\,Pa \\
+\midrule
+\textit{Hierarchical gate} & \\
+\quad $K_{\mathrm{geo}}$            & $12$ (BGM, full cov., DP prior) \\
+\quad $K_{\phi}^{(g)}$              & BIC-selected per group,
+                                      $\sum_{g}K_{\phi}^{(g)}=540$ \\
+\quad signature $\boldsymbol{\phi}$ & $18$-D (Eq.~\eqref{eq:phi}) \\
+\midrule
+\textit{Per-cell GP expert} & \\
+\quad kernel                        & Mat\'ern-$5/2$ ARD on $\mathbb{R}^{5}$ \\
+\quad training                      & Adam, lr $5\cdot 10^{-2}$, $100$ iter \\
+\quad cell-size range               & $[30, 2500]$ (stratified subsample) \\
+\midrule
+\textit{Hotfix \& residual correction} & \\
+\quad MAE threshold $\tau_{\mathrm{mae}}$ & $0.15$ \\
+\quad retrain                       & isotropic baseline, Adam $300$ iter \\
+\quad residual basis                & degree-$2$ monomials,
+                                      $\Phi\in\mathbb{R}^{21}$ \\
+\quad ridge $\alpha$                & $10^{-3}$, intercept unregularised \\
+\midrule
+\textit{Aggregation (paper)}        & rBCM, top-$1$ routing \\
+\midrule
+\textit{Inverse CMA-ES} & \\
+\quad popsize $P$                   & $12$ (benchmark) / $16$ (user-facing) \\
+\quad $\sigma_{0}$                  & $0.5$ (log-space) \\
+\quad $T_{\mathrm{cma}}$            & $60$ / $700$; tol-x / tol-f early stop \\
+\quad bound pad                     & $2\%$ log on $\eta,\sigma_{Y}$;
+                                      $2\%$ linear on $n$ \\
+\midrule
+\textit{Priors} & \\
+\quad single-setup $\lambda$        & $10^{-5}$ at $\sigma_{Y}^{\mathrm{NN}}$
+                                      (data-honest) \\
+\quad joint-stage $\lambda_{\mathrm{joint}}$ & $5\cdot 10^{-2}$ at
+                                               $\sigma_{Y}^{(1)}$
+                                               (stage-coupling) \\
+\quad prior width $w$               & $1$ (log-std) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1767,7 +1765,7 @@ of two.
       prediction $\hat{\mathbf{y}}$ versus MPM ground truth
       $\mathbf{y}$ across $22{,}209$ held-out $T_{\mathrm{sim}}$
       samples, coloured by routed expert id. To be regenerated with
-      frozen checkpoint \texttt{rbcm\_v1\_hotfix\_poly/model.pt}.}
+      the frozen surrogate checkpoint.}
     \else
       \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
     \fi
@@ -1910,18 +1908,18 @@ Three findings.
 GRBCM~\cite{liu2018generalized} augments our aggregation with an
 additional geometry-wide baseline expert indexed by $0$ with
 predictive moments $(\mu_0, \sigma_0^{2})$:
-\begin{equation}
+\begin{align}
 \label{eq:grbcm}
     \sigma_{\mathrm{GRBCM}}^{-2}
-    = \sigma_0^{-2}
-      + \sum_{k \in \mathcal{R}} \beta_k\,\sigma_k^{-2},
-    \qquad
+    &= \sigma_0^{-2}
+       + \sum_{k \in \mathcal{R}} \beta_k\,\sigma_k^{-2},
+\nonumber\\
     \mu_{\mathrm{GRBCM}}
-    = \sigma_{\mathrm{GRBCM}}^{\,2}\!
+    &= \sigma_{\mathrm{GRBCM}}^{\,2}\!
        \left[\sigma_0^{-2}\,\mu_0
            + \sum_{k \in \mathcal{R}}
                \beta_k\,\sigma_k^{-2}\,\mu_k\right].
-\end{equation}
+\end{align}
 Computing $(\mu_0, \sigma_0^2)$ requires a second GP query per
 sample, doubling inference cost ($21.6$\,s vs.\ $12.0$\,s). On our
 peaked gate posterior the baseline blend contributes no independent
