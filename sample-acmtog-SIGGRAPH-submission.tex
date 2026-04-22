@@ -191,33 +191,47 @@
 Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian}
 estimates Herschel--Bulkley parameters $(\sigma_Y, \eta, n)$ of complex
 fluids by matching observed dam-break flows against physics-based
-simulation, enabling the characterization of materials---pastes, chunky
-sauces, granular fluids---that conventional rheometers cannot handle.
-However, inverting the material point method in the loop requires hours
-of GPU time per video, leaving this otherwise uniquely capable approach
-confined to offline research use.
+simulation, uniquely enabling the characterization of
+materials---pastes, chunky sauces, granular slurries---that
+conventional parallel-plate rheometers cannot handle. The approach has
+remained offline-only, however, because inverting the material point
+method in the loop requires hours of GPU time per video; in particular,
+the yield-stress/consistency identifiability degeneracy that the
+original authors diagnosed, and the multi-observation remedy they
+proposed for it, were consequently computationally out of reach in
+practice.
 
-We propose a surrogate-accelerated framework that compresses this
-inverse from hours to seconds per video. Our technical core couples two
-components. First, a regime-aware hierarchical Mixture-of-GP surrogate
-with 540 specialized sparse GP experts, routed by a two-level Bayesian
-Gaussian mixture gate over container geometry and observation
-signatures, and aggregated via the robust Bayesian Committee Machine.
-Second, an identifiability-aware inverse in which CMA-ES is warm-started
-from the routed expert's nearest training neighbor and anchored by a
-soft log-$\sigma_Y$ prior at that neighbor---resolving the
-yield-stress/consistency similarity degeneracy whose practical
-mitigation had previously been computationally out of reach.
+We present a surrogate-accelerated framework that compresses the
+inverse from hours to a median of twelve seconds per video on a single
+consumer GPU. Three components together make this shift possible.
+First, a regime-aware hierarchical Mixture-of-GP surrogate with $540$
+specialized sparse GP experts, routed by a two-level Bayesian
+Gaussian-mixture gate over container geometry and observation
+signatures and aggregated via a robust Bayesian Committee Machine,
+replaces the MPM forward map with a calibrated predictive
+distribution whose uncertainty is propagated into the inverse.
+Second, an identifiability-aware inverse warm-starts CMA-ES from the
+routed expert's nearest training neighbor and anchors it with a soft
+data-honest log-$\sigma_Y$ prior at that neighbor, turning the
+similarity degeneracy from a reported limitation into a tractable
+ill-conditioning we can mitigate. Third, a non-interactive ChArUco
+camera-calibration pipeline replaces the two-stage manual workflow of
+the predecessor, cutting per-capture human time from roughly $25$ to
+$10$ minutes and making the end-to-end wall-clock, not just the
+inverse, field-deployable.
 
-Evaluated against simulation-in-the-loop inversion on held-out synthetic
-samples and real non-Newtonian fluids, our method matches baseline
-accuracy at three orders of magnitude lower latency. This seconds-scale
-inversion unlocks three capabilities inaccessible to prior work:
-\emph{(i)} fresh parameter estimates for time-varying fluids,
-\emph{(ii)} practical characterization of materials conventional
-rheometers cannot measure, and \emph{(iii)} a multi-observation joint
-protocol that approaches parallel-plate rheometer precision from phone
-videos alone.
+Evaluated against simulation-in-the-loop inversion on held-out
+synthetic samples and real non-Newtonian fluids, our method matches
+baseline accuracy at three orders of magnitude lower latency. This
+seconds-scale inversion unlocks three capabilities inaccessible to
+prior work: \emph{(i)}~fresh parameter estimates for time-varying
+fluids, tracked across repeated captures rather than frozen at a
+single snapshot; \emph{(ii)}~practical characterization of materials
+that parallel-plate rheometers cannot measure, extending rheometry to
+chunky, granular, and large-inclusion samples; and \emph{(iii)}~a
+multi-observation joint protocol---the same remedy prior work
+proposed but could not afford---that approaches parallel-plate
+precision from phone videos alone.
 \end{abstract}
 
 
