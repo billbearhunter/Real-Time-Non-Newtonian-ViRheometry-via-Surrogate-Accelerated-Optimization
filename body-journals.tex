@@ -75,9 +75,12 @@ $\sigma_Y$ where vanilla CMA-ES would slide to $\sigma_Y \to 0$.
 Our work inherits the problem setup, dam-break observation protocol, and
 inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
 contributes the machinery needed to make that formulation
-computationally practical and to resolve an identifiability limit that
-prior work had identified but could not practically mitigate. The main
-contributions are:
+computationally practical. In particular, the multi-observation
+remedy that~\cite{hamamichi2023nonnewtonian} identified for the
+yield-stress/consistency degeneracy, though demonstrated on a
+handful of showcase materials, remained too expensive to adopt
+per material; our acceleration turns it into a default per-material
+step. The main contributions are:
 
 \begin{itemize}
     \item A \emph{hierarchical Mixture-of-GP surrogate} for the
@@ -969,10 +972,11 @@ and the prior coefficients are $\lambda = 10^{-5}$, $w = 1$
 
 When multiple observations
 $\{(W_{s}, H_{s}, \mathbf{y}_{\mathrm{obs}}^{(s)})\}_{s=1}^{S}$
-of the same material are available---a protocol identified
-in~\cite{hamamichi2023nonnewtonian} as the mitigation for
-difficulty~(iii) but left computationally out of reach---our
-surrogate makes it practical, and the inverse becomes
+of the same material are available---a protocol identified and
+demonstrated in~\cite{hamamichi2023nonnewtonian} as the mitigation
+for difficulty~(iii) but restricted to showcase runs by the
+hours-per-setup MPM cost---our surrogate makes it practical per
+material, and the inverse becomes
 \begin{taggedeqn}{P$^{\star}$}{Pstar}
 \begin{aligned}
     \hat{\boldsymbol{\theta}}
@@ -2510,8 +2514,10 @@ Bayesian Gaussian mixture gate over container geometry and
 observation signatures, and an identifiability-aware inverse that
 warm-starts CMA-ES from the routed expert's nearest training
 neighbour and anchors the $\sigma_Y$ axis with a data-honest soft
-prior---resolving the yield-stress/consistency similarity degeneracy
-that prior work identified but could not practically mitigate.
+prior---addressing the yield-stress/consistency similarity
+degeneracy that prior work identified and partially mitigated via
+costly multi-setup showcases, now at a cost that permits the remedy
+to run per material by default.
 
 Beyond runtime reduction, the seconds-scale inverse unlocks three
 capabilities inaccessible to simulation-in-the-loop rheometry: fresh
