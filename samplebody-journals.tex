@@ -237,6 +237,63 @@ training-data-anchored log-$\sigma_Y$ prior to address the yield-stress
 identifiability degeneracy that is specific to Herschel--Bulkley
 inversion and not resolved by generic BO machinery.
 
+The substitution of an expensive simulator $\mathcal{S}$ by a trained
+surrogate $\tilde{\mathcal{S}}$ inside a Bayesian / derivative-free
+inverse is not heuristic: \citet{stuart2018posterior} prove that the
+Hellinger distance between a GP-surrogate-based posterior and the
+true simulator-based posterior is bounded by moments of the
+surrogate's predictive error, and \citet{teckentrup2020convergence}
+extends the guarantee to the realistic setting in which kernel
+hyperparameters are themselves estimated from data. Our surrogate
+satisfies the premise of both results at evaluation time---the rBCM
+aggregator returns calibrated predictive error natively---so the
+replacement of MPM-in-the-loop by our hierarchical GP committee
+inherits the same posterior-fidelity guarantees that justify
+Bayesian calibration~\cite{kennedy2001bayesian} and modern
+simulation-based inference~\cite{cranmer2020frontier}.
+
+
+\subsection{Flow Observations as Rheometric Signals}
+
+A second prerequisite for replacing simulation-in-the-loop inversion
+with a surrogate is that the chosen observation $\mathbf{y}_{\mathrm{obs}}$
+actually carries enough information about
+$(\sigma_Y,\eta,n)$ to be worth inverting at all. The single scalar
+flow-front trace extracted from a phone-video dam-break looks
+information-poor at first sight, but gravity-driven spreading of
+viscoplastic fluids has a long pedigree as a rheometric observation:
+the slump test of \citet{pashias1996fifty} recovers yield stress
+from a single geometric reading, and \citet{roussel2005fiftycent}
+extend the argument to the spreading regime that matches our
+dam-break geometry directly. Final-deposit shapes of stopped
+free-surface flows are themselves a recognised rheological
+signature~\cite{coussot1996rheological}, and
+\citet{ancey2007plasticity} frames the broader class of
+gravity-driven yield-stress flows as a standard rheometric regime.
+The relation between flow-front position and
+Herschel--Bulkley parameters is made quantitative by the similarity
+analyses of \citet{liumei1989slow} and
+\citet{balmforth2007two}---the same similarity structure leveraged
+by~\citet{hamamichi2023nonnewtonian}.
+
+Recent inverse-analysis work sharpens these classical arguments into
+explicit identifiability statements for our observation class.
+\citet{martinpritchard2022inferring} show that the full generalized
+Newtonian constitutive function is, in principle, uniquely
+recoverable from free-surface evolution;
+\citet{ahmadi2022identification} compute linearly-independent
+sensitivity coefficients of the three Herschel--Bulkley parameters
+with respect to free-surface readings; and
+\citet{muchiri2024identification} demonstrate inverse recovery of
+yield stress and consistency from shallow-water elevation
+hydrographs under viscoplastic rheology. The residual
+yield-stress / consistency degeneracy we address in~\S\ref{sec:inverse}
+is therefore not a fundamental information-theoretic limit of the
+phone-video observation---it is a practical ill-conditioning that
+arises only in the low-$\sigma_Y$ regime where the yield term is
+dominated by the viscous contribution, which our data-honest
+log-$\sigma_Y$ prior is designed to mitigate rather than paper over.
+
 
 \section{Background}
 
