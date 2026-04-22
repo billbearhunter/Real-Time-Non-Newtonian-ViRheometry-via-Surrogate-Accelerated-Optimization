@@ -16,6 +16,20 @@
 \SetAlCapNameFnt{\small}
 \SetAlCapHSkip{0pt}
 
+% --- Tagged equation helper (fix hyperref duplicate destinations) -----------
+% amsmath's \tag{...} updates the visible equation label but NOT the
+% internal counter-based hyperref destination \@currentHref; the result
+% is that several \tag'd equations that all sit on the same equation
+% counter value collide on the same hyperref name (e.g. equation.24),
+% and pdfTeX reports "destination with the same identifier has been
+% already used, duplicate ignored" for every collision. \taglabel
+% below both calls \tag and forces a fresh \@currentHref that the
+% following \label captures, so each tagged equation gets a unique
+% hyperref target (equation.P, equation.Pprime, equation.Pstar, ...).
+\makeatletter
+\newcommand{\taglabel}[2]{\tag{#1}\def\@currentHref{equation.#2}\label{eq:#2}}
+\makeatother
+
 % --- Typography relief -----------------------------------------------------
 % Let TeX stretch inter-word spacing by up to 3em on tight paragraphs before
 % declaring an overfull hbox. This absorbs most small-to-medium overflows
