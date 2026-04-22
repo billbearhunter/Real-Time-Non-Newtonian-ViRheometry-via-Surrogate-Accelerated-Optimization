@@ -16,6 +16,23 @@
 \SetAlCapNameFnt{\small}
 \SetAlCapHSkip{0pt}
 
+% --- Float placement relief ------------------------------------------------
+% [t]-only placement caused a large backlog of figures/tables/algorithms to
+% queue past LaTeX's \topnumber / \totalnumber limits, dumping onto the
+% final pages as a "float-only" block and producing trailing blank pages.
+% placeins with [section] adds an implicit \FloatBarrier at every section
+% boundary so floats cannot leak into later sections; widened float
+% fractions give each page more room for on-page placement. Floats below
+% also use [!htbp] to let LaTeX try every position before deferring.
+\usepackage[section]{placeins}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{5}
+
 % --- Tagged equation environment (fix hyperref duplicate destinations) -----
 % amsmath's \tag{...} replaces the visible equation number but rolls the
 % equation counter back at \end{equation}, so multiple \tag-labelled

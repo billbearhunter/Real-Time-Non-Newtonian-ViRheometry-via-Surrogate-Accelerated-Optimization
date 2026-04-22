@@ -584,7 +584,7 @@ $\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8})
 \in \mathbb{R}_{\ge 0}^{8}$ that the inverse of
 Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Stage 1 reprojection oracle.}
 \label{alg:reproj}
 \KwIn{$7$-vector $\boldsymbol{\theta}_{\mathrm{cam}} =
@@ -620,7 +620,7 @@ $s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
 \Return{$\{\mathbf{u}_{i}\}_{i \in \mathcal{I}}$.}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Two-stage camera calibration.}
 \label{alg:calib}
 \KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
@@ -870,7 +870,7 @@ through four substitutions, each addressing a specific difficulty
 above; Table~\ref{tab:subs} summarises the mapping and points to the
 subsection that supplies each piece of machinery.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{The four substitutions that transform the canonical inverse
@@ -1304,7 +1304,7 @@ Algorithm~\ref{alg:joint} is the two-stage joint multi-setup
 inverse; it solves (\ref{eq:Pstar}) and is the configuration used
 for our real-fluid validation in \S\ref{sec:rheometer}.
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Offline construction of the HVIMoGP-rBCM surrogate.}
 \label{alg:train}
 \KwData{Training corpus
@@ -1392,7 +1392,7 @@ On a held-out split, compute per-expert forward MAE
 \end{algorithm}
 
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Online forward pass
   $\hat{\mathbf{y}}=\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)$.}
 \label{alg:forward}
@@ -1447,7 +1447,7 @@ $\hat{y}_{d}\leftarrow\max_{j\le d}\hat{y}_{j}$
 \end{algorithm}
 
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Online single-setup inverse
   $(\mathbf{y}_{\mathrm{obs}},W,H)\mapsto\hat{\boldsymbol{\theta}}$.
   Solves~(\ref{eq:Pprime}).}
@@ -1518,7 +1518,7 @@ $\hat{\mathbf{y}}\leftarrow\tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W,H)$\;
 \end{algorithm}
 
 
-\begin{algorithm}[t]
+\begin{algorithm}[!htbp]
 \caption{Online joint multi-setup inverse
   $\{(\mathbf{y}_{\mathrm{obs}}^{(s)},W_{s},H_{s})\}_{s=1}^{S}
   \mapsto\hat{\boldsymbol{\theta}}$.
@@ -1613,7 +1613,7 @@ frozen checkpoint with the hyperparameters in
 Table~\ref{tab:hyper}; ablations over gate granularity, aggregation
 scheme, and inverse augmentations are in \S\ref{sec:ablation}.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Frozen configuration used throughout the evaluation. All
@@ -1757,7 +1757,7 @@ correction (Eq.~\eqref{eq:poly}) is specifically designed to suppress
 the former, reducing the $p_{999}$ row-max error by roughly a factor
 of two.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder: parity plot of surrogate
@@ -1778,7 +1778,7 @@ of two.
     \label{fig:parity}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[5.5cm]{Placeholder: per-expert $R^{2}$
@@ -1820,7 +1820,7 @@ For reference, each MPM forward evaluation alone takes several
 minutes on the same hardware, so a comparable CMA-ES budget under
 simulation-in-the-loop (Baseline~A) takes hours per sample.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Inverse HB recovery on $N=10$ held-out samples (seed $= 0$).
@@ -1847,7 +1847,7 @@ Figure~\ref{fig:flowcurve-syn} overlays the recovered flow curve
 $\hat\tau(\dot\gamma) = \hat\sigma_Y + \hat\eta\,\dot\gamma^{\,\hat n}$
 against ground truth on a representative sample.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[5.5cm]{Placeholder: recovered versus
@@ -1882,7 +1882,7 @@ All rows in Table~\ref{tab:ablation} use identical gate routing,
 identical experts, the same $10$-sample inverse set, and the frozen
 CMA-ES budget ($12\times 25 = 300$ surrogate calls).
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Ablation of inverse-side design choices; medians over
@@ -1977,7 +1977,7 @@ $\hat{\boldsymbol{\theta}}$ essentially at the measurement instant.
 We score both against the true $\boldsymbol{\theta}(t_k)$ in
 per-parameter log-relative error.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6.5cm]{Placeholder: two-panel tracking figure
@@ -2032,7 +2032,7 @@ instead by \emph{sim--real replay}: we run MPM with the recovered
 $\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
 silhouette against the original phone video frame by frame.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
@@ -2079,7 +2079,7 @@ joint inversion. The inverse objective sums Eq.~\eqref{eq:Pprime}
 over the available setups, sharing $\boldsymbol{\theta}$ while
 routing each observation through its own expert.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Multi-observation joint inversion on the low-$\sigma_Y$
@@ -2120,7 +2120,7 @@ overlay the recovered HB flow curve against the rheometer reference.
 Each material is captured at two to three $(W, H)$ setups per
 \S\ref{sec:multi} and inverted jointly.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder: recovered HB flow curve
@@ -2163,7 +2163,7 @@ $T_{\mathrm{real}}$ subset. All three pipelines consume the same
 phone-video clips and produce an HB triple
 $\hat{\boldsymbol{\theta}}$.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[5.5cm]{Placeholder: wall-clock comparison on
@@ -2187,7 +2187,7 @@ $\hat{\boldsymbol{\theta}}$.
     \label{fig:speedup}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[5.5cm]{Placeholder: CMA-ES loss versus
@@ -2250,7 +2250,7 @@ saving an average of $14$\,min\,$43$\,s per capture. Video editing
 footage and are orthogonal to the calibration method. End-to-end,
 the manual workflow drops from $25$\,min to $10$\,min per capture.
 
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
 \caption{Manual capture-and-calibration wall-clock per material.
