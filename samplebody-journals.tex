@@ -40,11 +40,12 @@ that would otherwise be within reach of a video-based approach:
     over instrumental rheometry---chunky sauces, particulate
     suspensions---remains confined to offline demonstration rather than
     fieldable tool so long as each measurement costs hours.
-    \item \emph{Multi-observation precision recovery.} The prior
-    work~\cite{hamamichi2023nonnewtonian} itself identifies a similarity
+    \item \emph{Multi-observation precision recovery.}
+    \cite{hamamichi2023nonnewtonian} itself identifies a similarity
     degeneracy between yield stress and consistency, and proposes
-    multi-setup joint inversion as the mitigation. At hours per setup,
-    $N$-setup inversion is computationally infeasible in practice.
+    multi-setup joint inversion as the mitigation---but at hours per
+    setup, $N$-setup inversion is computationally infeasible in
+    practice.
 \end{itemize}
 
 We propose a surrogate-accelerated framework that compresses the
@@ -1946,14 +1947,16 @@ CMA-ES budget ($12\times 25 = 300$ surrogate calls).
 $10$ test samples. ``Fwd NMSE'' is the residual at the recovered
 parameter; ``dt'' is per-sample wall-clock.}
 \label{tab:ablation}
+\setlength{\tabcolsep}{3.5pt}
+\small
 \begin{tabular}{@{}lccccc@{}}
 \toprule
 Config & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ & $\mathrm{relE}\,\sigma_Y$ & Fwd NMSE & dt\,(s) \\
 \midrule
-Pure NN (no CMA)              & 0.115 & 0.153 & \textbf{0.168} & $3.9\times 10^{-3}$ & \textbf{0.0} \\
-GRBCM $+$ warm                 & \textbf{0.076} & 0.198 & 0.366 & $1.5\times 10^{-5}$ & 21.6 \\
-rBCM $+$ warm, no prior        & 0.109 & 0.201 & 0.459 & $\mathbf{9.5\times 10^{-6}}$ & 5.9 \\
-\textbf{rBCM $+$ warm $+$ prior (ours)} & 0.160 & 0.202 & \textbf{0.298} & $1.4\times 10^{-5}$ & 12.0 \\
+Pure NN (no CMA)        & 0.115 & 0.153 & \textbf{0.168} & $3.9{\times}10^{-3}$ & \textbf{0.0} \\
+GRBCM warm              & \textbf{0.076} & 0.198 & 0.366 & $1.5{\times}10^{-5}$ & 21.6 \\
+rBCM warm, no prior     & 0.109 & 0.201 & 0.459 & $\mathbf{9.5{\times}10^{-6}}$ & 5.9 \\
+\textbf{Ours (rBCM warm $+$ prior)} & 0.160 & 0.202 & \textbf{0.298} & $1.4{\times}10^{-5}$ & 12.0 \\
 \bottomrule
 \end{tabular}
 \end{table}
