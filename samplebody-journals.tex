@@ -504,8 +504,9 @@ weighted chamfer cost is
          {\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)},
 \end{equation}
 with $d(p)$ bilinearly interpolated from the EDT and
-$w(p) = w_{\mathrm{left}}(p_{x})\,w_{\mathrm{top}}(p_{y})\,
-w_{\mathrm{bottom}}(p_{y})$ a product of side-emphasis weights.
+$w(p)$ a product of three side-emphasis weights
+$w_{\mathrm{left}}(p_{x})$, $w_{\mathrm{top}}(p_{y})$, and
+$w_{\mathrm{bottom}}(p_{y})$.
 Per-face normalisation prevents long edges (e.g.\ the bottom wall)
 from dominating short ones. We minimise $\mathcal{L}_{\mathrm{cham}}$
 with L-BFGS-B~\cite{byrd1995limited,zhu1997algorithm} over the six
@@ -837,13 +838,12 @@ two successively more tractable forms. The canonical
 simulation-in-the-loop inverse
 of~\cite{hamamichi2023nonnewtonian} reads
 \begin{equation}
-\label{eq:P}
+\tag{P}\label{eq:P}
     \hat{\boldsymbol{\theta}}
     \;=\;
     \arg\min_{\boldsymbol{\theta}\in\Theta}
     \bigl\|\mathcal{S}(\boldsymbol{\theta};\,W, H)
            - \mathbf{y}_{\mathrm{obs}}\bigr\|^{2},
-    \tag{P}
 \end{equation}
 and leaves three practical difficulties unaddressed:
 \emph{(i)}~each evaluation of $\mathcal{S}$ requires a full MPM
@@ -858,7 +858,7 @@ $\eta\,\dot\gamma^{\,n}$ (\S3.3).
 
 We transform (\ref{eq:P}) into the surrogate-driven form
 \begin{equation}
-\label{eq:Pprime}
+\tag{P$'$}\label{eq:Pprime}
     \hat{\boldsymbol{\theta}}
     \;=\;
     \arg\min_{\boldsymbol{\theta}\in\Theta_{k^{\star}}}\,
@@ -868,7 +868,6 @@ We transform (\ref{eq:P}) into the surrogate-driven form
     \;+\;
     \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
                         {w}\right)^{\!2},
-    \tag{P$'$}
 \end{equation}
 through four substitutions, each addressing a specific difficulty
 above; Table~\ref{tab:subs} summarises the mapping and points to the
@@ -920,7 +919,7 @@ in~\cite{hamamichi2023nonnewtonian} as the mitigation for
 difficulty~(iii) but left computationally out of reach---our
 surrogate makes it practical, and the inverse becomes
 \begin{equation}
-\label{eq:Pstar}
+\tag{P$^{\star}$}\label{eq:Pstar}
     \hat{\boldsymbol{\theta}}
     \;=\;
     \arg\min_{\boldsymbol{\theta}\in\bigcap_{s}\Theta_{k_{s}^{\star}}}\,
@@ -931,7 +930,6 @@ surrogate makes it practical, and the inverse becomes
     \;+\;
     \lambda\!\left(\frac{\log\sigma_Y - \log\sigma_Y^{\mathrm{NN}}}
                         {w}\right)^{\!2}.
-    \tag{P$^{\star}$}
 \end{equation}
 Sharing $\boldsymbol{\theta}$ across setups while each setup is
 routed through its own expert tightens
@@ -1267,9 +1265,9 @@ headline synthetic numbers in \S\ref{sec:mainresults}
 (\texttt{vi\_mogp.invert\_rbcm}) runs with popsize $P = 12$ and
 $T_{\mathrm{cma}} = 60$ (i.e.\ up to $720$ surrogate evaluations);
 the user-facing single-setup entry point
-(\texttt{Optimization/optimize\_1setup.py}) defaults to the looser
-$P = 16$, $T_{\mathrm{cma}} = 700$, which rarely matters because
-early stopping fires well before the budget. Parameter bounds are
+(\texttt{optimize\_1setup.py}) defaults to the looser $P = 16$,
+$T_{\mathrm{cma}} = 700$, which rarely matters because early
+stopping fires well before the budget. Parameter bounds are
 enforced through CMA's boundary handler. On a single consumer GPU,
 the full single-setup inverse---routing, NN warm-start, the bounded
 CMA loop, and the final forward---takes a median of $12$\,s per
@@ -1601,10 +1599,14 @@ $W, H \in [2, 7]$\,cm, sampled by Latin-hypercube coverage of the
 log-scaled parameter space and supplemented by an adaptive-infill
 batch of $2{,}500$ samples targeting $\sigma_Y \le 1$\,Pa (the regime
 in which the identifiability ridge is most pronounced). The level-2
-component counts are
-$K_{\phi}^{(g)} = (45, 50, 40, 40, 30, 50, 50, 50, 45, 50, 45, 45)$
-for $g = 1, \dots, 12$, summing to $540$ experts. All reported
-results use this single frozen checkpoint with the hyperparameters in
+component counts, chosen per geo group by BIC, are
+\begin{equation*}
+    \bigl(K_{\phi}^{(g)}\bigr)_{g=1}^{12}
+    \;=\;
+    (45,\,50,\,40,\,40,\,30,\,50,\,50,\,50,\,45,\,50,\,45,\,45),
+\end{equation*}
+summing to $540$ experts. All reported results use this single
+frozen checkpoint with the hyperparameters in
 Table~\ref{tab:hyper}; ablations over gate granularity, aggregation
 scheme, and inverse augmentations are in \S\ref{sec:ablation}.
 
@@ -2476,18 +2478,36 @@ iterative, and situated measurement.
 
 % --- Acknowledgements -------------------------------------------------
 % acmart's [anonymous] class option automatically suppresses the
-% \begin{acks}...\end{acks} block during peer review, so the block is
-% safe to keep enabled throughout submission. Replace the bracketed
-% placeholders with the real acknowledgement text at camera-ready.
+% \begin{acks}...\end{acks} block during peer review, so a pure
+% \begin{acks} block is invisible under the review build. To keep a
+% visible acknowledgements stub in both review and camera-ready
+% builds, we also write a plain \section*{Acknowledgements} here
+% with placeholder text; at camera-ready, replace the placeholder
+% with the real text and optionally remove this comment block.
+\section*{Acknowledgements}
+We thank
+\textit{[collaborators, material / rheometer access providers,
+compute-cluster contacts]}
+for making this work possible. The $295{,}419$-row MPM training
+corpus was generated on
+\textit{[institutional compute resource]}.
+This research was supported by
+\textit{[funding sources and grant numbers]}.
+
 \begin{acks}
-    We thank
-    \textit{[collaborators, material / rheometer access providers,
-    compute-cluster contacts]}
-    for making this work possible. The $295{,}419$-row MPM training
-    corpus was generated on
-    \textit{[institutional compute resource]}.
-    This research was supported by
-    \textit{[funding sources and grant numbers]}.
+% Under the [anonymous] class option this block is suppressed.
+% Remove [anonymous] to have acmart typeset the proper
+% acknowledgements in the camera-ready. The \section* above
+% duplicates the content so that reviewers see the stub during
+% anonymous review.
+We thank
+\textit{[collaborators, material / rheometer access providers,
+compute-cluster contacts]}
+for making this work possible. The $295{,}419$-row MPM training
+corpus was generated on
+\textit{[institutional compute resource]}.
+This research was supported by
+\textit{[funding sources and grant numbers]}.
 \end{acks}
 
 % Bibliography

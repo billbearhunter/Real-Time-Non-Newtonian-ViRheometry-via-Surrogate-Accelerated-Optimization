@@ -16,6 +16,16 @@
 \SetAlCapNameFnt{\small}
 \SetAlCapHSkip{0pt}
 
+% --- Typography relief -----------------------------------------------------
+% Let TeX stretch inter-word spacing by up to 3em on tight paragraphs before
+% declaring an overfull hbox. This absorbs most small-to-medium overflows
+% from long inline math, \texttt{long/file/paths.py}, and multi-line
+% compound adjectives without manual line-break hints. Tune down if the
+% inter-word spacing becomes visually uneven.
+\emergencystretch=3em
+\hbadness=2000   % mute "Underfull \hbox" complaints below this badness
+\hfuzz=1pt       % tolerate up to 1pt overfull without reporting
+
 % --- Figure placeholder mode ---------------------------------------------
 % When \figplaceholdertrue is set, figures whose source data is not yet
 % finalised render as a framed placeholder box of the intended size, so
