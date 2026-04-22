@@ -72,15 +72,21 @@ Together, the warm-start and anchored prior collapse the
 yield-stress/consistency ridge, recovering a physically plausible
 $\sigma_Y$ where vanilla CMA-ES would slide to $\sigma_Y \to 0$.
 
-Our work inherits the problem setup, dam-break observation protocol, and
-inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
+Our work inherits the problem setup, dam-break observation protocol,
+and inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
 contributes the machinery needed to make that formulation
-computationally practical. In particular, the multi-observation
-remedy that~\cite{hamamichi2023nonnewtonian} identified for the
-yield-stress/consistency degeneracy, though demonstrated on a
-handful of showcase materials, remained too expensive to adopt
-per material; our acceleration turns it into a default per-material
-step. The main contributions are:
+computationally practical. \cite{hamamichi2023nonnewtonian} treats
+the yield-stress/consistency degeneracy with a four-part pipeline:
+a loss-Hessian similarity analysis, a plane-Poiseuille-flow proxy
+for that Hessian, Hessian-guided active selection of successive
+setups, and iterative multi-setup CMA-ES over the selected setups.
+That pipeline was validated on $30$ material-trial cases but remains
+gated by the per-iterate MPM cost of the inner CMA-ES. We depart by
+taking a different, surrogate-native mitigation path (detailed in
+\S\ref{sec:inverse}): our inverse neither computes Hessians nor
+selects setups, and our multi-setup formulation is a single joint
+optimization over all available setups rather than a sequential
+refinement. The main contributions are:
 
 \begin{itemize}
     \item A \emph{hierarchical Mixture-of-GP surrogate} for the
@@ -127,19 +133,37 @@ appears in~\cite{bridson2015fluid}.
 Estimating simulation parameters from video by matching rendered and
 observed dynamics has a long lineage in graphics and
 vision~\cite{bhat2002computing,monszpart2016smash}. Takahashi and
-Lin~\cite{takahashi2019video} established the video-to-parameter pattern
-for viscous fluids by matching rendered and observed dam-break
-silhouettes on a per-scene basis; Hamamichi et
-al.~\cite{hamamichi2023nonnewtonian} extended this to the non-Newtonian
-Herschel--Bulkley triple $(\sigma_Y, \eta, n)$ via dimensional-similarity
-analysis over tabulated MPM outputs, and is the direct predecessor of
-our work. We inherit their dam-break observation protocol, their
-Herschel--Bulkley inverse objective, and their simulation-in-the-loop
-formulation, and contribute the machinery needed to make that
-formulation practical at seconds-scale latency and to resolve the
-yield-stress/consistency identifiability degeneracy that
-\cite{hamamichi2023nonnewtonian} identifies but leaves mitigated only at
-prohibitive computational cost.
+Lin~\cite{takahashi2019video} established the video-to-parameter
+pattern for viscous fluids by matching rendered and observed
+dam-break silhouettes on a per-scene basis; Hamamichi et
+al.~\cite{hamamichi2023nonnewtonian} extended this to the
+non-Newtonian Herschel--Bulkley triple $(\sigma_Y,\eta,n)$ and is
+the direct predecessor of our work.
+Their treatment of the yield-stress/consistency degeneracy is more
+elaborate than a single remedy: they (i) diagnose the degeneracy by
+computing the loss Hessian $\mathbf{H}_{M;S}$ and identifying its
+small-eigenvalue directions as a local \emph{similarity set} of
+indistinguishable material parameters; (ii) replace the
+prohibitively expensive dam-break Hessian with an analytic
+plane-Poiseuille-flow surrogate $\mathbf{H}^{PP}_{M;S_{PP}}$ plus
+a learned map $S_{PP}=\Theta(M,S)$; (iii) use the Hessian condition
+number to \emph{actively select} successive setups whose eigenstructure
+complements the current similarity set; and (iv) run a sequential
+multi-setup CMA-ES over the selected setups, which they benchmark
+systematically across $30$ material-trial cases and demonstrate
+iteratively reduces relative error as $S$ grows from $1$ to $4$.
+We inherit their dam-break observation protocol, their
+Herschel--Bulkley inverse objective, and their
+simulation-in-the-loop formulation. Our treatment of the degeneracy
+follows a \emph{complementary} path: we do not compute Hessians or
+select setups, relying instead on a nearest-neighbor warm-start from
+the routed expert's training data and a data-honest log-$\sigma_Y$
+soft prior anchored at that neighbor (\S\ref{sec:inverse}), combined
+with a joint---rather than sequential---multi-setup inversion
+(\S\ref{sec:method}). The surrogate makes both the
+single-setup inverse and the multi-setup joint inverse cheap enough
+to run per material by default, rather than as a dedicated validation
+sweep.
 
 Related work recovers material parameters from other visual modalities:
 video-based cloth friction~\cite{rasheed2020visual},
@@ -972,11 +996,12 @@ and the prior coefficients are $\lambda = 10^{-5}$, $w = 1$
 
 When multiple observations
 $\{(W_{s}, H_{s}, \mathbf{y}_{\mathrm{obs}}^{(s)})\}_{s=1}^{S}$
-of the same material are available---a protocol identified and
-demonstrated in~\cite{hamamichi2023nonnewtonian} as the mitigation
-for difficulty~(iii) but restricted to showcase runs by the
-hours-per-setup MPM cost---our surrogate makes it practical per
-material, and the inverse becomes
+of the same material are available---a regime that
+\cite{hamamichi2023nonnewtonian} addresses with Hessian-guided
+active setup selection and a sequential $1\to 2\to 3\to 4$ CMA-ES
+sweep gated by the per-iterate MPM cost---our surrogate instead
+permits all $S$ setups to be combined in a single joint objective,
+yielding
 \begin{taggedeqn}{P$^{\star}$}{Pstar}
 \begin{aligned}
     \hat{\boldsymbol{\theta}}
@@ -2514,10 +2539,13 @@ Bayesian Gaussian mixture gate over container geometry and
 observation signatures, and an identifiability-aware inverse that
 warm-starts CMA-ES from the routed expert's nearest training
 neighbour and anchors the $\sigma_Y$ axis with a data-honest soft
-prior---addressing the yield-stress/consistency similarity
-degeneracy that prior work identified and partially mitigated via
-costly multi-setup showcases, now at a cost that permits the remedy
-to run per material by default.
+prior---a complementary mitigation for the
+yield-stress/consistency similarity degeneracy that~\cite{hamamichi2023nonnewtonian}
+treated through Hessian-based similarity analysis, a
+Poiseuille-flow proxy, active setup selection, and iterative
+multi-setup CMA-ES. Our path trades the Hessian machinery for
+training-data priors and joint (rather than sequential) multi-setup
+inversion, both made practical by the surrogate.
 
 Beyond runtime reduction, the seconds-scale inverse unlocks three
 capabilities inaccessible to simulation-in-the-loop rheometry: fresh

@@ -194,14 +194,15 @@ estimates Herschel--Bulkley parameters $(\sigma_Y, \eta, n)$ of complex
 fluids by matching observed dam-break flows against physics-based
 simulation, uniquely enabling the characterization of
 materials---pastes, chunky sauces, granular slurries---that
-conventional parallel-plate rheometers cannot handle. The approach has
-remained offline-only, however, because inverting the material point
-method in the loop requires hours of GPU time per video; in
-particular, the multi-observation joint inversion that the original
-authors proposed as a remedy for the yield-stress/consistency
-identifiability degeneracy they diagnosed, though demonstrated on a
-handful of showcase materials, remained too expensive to adopt as a
-default per-material protocol.
+conventional parallel-plate rheometers cannot handle. The approach
+has remained offline-only, however, because inverting the material
+point method in the loop requires hours of GPU time per video;
+although the original authors diagnosed the yield-stress/consistency
+degeneracy via a loss-Hessian similarity analysis and mitigated it
+with a Poiseuille-flow proxy, Hessian-guided active setup selection,
+and iterative multi-setup CMA-ES, the whole pipeline is gated by
+hundreds of per-iterate MPM evaluations, making per-material use
+impractical.
 
 We present a surrogate-accelerated framework that compresses the
 inverse from hours to a median of twelve seconds per video on a single
@@ -212,11 +213,13 @@ Gaussian-mixture gate over container geometry and observation
 signatures and aggregated via a robust Bayesian Committee Machine,
 replaces the MPM forward map with a calibrated predictive
 distribution whose uncertainty is propagated into the inverse.
-Second, an identifiability-aware inverse warm-starts CMA-ES from the
-routed expert's nearest training neighbor and anchors it with a soft
-data-honest log-$\sigma_Y$ prior at that neighbor, turning the
-similarity degeneracy from a reported limitation into a tractable
-ill-conditioning we can mitigate. Third, a non-interactive ChArUco
+Second, an identifiability-aware inverse that follows a
+\emph{complementary} mitigation path to the prior work's
+Hessian-and-setup-selection machinery: we warm-start CMA-ES from the
+routed expert's nearest training neighbor and anchor it with a
+data-honest log-$\sigma_Y$ soft prior at that neighbor, plus a joint
+(rather than sequential) multi-setup formulation---no Hessians, no
+active setup selection, but the same identifiability gain. Third, a non-interactive ChArUco
 camera-calibration pipeline replaces the two-stage manual workflow of
 the predecessor, cutting per-capture human time from roughly $25$ to
 $10$ minutes and making the end-to-end wall-clock, not just the
@@ -231,10 +234,10 @@ fluids, tracked across repeated captures rather than frozen at a
 single snapshot; \emph{(ii)}~practical characterization of materials
 that parallel-plate rheometers cannot measure, extending rheometry to
 chunky, granular, and large-inclusion samples; and \emph{(iii)}~a
-multi-observation joint protocol---the same remedy prior work
-demonstrated but could only afford on showcase materials---that
-approaches parallel-plate precision from phone videos alone, now as a
-routine per-material step rather than a dedicated experiment.
+multi-observation joint protocol that approaches parallel-plate
+precision from phone videos alone, run as a routine per-material
+step rather than the hour-per-setup sequential sweep required by
+prior Hessian-guided approaches.
 \end{abstract}
 
 
