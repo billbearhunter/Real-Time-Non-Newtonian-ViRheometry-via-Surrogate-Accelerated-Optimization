@@ -2225,6 +2225,90 @@ the additional capability of covering the full household $(W, H)$
 range rather than a narrow single-geometry box.
 
 
+\subsection{End-to-End Capture-to-Parameter Time Budget}
+\label{sec:timebudget}
+
+We close the evaluation by looking at \emph{total} time from raw
+phone video to a recovered Herschel--Bulkley triple. Two time sinks
+dominate: the manual capture-and-calibration workflow that takes an
+experimenter's attention, and the automated inverse that takes
+compute. Both are substantially shorter in our pipeline than in the
+direct predecessor's.
+
+\paragraph{Manual capture and calibration time.}
+Table~\ref{tab:calib-time} breaks the human-in-the-loop portion of
+the pipeline into its four steps. The predecessor's camera
+calibration goes through \texttt{fSpy} (manual vanishing-point
+fitting) followed by \texttt{Blender} (manual alignment and
+background render), which together consume nearly $16$\,min of
+attention per capture and are the dominant source of manual
+variance. Our two-stage ChArUco + OpenGL calibration
+(\S\ref{sec:calib}) replaces both steps with a single non-interactive
+invocation that completes in $1$\,min\,$12$\,s on a consumer laptop,
+saving an average of $14$\,min\,$43$\,s per capture. Video editing
+(\texttt{Premiere Pro} frame selection) and mask cleanup
+(\texttt{Photoshop}) are unchanged, because they operate on the raw
+footage and are orthogonal to the calibration method. End-to-end,
+the manual workflow drops from $25$\,min to $10$\,min per capture.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Manual capture-and-calibration wall-clock per material.
+Step-by-step timings adopted from the workflow study
+of~\cite{hamamichi2023nonnewtonian}-style pipelines, measured on the
+same experimenter and hardware. The calibration row is the
+only step affected by our method.}
+\label{tab:calib-time}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Step & Predecessor (mm:ss) & Ours (mm:ss) \\
+\midrule
+Video trimming (\texttt{Premiere Pro})
+  & $2{:}27$ & $2{:}27$ \\
+Camera calibration
+  & \texttt{fSpy}  $4{:}28$ & ChArUco $1{:}12$ \\
+  & \texttt{Blender} $11{:}28$ & (automatic)  \\
+\,\quad \textit{calibration subtotal}
+  & \textbf{$15{:}56$} & \textbf{$1{:}12$} \\
+Mask cleanup (\texttt{Photoshop})
+  & $6{:}30$ & $6{:}30$ \\
+\midrule
+\textbf{Manual total} & \textbf{$24{:}53$} & \textbf{$10{:}10$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Automated inverse time.}
+The compute-side contribution is the CMA-ES inverse of
+\S\ref{sec:mainresults}. A single-setup inverse through
+Algorithm~\ref{alg:invert} takes a median of $12$\,s per video on a
+single consumer GPU (Table~\ref{tab:main}), versus several hours
+under the simulation-in-the-loop baseline that runs MPM at every
+candidate. A joint two-setup inverse through
+Algorithm~\ref{alg:joint} adds a second bounded CMA-ES run on the
+summed-NMSE objective of~\eqref{eq:Pstar}, bringing the total to a
+median of $24$\,s; three setups extend this to $\sim\!36$\,s
+(Table~\ref{tab:multi-setup}). The predecessor's
+multi-setup protocol---proposed
+in~\cite{hamamichi2023nonnewtonian} as the identifiability
+mitigation but left computationally infeasible in practice---scales
+the hours-per-setup cost linearly with the number of setups.
+
+\paragraph{End-to-end.}
+Combining the two components, our per-material pipeline finishes in
+roughly $10$--$11$\,min of wall-clock (manual $\sim\!10$\,min
+$+$ automated $\le 1$\,min), versus hours of manual calibration
+followed by additional hours of MPM-in-loop inversion under the
+predecessor---a difference of more than an order of magnitude in
+both the human-attention budget and the compute budget. More
+importantly, the automated portion completes within the time window
+of a single user session, which is what makes the freshness,
+fieldable-capture, and multi-setup capabilities of
+\S\ref{sec:freshness}--\ref{sec:rheometer} practically accessible
+rather than nominal.
+
+
 \section{Discussion}
 \label{sec:discussion}
 
