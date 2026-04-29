@@ -199,9 +199,9 @@ of~\cite{hamamichi2023nonnewtonian}. Each such inverse requires
 hundreds of in-loop material-point-method evaluations and therefore
 takes hours of GPU time per video; the identifiability mitigation
 proposed by prior work---a multi-setup protocol guided by a Hessian
-analysis of the similarity relation in the loss landscape---has
-consequently been demonstrated on a handful of cases rather than
-applied per material in routine use.
+analysis of the similarity relation in the loss landscape---inherits
+this per-iterate simulation cost, putting routine per-material use
+out of reach.
 
 We compress this inverse from hours to a median of twelve seconds
 per video by replacing the in-loop simulator with a hierarchical
