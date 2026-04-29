@@ -189,45 +189,40 @@
 %\renewcommand\shortauthors{Zhou, G. et al}
 
 \begin{abstract}
-Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian}
-estimates Herschel--Bulkley parameters $(\sigma_Y, \eta, n)$ of
-complex fluids---pastes, chunky sauces, granular slurries---that
-parallel-plate rheometers cannot handle, by matching dam-break flows
-against physics-based simulation. Despite a sophisticated
-identifiability-mitigation pipeline (loss-Hessian analysis,
-Poiseuille-flow proxy, active setup selection, iterative multi-setup
-CMA-ES), inversion remains hours-per-video because the material
-point method must be evaluated hundreds of times per inverse,
-foreclosing per-material use.
+We estimate the three Herschel--Bulkley parameters
+(yield stress $\sigma_Y$, power-law index $n$, consistency parameter
+$\eta$) of complex fluids---pastes, chunky sauces, granular
+slurries---for which conventional rheometers cannot provide useful
+measurements, by matching dam-break video footage against
+physics-based simulation, following the protocol
+of~\cite{hamamichi2023nonnewtonian}. Each such inverse requires
+hundreds of in-loop material-point-method evaluations and therefore
+takes hours of GPU time per video; the identifiability mitigation
+proposed by prior work---a multi-setup protocol guided by a Hessian
+analysis of the similarity relation in the loss landscape---has
+consequently been demonstrated on a handful of cases rather than
+applied per material in routine use.
 
-We compress the inverse to a median of twelve seconds per video on
-one consumer GPU through three coupled components. A regime-aware
-hierarchical Mixture-of-GP surrogate---$540$ sparse GP experts
-routed by a two-level Bayesian Gaussian-mixture gate and aggregated
-via a robust Bayesian Committee Machine---replaces the MPM forward
-map with calibrated predictive distributions. An
-identifiability-aware inverse warm-starts CMA-ES from the routed
-expert's nearest training neighbor, anchors it with a data-honest
-log-$\sigma_Y$ soft prior, and combines all available setups in a
-single joint objective; an active two-setup selector fuses
-Hessian-orthogonality with surrogate-spread and local-perturbation
-candidates via a switch policy. A non-interactive ChArUco
-calibration pipeline cuts per-capture human effort from $25$ to
-$10$ minutes, making the end-to-end wall-clock field-deployable.
+We compress this inverse from hours to a median of twelve seconds
+per video by replacing the in-loop simulator with a hierarchical
+mixture of Gaussian-process experts trained on a corpus of MPM
+dam-break simulations and routed by a learned Bayesian gate. We
+address the same identifiability degeneracy through a
+complementary, surrogate-native path: we warm-start the optimizer
+from the routed expert's nearest training neighbor, anchor it with
+a soft prior on log-$\sigma_Y$ at that neighbor, and combine all
+available setups in a single joint objective rather than a
+sequential refinement.
 
-Evaluated against simulation-in-the-loop inversion on held-out
-synthetic samples and real non-Newtonian fluids---including
-head-to-head comparison on three real-video materials---our method
-matches baseline accuracy at three orders of magnitude lower
-latency. Seconds-scale inversion unlocks capabilities inaccessible
-to prior work: \emph{(i)}~fresh parameter estimates for time-varying
-fluids, tracked across repeated captures rather than frozen at a
-single snapshot; \emph{(ii)}~practical characterization of materials
-that parallel-plate rheometers cannot measure, extending rheometry
-to chunky, granular, and large-inclusion samples;
-\emph{(iii)}~a multi-observation joint protocol approaching
-parallel-plate precision from phone videos alone, run as a routine
-per-material step rather than a dedicated multi-hour sweep.
+We validate our method by comparing against the simulation-in-the-loop
+predecessor on real-video captures and against parallel-plate
+rheometer measurements on materials the rheometers can handle. The
+seconds-scale inversion enables three uses inaccessible to prior
+work: tracking parameter freshness for time-varying fluids across
+repeated captures, characterizing rheometer-infeasible materials as
+a routine task rather than a dedicated experiment, and a
+multi-observation joint protocol that approaches parallel-plate
+precision from phone videos alone.
 \end{abstract}
 
 
