@@ -198,7 +198,8 @@ physics-based simulation, following the protocol
 of~\cite{hamamichi2023nonnewtonian}. The inverse is accurate but
 slow: each estimation requires hundreds of in-loop
 material-point-method evaluations and therefore takes around eight
-hours of GPU time per setup, foreclosing per-material routine use.
+hours of GPU time per setup, so the method serves as a research
+tool rather than a routine measurement.
 
 We compress this inverse from hours to a median of twelve seconds
 per video by replacing the in-loop simulator with a hierarchical
