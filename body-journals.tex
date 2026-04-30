@@ -31,81 +31,96 @@ three capabilities that would otherwise be within reach of a
 video-based approach:
 
 \begin{itemize}
-    \item \emph{Freshness for time-varying fluids.} When a material's
-    properties evolve during the measurement window---sedimentation,
-    aging, temperature drift, mixing history, cooking
-    cooldown---an hour-scale inversion returns a parameter describing a
-    past state. The inferred value is stale by the time it is delivered.
-    \item \emph{Practical use on rheometer-infeasible materials.} The
-    class of materials for which video rheometry has independent value
-    over instrumental rheometry---chunky sauces, particulate
-    suspensions---remains confined to offline demonstration rather than
-    fieldable tool so long as each measurement costs hours.
-    \item \emph{Multi-observation precision recovery.}
-    \cite{hamamichi2023nonnewtonian} itself identifies a similarity
-    degeneracy between yield stress and consistency, and proposes
-    multi-setup joint inversion as the mitigation---but at hours per
-    setup, $N$-setup inversion is computationally infeasible in
-    practice.
+    \item \emph{Tracking parameters of time-varying fluids.} When a
+    material's properties evolve during the measurement
+    window---sedimentation, aging, temperature drift, mixing history,
+    cooking cooldown---an hour-scale inversion returns a parameter
+    describing a past state. The inferred value is stale by the time
+    it is delivered.
+    \item \emph{Characterizing many materials in a single session.}
+    Comparing several brands or batches, or sweeping a single material
+    over temperature, dilution, or shear-history conditions, requires
+    running the inverse $N$ times. At hours per setup, even modest $N$
+    is impractical, so per-material rheometry is restricted to
+    handpicked showcase samples rather than scaled to surveys or
+    catalogs.
+    \item \emph{Iterative measurement workflows.} Closed-loop uses,
+    in which each capture's recovered parameters guide the next
+    adjustment to a recipe or process, are foreclosed when the
+    measurement-to-decision latency is hours.
 \end{itemize}
 
 We propose a surrogate-accelerated framework that compresses the
-inverse from hours to \emph{seconds per video}, making all three
-capabilities available within a practical workflow. Our technical core
-couples two components.
-\emph{(i)}~A \emph{regime-aware hierarchical Mixture-of-GP surrogate}
-(HVIMoGP-rBCM) replaces MPM inside the optimizer: a two-level Bayesian
-Gaussian mixture gate routes each query---first by container geometry
-$(W, H)$, then by observation signature---through one of 540 specialized
-sparse Gaussian-process experts, aggregated at prediction time by the
-robust Bayesian Committee Machine. This hierarchical structure is
-motivated by the fact that the Herschel--Bulkley inverse landscape is
-not globally homogeneous: the flow regime changes morphologically with
-container shape and discretely across the yield threshold, so a single
-global surrogate cannot cover the $5.5$ orders of magnitude in $\eta$
-and $5.6$ orders in $\sigma_Y$ at the accuracy required for optimization.
-\emph{(ii)}~An \emph{identifiability-aware inverse} in which CMA-ES is
-warm-started from the routed expert's nearest training neighbor in
-observation space, and anchored by a soft log-$\sigma_Y$ prior at that
-neighbor. The prior is \emph{data-honest} in that its center comes from
-a training point of the surrogate rather than from a user-chosen guess.
-Together, the warm-start and anchored prior collapse the
-yield-stress/consistency ridge, recovering a physically plausible
-$\sigma_Y$ where vanilla CMA-ES would slide to $\sigma_Y \to 0$.
+inverse from hours to seconds per setup, making all three
+capabilities available within a practical workflow. Our technical
+core couples three components.
+
+\emph{(i)}~A \emph{hierarchical mixture of Gaussian-process experts}
+replaces MPM inside the optimizer. The hierarchy is motivated by the
+fact that the Herschel--Bulkley inverse landscape is not globally
+homogeneous: the flow regime changes morphologically with container
+geometry $(W, H)$ and discretely across the yield threshold. Routing
+proceeds in stages---first over container geometry, then over
+observation signatures, then over yield-stress strata---each stage
+restricting the effective domain that any single Gaussian process
+must cover, so the leaf experts can be fitted accurately at the
+resolution required for inversion.
+
+\emph{(ii)}~An \emph{identifiability-aware inverse} addresses the
+yield-stress/consistency ridge that arises when the observed
+shear-rate range is dominated by the consistency term. We exploit
+the fact that the surrogate's training corpus densely covers the
+parameter space, and use this coverage to constrain the optimizer:
+candidates near training samples are ranked by their training-data
+support, and the recovered yield stress is anchored against
+data-supported priors rather than allowed to drift along the
+unidentifiable ridge.
+
+\emph{(iii)}~An \emph{algorithmic camera-calibration pipeline}
+replaces the manual fSpy-and-Photoshop workflow that precedes the
+inverse in prior work. A ChArUco marker board provides an initial
+pose estimate, and a subsequent silhouette-edge refinement aligns
+the camera against the dam-break geometry without per-capture human
+annotation, removing the largest fixed cost of the capture
+workflow.
 
 Our work inherits the problem setup, dam-break observation protocol,
 and inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
 contributes the machinery needed to make that formulation
-computationally practical. \cite{hamamichi2023nonnewtonian} treats
-the yield-stress/consistency degeneracy with a four-part pipeline:
-a loss-Hessian similarity analysis, a plane-Poiseuille-flow proxy
-for that Hessian, Hessian-guided active selection of successive
-setups, and iterative multi-setup CMA-ES over the selected setups.
-That pipeline was validated on $30$ material-trial cases but remains
-gated by the per-iterate MPM cost of the inner CMA-ES. We depart by
-taking a different, surrogate-native mitigation path (detailed in
-\S\ref{sec:inverse}): our inverse neither computes Hessians nor
-selects setups, and our multi-setup formulation is a single joint
-optimization over all available setups rather than a sequential
-refinement. The main contributions are:
+computationally practical. \cite{hamamichi2023nonnewtonian} addresses
+the yield-stress/consistency degeneracy with a multi-stage protocol
+combining loss-Hessian similarity analysis, a plane-Poiseuille-flow
+proxy for the Hessian, Hessian-guided active selection of successive
+setups, and iterative multi-setup CMA-ES; the protocol is sound and
+was validated on $30$ material-trial cases, but it inherits the
+per-iterate MPM cost. By porting the inverse pipeline onto a learned
+surrogate, the same setup-selection and multi-setup machinery becomes
+affordable per material rather than only per showcase, and the inverse
+returns within the latency required by the three uses above. The
+main contributions are:
 
 \begin{itemize}
-    \item A \emph{hierarchical Mixture-of-GP surrogate} for the
-    Herschel--Bulkley inverse landscape that covers
-    $5.5$--$5.6$ orders of magnitude in $\eta$ and $\sigma_Y$ using 540
-    specialized experts routed by a two-level Bayesian Gaussian mixture
-    gate and aggregated via robust BCM.
-    \item An \emph{identifiability-aware inverse loop} that combines
-    training-nearest-neighbor warm-starting with a data-honest
-    log-$\sigma_Y$ soft prior, resolving the yield-stress/consistency
-    similarity degeneracy without injecting user-chosen bias.
-    \item An evaluation establishing that seconds-scale video rheometry
-    unlocks three capabilities inaccessible to simulation-in-the-loop
-    inversion: \emph{(a)} fresh parameter estimates for time-varying
-    fluids, \emph{(b)} practical characterization of materials
-    conventional rheometers cannot measure, and \emph{(c)} a
-    multi-observation joint protocol that approaches parallel-plate
-    rheometer precision from phone videos alone.
+    \item A \emph{hierarchical mixture of Gaussian-process experts}
+    that replaces MPM inside the inverse loop, fitted to a corpus of
+    MPM dam-break simulations and structured to handle the geometric
+    and yield-threshold non-stationarities of the Herschel--Bulkley
+    inverse landscape.
+    \item An \emph{identifiability-aware inverse} that uses the
+    surrogate's training corpus as a structural prior, constraining
+    the optimizer to data-supported regions of parameter space and
+    addressing the yield-stress/consistency ridge through this
+    constraint.
+    \item An \emph{algorithmic two-stage camera-calibration pipeline}
+    based on ChArUco markers and silhouette-edge refinement,
+    replacing the manual workflow of prior work and removing the
+    largest fixed cost from each capture.
+    \item An evaluation establishing that seconds-scale video
+    rheometry enables three uses inaccessible at hours-per-setup
+    cost: \emph{(i)}~tracking how a material's parameters evolve in
+    real time; \emph{(ii)}~characterizing many materials, batches,
+    or conditions within a single measurement session; and
+    \emph{(iii)}~iterative measurement workflows where each capture's
+    parameters guide the next adjustment.
 \end{itemize}
 
 \section{Related Work}
