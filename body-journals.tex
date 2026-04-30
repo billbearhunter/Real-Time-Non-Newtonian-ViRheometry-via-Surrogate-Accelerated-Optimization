@@ -25,9 +25,10 @@ However, this otherwise uniquely capable approach is bottlenecked by the
 cost of its inner loop. A single MPM dam-break simulation takes several
 minutes on modern GPU hardware, and derivative-free optimization
 typically issues hundreds of candidate evaluations before convergence.
-The end-to-end inverse therefore takes \emph{hours per video}, confining
-the method to offline research use and precluding three capabilities
-that would otherwise be within reach of a video-based approach:
+The end-to-end inverse therefore takes \emph{over ten hours per
+video}, confining the method to offline research use and precluding
+three capabilities that would otherwise be within reach of a
+video-based approach:
 
 \begin{itemize}
     \item \emph{Freshness for time-varying fluids.} When a material's
@@ -2530,7 +2531,7 @@ inverse is an open direction.
 
 We presented a surrogate-accelerated framework for non-Newtonian
 video rheometry that compresses the Herschel--Bulkley inverse from
-hours per video in simulation-in-the-loop prior
+over ten hours per video in simulation-in-the-loop prior
 work~\cite{hamamichi2023nonnewtonian} to a median of $12$\,s per
 video on a single consumer GPU. The method rests on two coupled
 components: a regime-aware hierarchical Mixture-of-GP surrogate
