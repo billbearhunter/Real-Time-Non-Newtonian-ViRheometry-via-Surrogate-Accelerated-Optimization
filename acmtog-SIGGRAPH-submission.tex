@@ -202,14 +202,12 @@ hours of GPU time per setup, so the method serves as a research
 tool rather than a routine measurement.
 
 We compress this inverse from hours to a median of twelve seconds
-per video by replacing the in-loop simulator with a hierarchical
-mixture of Gaussian-process experts trained on a corpus of MPM
-dam-break simulations and routed by a learned Bayesian gate. To
-preserve the predecessor's identifiability handling under a
-surrogate, we warm-start the optimizer from the routed expert's
-nearest training neighbor, anchor it with a soft prior on
-log-$\sigma_Y$ at that neighbor, and combine all available setups in
-a single joint objective.
+per video by replacing the in-loop simulator with a mixture of
+Gaussian-process experts fitted to a corpus of MPM dam-break
+simulations. To preserve the predecessor's identifiability handling
+under this surrogate, the optimizer is anchored to the surrogate's
+training distribution and combines multiple observations in a
+single joint objective.
 
 We validate our method by comparing against the simulation-in-the-loop
 predecessor on real-video captures and against parallel-plate
