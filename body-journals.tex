@@ -415,352 +415,19 @@ particles and the $8$-dimensional flow-distance vector that the
 inverse operates on.
 
 
-\subsection{From Phone Video to Flow-Front Distances}
-\label{sec:calib}
+\subsection{Observation Pipeline}
+\label{sec:obs-pipeline}
 
-To run the inverse on a real experiment, we need to convert a
-smartphone video of the dam-break flow into the observation vector
-$\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8}) \in
-\mathbb{R}_{\ge 0}^{8}$ of Eq.~\eqref{eq:y-def}. We use a two-stage
-camera calibration followed by silhouette-based flow-front
-extraction; the full pipeline is summarised in
-Algorithm~\ref{alg:calib}.
-
-\paragraph{Stage 1: ChArUco prior.}
-A printed ChArUco
-board~\cite{garrido2014automatic,garrido2016generation} is placed in
-the experimental scene alongside the fluid container. The standard
-pinhole projection~\cite{hartley2004multiple} sends a world point
-$\mathbf{P}_{w}$ to pixels via
-\begin{equation}
-\label{eq:pinhole}
-    \mathbf{P}_{c} \;=\; \mathbf{R}\,\mathbf{P}_{w} + \mathbf{t},
-    \qquad
-    \mathbf{p} \;=\; \tfrac{1}{Z_{c}}\,\mathbf{K}\,\mathbf{P}_{c},
-    \quad
-    \mathbf{K} = \begin{pmatrix}
-          f_{x} & 0     & c_{x} \\
-          0     & f_{y} & c_{y} \\
-          0     & 0     & 1
-        \end{pmatrix}.
-\end{equation}
-Rather than optimising $(K, R, \mathbf{t})$ as $11$ free scalars, we
-exploit the fact that our rig is level and the camera looks at a
-fixed target, and parameterise the whole camera by a compact
-$7$-vector
-\begin{equation}
-\label{eq:theta-cam}
-    \boldsymbol{\theta}_{\mathrm{cam}}
-    \;=\;
-    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,\psi_{E},\,
-    \mathrm{fov},\,d_{\mathrm{eye}}),
-\end{equation}
-where $\mathbf{l} = (l_{x}, 0, l_{z})^{\!\top}$ is the look-at point
-on the rig floor, $(\theta_{E}, \phi_{E}, \psi_{E})$ are spherical
-angles of the eye direction, $d_{\mathrm{eye}}$ is the eye--target
-distance, and $\mathrm{fov}$ is the vertical field of view. The eye position and
-an orthonormal camera basis are then reconstructed deterministically
-from $\boldsymbol{\theta}_{\mathrm{cam}}$:
-\begin{equation}
-\label{eq:eye}
-    \mathbf{E}(\boldsymbol{\theta}_{\mathrm{cam}})
-    \;=\; d_{\mathrm{eye}}
-    \begin{pmatrix}
-        \sin\theta_{E}\cos\phi_{E} \\
-        \cos\theta_{E} \\
-        -\sin\theta_{E}\sin\phi_{E}
-    \end{pmatrix},
-\end{equation}
-\begin{equation}
-\label{eq:basis}
-    \mathbf{C}_{z} = \frac{\mathbf{E} - \mathbf{l}}
-                           {\|\mathbf{E} - \mathbf{l}\|},
-    \quad
-    \mathbf{C}_{x} = \frac{(C_{z,3},\,0,\,-C_{z,1})^{\!\top}}
-                           {\|(C_{z,3},\,0,\,-C_{z,1})\|},
-    \quad
-    \mathbf{C}_{y} = \mathbf{C}_{z} \times \mathbf{C}_{x},
-\end{equation}
-so that $R = [\mathbf{C}_{x}\,|\,\mathbf{C}_{y}\,|\,\mathbf{C}_{z}]^{\!\top}$ and
-$\mathbf{t} = -R\,\mathbf{E}$; the $\mathbf{C}_{x}$ construction
-enforces a horizontal camera up-axis. A world point $\mathbf{P}_{i}$
-thus maps first to camera coordinates
-\begin{equation}
-\label{eq:screen}
-    \mathbf{Y}_{i}
-    \;=\;
-    \bigl(
-      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{x},\;
-      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{y},\;
-      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{z}
-    \bigr),
-\end{equation}
-and then to pixels by perspective division. Matching the renderer's
-vertical-field-of-view convention $f_{y} = H/(2\tan(\mathrm{fov}/2))$
-gives the scale factor
-\begin{equation}
-\label{eq:scale}
-    s \;=\; \frac{1}{2\,\tan(\mathrm{fov}/2)},
-\end{equation}
-and the full reprojection of $\mathbf{P}_{i}$ into the image plane
-$[0, W]\times[0, H]$ reads
-\begin{equation}
-\label{eq:project}
-    \pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})
-    \;=\;
-    \left(
-        \frac{W}{2} + s\,H\,\frac{[\mathbf{Y}_{i}]_{1}}{|[\mathbf{Y}_{i}]_{3}|},\;
-        \frac{H}{2} - s\,H\,\frac{[\mathbf{Y}_{i}]_{2}}{|[\mathbf{Y}_{i}]_{3}|}
-    \right).
-\end{equation}
-
-After sub-pixel corner refinement~\cite{forstner1987fast} on the
-detected ChArUco board, Stage~1 solves
-\begin{equation}
-\label{eq:stage1}
-    \hat{\boldsymbol{\theta}}_{\mathrm{cam}}
-    \;=\;
-    \arg\min_{\boldsymbol{\theta}_{\mathrm{cam}}}\,
-    \frac{1}{|\mathcal{I}|}
-    \sum_{i \in \mathcal{I}}
-    \rho_{\delta}\!\bigl(
-      \|\mathbf{u}_{i} - \pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})\|
-    \bigr),
-\end{equation}
-where $\mathcal{I}$ indexes detected corners with pixel observations
-$\mathbf{u}_{i}$ and known board coordinates $\mathbf{P}_{i}$, and
-$\rho_{\delta}$ is the Huber loss with a $\delta = 2$\,px threshold,
-\begin{equation}
-\label{eq:huber}
-    \rho_{\delta}(e)
-    \;=\;
-    \begin{cases}
-        \tfrac{1}{2}e^{2}, & e < \delta, \\
-        \delta\bigl(e - \tfrac{1}{2}\delta\bigr), & e \ge \delta,
-    \end{cases}
-\end{equation}
-which prevents any single mis-refined corner from dominating the fit.
-The minimisation uses adaptive
-Nelder--Mead~\cite{nelder1965simplex,gao2012implementing} because
-$\pi$ is cheap to evaluate but awkward to differentiate under the
-$\boldsymbol{\theta}_{\mathrm{cam}}$ parameterisation. Stage~1
-returns an intrinsic matrix $\mathbf{K}_{0}$ (derived from
-$\mathrm{fov}$ and the image size) and an initial extrinsic
-$(R_{0}, \mathbf{t}_{0})$ (derived from $\mathbf{E}, \mathbf{l}$
-via Eq.~\eqref{eq:basis}).
-
-\paragraph{Stage 2: silhouette-guided extrinsic refinement.}
-Stage~1 is typically accurate to a few pixels but can leave a small
-residual offset, since the ChArUco board is not rigidly coupled to
-the container. Stage~2 \emph{fixes} $\mathbf{K}_{0}$ and refines only the
-extrinsic parameters so that a rendered container silhouette
-aligns with the reference frame $I_{0}$ captured at the instant
-of dam release. We use a two-phase schedule.
-
-\emph{Phase~A (smooth chamfer).}
-A Canny edge detector~\cite{canny1986computational} applied to
-$I_{0}$ yields a target-edge pixel set $E$, from which we
-precompute an exact Euclidean distance
-transform~\cite{maurer2003linear,borgefors1986distance}
-\begin{equation}
-\label{eq:edt}
-    D_{E}(p) \;=\;
-    \min_{q \in E}\,\|\,p - q\,\|_{2}
-    \qquad \text{for each pixel } p \in \Omega.
-\end{equation}
-For candidate extrinsics $(R, \mathbf{t})$, let $P_{f}(R, \mathbf{t})$
-denote the projected edge pixels of the $f$-th visible cube face
-and $\mathcal{F}$ the set of visible faces. The per-face-normalised
-weighted chamfer cost is
-\begin{equation}
-\label{eq:chamfer}
-    \mathcal{L}_{\mathrm{cham}}(R, \mathbf{t})
-    \;=\;
-    \frac{1}{|\mathcal{F}|}
-    \sum_{f \in \mathcal{F}}
-    \frac{\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)\, D_{E}(p)}
-         {\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)},
-\end{equation}
-with $D_{E}(p)$ bilinearly interpolated from the EDT and
-$w(p)$ a product of three side-emphasis weights
-$w_{\mathrm{left}}(p_{x})$, $w_{\mathrm{top}}(p_{y})$, and
-$w_{\mathrm{bottom}}(p_{y})$.
-Per-face normalisation prevents long edges (e.g.\ the bottom wall)
-from dominating short ones. We minimise $\mathcal{L}_{\mathrm{cham}}$
-with L-BFGS-B~\cite{byrd1995limited,zhu1997algorithm} over the six
-DoF of a Rodrigues rotation vector~\cite{rodrigues1840lois} and a
-translation, box-clamped to $\pm 2.5^{\circ}$ and $\pm 2$\,cm around
-the Stage-$1$ prior $(\mathbf{r}_{0}, \mathbf{t}_{0})$.
-
-\emph{Phase~B (non-smooth IoU).}
-Starting from the Phase-$A$ solution, we maximise a weighted Jaccard
-similarity / pixel-IoU~\cite{jaccard1912distribution} between the
-rendered silhouette $M(R, \mathbf{t})$ and the target foreground $T$,
-\begin{equation}
-\label{eq:iou}
-    \mathrm{IoU}_{w}(R, \mathbf{t})
-    \;=\;
-    \frac{\sum_{p}\, w(p)\,[\,M(p)\wedge T(p)\,]}
-         {\sum_{p}\, w(p)\,[\,M(p)\vee T(p)\,]},
-\end{equation}
-with an adaptive Nelder--Mead~\cite{gao2012implementing} simplex of
-size $0.15^{\circ}/1.5$\,mm. Because $\mathrm{IoU}_{w}$ is
-discretised on the pixel grid it is non-differentiable; the
-L-BFGS-B phase on the smooth chamfer cost provides the warm start
-needed to avoid the combinatorial local minima of
-Eq.~\eqref{eq:iou}.
-
-\paragraph{Safety clamp.}
-After refinement we check the deviation from the Stage-$1$ prior,
-$\Delta_{\mathrm{rot}} = \|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ and
-$\Delta_{t} = \|\mathbf{t}^{*} - \mathbf{t}_{0}\|$; if either
-exceeds the threshold ($2.5^{\circ}$ or $2$\,cm) we fall back to
-the ChArUco extrinsic. This guards against strong local minima in
-either phase, particularly when ChArUco board placement is sloppy.
-
-\paragraph{Flow-front extraction.}
-Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
-$t_{1}, \dots, t_{8}$
-is binarised by HSV-intensity thresholding (threshold $128$, black
-foreground by default) followed by morphological opening and closing
-on a $3\times 3$ kernel~\cite{gonzalez2018digital}; only the largest
-connected foreground component is retained to reject spurious
-specks. We then extract the outer contour $\partial\Omega_{i}$ of
-the foreground mask at frame $i$ and back-project every contour
-pixel $\mathbf{u} = (u, v)$ to the world ground plane $y = 0$
-through the calibrated pinhole camera. With
-$\mathbf{C}_{w} = -R^{\!\top}\,\mathbf{t}$ the world-frame camera
-centre and
-$\mathbf{d}(\mathbf{u}) = R^{\!\top}\,\mathbf{K}_{0}^{-1}\,(u, v, 1)^{\!\top}$
-the world-frame ray direction, the ray
-\begin{equation}
-\label{eq:backproj}
-    \mathbf{P}_{w}(\tau)
-    \;=\; \mathbf{C}_{w} + \tau\,\mathbf{d}(\mathbf{u})
-\end{equation}
-meets the floor at
-$\tau^{\star} = -[\mathbf{C}_{w}]_{y}/[\mathbf{d}(\mathbf{u})]_{y}$.
-Let $\mathbf{v} \in \mathbb{R}^{2}$ be the unit flow direction in
-the world $xz$-plane ($\mathbf{v} = (1, 0)$ for our apparatus), and
-let $x^{\mathrm{front}}_{\mathrm{box}}$ be the container's
-front-wall position read from the experiment manifest. The flow
-distance at frame $t_{i}$ is the farthest signed projection of
-$\partial\Omega_{i}$ onto $\mathbf{v}$ relative to that front wall,
-\begin{equation}
-\label{eq:xi}
-    x_{i} \;=\;
-    \max_{\mathbf{u} \in \partial\Omega_{i}}
-    \Bigl[\mathbf{v}^{\!\top}
-          \bigl(\mathbf{P}_{w}(\tau^{\star}(\mathbf{u}))\bigr)_{xz}\Bigr]
-    \;-\; x^{\mathrm{front}}_{\mathrm{box}}.
-\end{equation}
-Finally, residual binarisation noise can introduce occasional
-backward jumps across frames; we guard against this with a monotone
-pass $x_{i} \leftarrow \max(x_{i}, x_{i-1})$ (equivalent to
-Eq.~\eqref{eq:mono} applied in physical space), producing the
-observation
-$\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8})
-\in \mathbb{R}_{\ge 0}^{8}$ that the inverse of
-Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
-
-\begin{algorithm}[!htbp]
-\caption{Stage 1 reprojection oracle.}
-\label{alg:reproj}
-\KwIn{$7$-vector $\boldsymbol{\theta}_{\mathrm{cam}} =
-  (l_{x}, l_{z}, \theta_{E}, \phi_{E}, \psi_{E}, \mathrm{fov}, d_{\mathrm{eye}})$;
-  board coordinates $\{\mathbf{P}_{i}\}_{i \in \mathcal{I}}$
-  of detected corners; image size $(W, H)$.}
-\KwOut{Projected pixel coordinates
-  $\{\pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})\}$.}
-\BlankLine
-$\mathbf{l} \leftarrow (l_{x}, 0, l_{z})^{\!\top}$\;
-$\mathbf{E} \leftarrow
-  d_{\mathrm{eye}}\,(\sin\theta_{E}\cos\phi_{E},\,\cos\theta_{E},\,
-      -\sin\theta_{E}\sin\phi_{E})^{\!\top}$
-  \tcp*{Eq.~\eqref{eq:eye}}
-$\tilde{\mathbf{C}}_{z} \leftarrow \mathbf{E} - \mathbf{l}$;\quad
-  $\mathbf{C}_{z} \leftarrow \tilde{\mathbf{C}}_{z}/\|\tilde{\mathbf{C}}_{z}\|$\;
-$\hat{\mathbf{C}}_{x} \leftarrow (C_{z,3},\,0,\,-C_{z,1})^{\!\top}$;\quad
-  $\mathbf{C}_{x} \leftarrow \hat{\mathbf{C}}_{x}/\|\hat{\mathbf{C}}_{x}\|$\;
-$\mathbf{C}_{y} \leftarrow \mathbf{C}_{z} \times \mathbf{C}_{x}$
-  \tcp*{Eq.~\eqref{eq:basis}}
-$s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
-  \tcp*{Eq.~\eqref{eq:scale}}
-\ForEach{corner $i \in \mathcal{I}$}{
-  $\mathbf{Y}_{i} \leftarrow \bigl(
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{x},\;
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{y},\;
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{z}\bigr)$
-    \tcp*{Eq.~\eqref{eq:screen}}
-  $u_{i,1} \leftarrow W/2 + sH\,[\mathbf{Y}_{i}]_{1}/|[\mathbf{Y}_{i}]_{3}|$\;
-  $u_{i,2} \leftarrow H/2 - sH\,[\mathbf{Y}_{i}]_{2}/|[\mathbf{Y}_{i}]_{3}|$
-    \tcp*{Eq.~\eqref{eq:project}}
-}
-\Return{$\{\mathbf{u}_{i}\}_{i \in \mathcal{I}}$.}
-\end{algorithm}
-
-\begin{algorithm}[!htbp]
-\caption{Two-stage camera calibration.}
-\label{alg:calib}
-\KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
-  reference frame $I_{0}$ at dam-release instant;
-  container dimensions $(W, H)$; image size $(W, H)$;
-  safety thresholds
-  $\Delta_{\mathrm{rot}}^{\max}=2.5^{\circ}$,
-  $\Delta_{t}^{\max}=2$\,cm;
-  Huber threshold $\delta=2$\,px.}
-\KwOut{Calibrated intrinsic $\mathbf{K}_{0}$ and extrinsic
-  $(R^{*}, \mathbf{t}^{*})$.}
-\BlankLine
-
-\tcp{\bf Stage 1: ChArUco prior.}
-Detect ChArUco corners in $I_{\mathrm{bg}}$ with sub-pixel
-  refinement~\cite{garrido2014automatic,forstner1987fast}; let
-  $\mathcal{I}$ be the detected ids with pixel observations
-  $\{\mathbf{u}_{i}\}$\;
-\While{Nelder--Mead not converged}{
-  Propose candidate $\boldsymbol{\theta}_{\mathrm{cam}}$\;
-  $\{\hat{\mathbf{u}}_{i}\} \leftarrow
-   \textbf{Algorithm}~\ref{alg:reproj}(\boldsymbol{\theta}_{\mathrm{cam}};
-    \{\mathbf{P}_{i}\})$\;
-  $\mathcal{L}_{1} \leftarrow \tfrac{1}{|\mathcal{I}|}
-    \sum_{i}\rho_{\delta}(\|\mathbf{u}_{i}-\hat{\mathbf{u}}_{i}\|)$
-    \tcp*{Eqs.~\eqref{eq:stage1},\eqref{eq:huber}}
-  Update simplex towards smaller $\mathcal{L}_{1}$\;
-}
-Extract $(\mathbf{K}_{0}, R_{0}, \mathbf{t}_{0})$ from
-  $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$ via
-  Eqs.~\eqref{eq:eye}--\eqref{eq:scale}\;
-
-\tcp{\bf Stage 2: silhouette-guided refinement (fix $\mathbf{K}_{0}$).}
-Canny-edge $I_{0}$ to obtain edge set $E$;
-  precompute EDT $D_{E}(\cdot)$ via Eq.~\eqref{eq:edt}\;
-Initialise $(\mathbf{r}, \mathbf{t}) \leftarrow (\mathbf{r}_{0}, \mathbf{t}_{0})$\;
-\emph{Phase A (L-BFGS-B, 6 DoF, smooth chamfer).}\;
-  $(\mathbf{r}_{A}, \mathbf{t}_{A}) \leftarrow
-   \arg\min_{(\mathbf{r},\mathbf{t})}
-   \mathcal{L}_{\mathrm{cham}}(R(\mathbf{r}), \mathbf{t})$
-   subject to
-   $\|\mathbf{r}-\mathbf{r}_{0}\|\le\Delta_{\mathrm{rot}}^{\max}$,
-   $\|\mathbf{t}-\mathbf{t}_{0}\|\le\Delta_{t}^{\max}$
-   \tcp*{Eq.~\eqref{eq:chamfer},~\cite{byrd1995limited,zhu1997algorithm}}
-\emph{Phase B (adaptive Nelder--Mead, non-smooth IoU).}\;
-  $(\mathbf{r}^{*}, \mathbf{t}^{*}) \leftarrow
-   \arg\max_{(\mathbf{r},\mathbf{t})}\mathrm{IoU}_{w}
-   (R(\mathbf{r}), \mathbf{t})$ starting at $(\mathbf{r}_{A}, \mathbf{t}_{A})$
-   with simplex radius $(0.15^{\circ},\,1.5\,\mathrm{mm})$
-   \tcp*{Eq.~\eqref{eq:iou}}
-
-\tcp{\bf Safety clamp against local minima.}
-\If{$\|\mathbf{r}^{*}-\mathbf{r}_{0}\|>\Delta_{\mathrm{rot}}^{\max}$
-  \textnormal{or}
-  $\|\mathbf{t}^{*}-\mathbf{t}_{0}\|>\Delta_{t}^{\max}$}{
-  $(\mathbf{r}^{*},\mathbf{t}^{*})\leftarrow(\mathbf{r}_{0},\mathbf{t}_{0})$
-    \tcp*{revert to Stage-$1$ extrinsic}
-}
-
-\Return{$\bigl(\mathbf{K}_{0},\,R(\mathbf{r}^{*}),\,\mathbf{t}^{*}\bigr)$.}
-\end{algorithm}
+Computing the observation vector $\mathbf{y}_{\mathrm{obs}}$ from a
+smartphone video requires two preprocessing steps: (a)~recovering the
+camera pose against the experimental scene, and (b)~extracting a
+silhouette-based flow-front distance at the eight uniformly spaced
+frames defining $\mathbf{y}$ in Eq.~\eqref{eq:y-def}. The
+silhouette-extraction step follows the protocol
+of~\cite{hamamichi2023nonnewtonian} (background removal, binary
+segmentation, frontal-extent measurement). The camera-calibration
+step is our contribution and is detailed as part of the method
+in~\S\ref{sec:calib}.
 
 
 \subsection{Inverse Video Rheometry as Simulation-in-the-Loop Optimization}
@@ -1372,6 +1039,354 @@ The stronger anchor is justified because $\boldsymbol{\theta}_{1}$
 is itself already data-driven; the prior term now plays the role of
 a \emph{stage-coupling regulariser} rather than a physical
 identifiability prior.
+
+
+\subsection{Camera Calibration}
+\label{sec:calib}
+
+To run the inverse on a real experiment, we need to convert a
+smartphone video of the dam-break flow into the observation vector
+$\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8}) \in
+\mathbb{R}_{\ge 0}^{8}$ of Eq.~\eqref{eq:y-def}. We use a two-stage
+camera calibration followed by silhouette-based flow-front
+extraction; the full pipeline is summarised in
+Algorithm~\ref{alg:calib}.
+
+\paragraph{Stage 1: ChArUco prior.}
+A printed ChArUco
+board~\cite{garrido2014automatic,garrido2016generation} is placed in
+the experimental scene alongside the fluid container. The standard
+pinhole projection~\cite{hartley2004multiple} sends a world point
+$\mathbf{P}_{w}$ to pixels via
+\begin{equation}
+\label{eq:pinhole}
+    \mathbf{P}_{c} \;=\; \mathbf{R}\,\mathbf{P}_{w} + \mathbf{t},
+    \qquad
+    \mathbf{p} \;=\; \tfrac{1}{Z_{c}}\,\mathbf{K}\,\mathbf{P}_{c},
+    \quad
+    \mathbf{K} = \begin{pmatrix}
+          f_{x} & 0     & c_{x} \\
+          0     & f_{y} & c_{y} \\
+          0     & 0     & 1
+        \end{pmatrix}.
+\end{equation}
+Rather than optimising $(K, R, \mathbf{t})$ as $11$ free scalars, we
+exploit the fact that our rig is level and the camera looks at a
+fixed target, and parameterise the whole camera by a compact
+$7$-vector
+\begin{equation}
+\label{eq:theta-cam}
+    \boldsymbol{\theta}_{\mathrm{cam}}
+    \;=\;
+    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,\psi_{E},\,
+    \mathrm{fov},\,d_{\mathrm{eye}}),
+\end{equation}
+where $\mathbf{l} = (l_{x}, 0, l_{z})^{\!\top}$ is the look-at point
+on the rig floor, $(\theta_{E}, \phi_{E}, \psi_{E})$ are spherical
+angles of the eye direction, $d_{\mathrm{eye}}$ is the eye--target
+distance, and $\mathrm{fov}$ is the vertical field of view. The eye position and
+an orthonormal camera basis are then reconstructed deterministically
+from $\boldsymbol{\theta}_{\mathrm{cam}}$:
+\begin{equation}
+\label{eq:eye}
+    \mathbf{E}(\boldsymbol{\theta}_{\mathrm{cam}})
+    \;=\; d_{\mathrm{eye}}
+    \begin{pmatrix}
+        \sin\theta_{E}\cos\phi_{E} \\
+        \cos\theta_{E} \\
+        -\sin\theta_{E}\sin\phi_{E}
+    \end{pmatrix},
+\end{equation}
+\begin{equation}
+\label{eq:basis}
+    \mathbf{C}_{z} = \frac{\mathbf{E} - \mathbf{l}}
+                           {\|\mathbf{E} - \mathbf{l}\|},
+    \quad
+    \mathbf{C}_{x} = \frac{(C_{z,3},\,0,\,-C_{z,1})^{\!\top}}
+                           {\|(C_{z,3},\,0,\,-C_{z,1})\|},
+    \quad
+    \mathbf{C}_{y} = \mathbf{C}_{z} \times \mathbf{C}_{x},
+\end{equation}
+so that $R = [\mathbf{C}_{x}\,|\,\mathbf{C}_{y}\,|\,\mathbf{C}_{z}]^{\!\top}$ and
+$\mathbf{t} = -R\,\mathbf{E}$; the $\mathbf{C}_{x}$ construction
+enforces a horizontal camera up-axis. A world point $\mathbf{P}_{i}$
+thus maps first to camera coordinates
+\begin{equation}
+\label{eq:screen}
+    \mathbf{Y}_{i}
+    \;=\;
+    \bigl(
+      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{x},\;
+      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{y},\;
+      (\mathbf{P}_{i} - \mathbf{E})\!\cdot\!\mathbf{C}_{z}
+    \bigr),
+\end{equation}
+and then to pixels by perspective division. Matching the renderer's
+vertical-field-of-view convention $f_{y} = H/(2\tan(\mathrm{fov}/2))$
+gives the scale factor
+\begin{equation}
+\label{eq:scale}
+    s \;=\; \frac{1}{2\,\tan(\mathrm{fov}/2)},
+\end{equation}
+and the full reprojection of $\mathbf{P}_{i}$ into the image plane
+$[0, W]\times[0, H]$ reads
+\begin{equation}
+\label{eq:project}
+    \pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})
+    \;=\;
+    \left(
+        \frac{W}{2} + s\,H\,\frac{[\mathbf{Y}_{i}]_{1}}{|[\mathbf{Y}_{i}]_{3}|},\;
+        \frac{H}{2} - s\,H\,\frac{[\mathbf{Y}_{i}]_{2}}{|[\mathbf{Y}_{i}]_{3}|}
+    \right).
+\end{equation}
+
+After sub-pixel corner refinement~\cite{forstner1987fast} on the
+detected ChArUco board, Stage~1 solves
+\begin{equation}
+\label{eq:stage1}
+    \hat{\boldsymbol{\theta}}_{\mathrm{cam}}
+    \;=\;
+    \arg\min_{\boldsymbol{\theta}_{\mathrm{cam}}}\,
+    \frac{1}{|\mathcal{I}|}
+    \sum_{i \in \mathcal{I}}
+    \rho_{\delta}\!\bigl(
+      \|\mathbf{u}_{i} - \pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})\|
+    \bigr),
+\end{equation}
+where $\mathcal{I}$ indexes detected corners with pixel observations
+$\mathbf{u}_{i}$ and known board coordinates $\mathbf{P}_{i}$, and
+$\rho_{\delta}$ is the Huber loss with a $\delta = 2$\,px threshold,
+\begin{equation}
+\label{eq:huber}
+    \rho_{\delta}(e)
+    \;=\;
+    \begin{cases}
+        \tfrac{1}{2}e^{2}, & e < \delta, \\
+        \delta\bigl(e - \tfrac{1}{2}\delta\bigr), & e \ge \delta,
+    \end{cases}
+\end{equation}
+which prevents any single mis-refined corner from dominating the fit.
+The minimisation uses adaptive
+Nelder--Mead~\cite{nelder1965simplex,gao2012implementing} because
+$\pi$ is cheap to evaluate but awkward to differentiate under the
+$\boldsymbol{\theta}_{\mathrm{cam}}$ parameterisation. Stage~1
+returns an intrinsic matrix $\mathbf{K}_{0}$ (derived from
+$\mathrm{fov}$ and the image size) and an initial extrinsic
+$(R_{0}, \mathbf{t}_{0})$ (derived from $\mathbf{E}, \mathbf{l}$
+via Eq.~\eqref{eq:basis}).
+
+\paragraph{Stage 2: silhouette-guided extrinsic refinement.}
+Stage~1 is typically accurate to a few pixels but can leave a small
+residual offset, since the ChArUco board is not rigidly coupled to
+the container. Stage~2 \emph{fixes} $\mathbf{K}_{0}$ and refines only the
+extrinsic parameters so that a rendered container silhouette
+aligns with the reference frame $I_{0}$ captured at the instant
+of dam release. We use a two-phase schedule.
+
+\emph{Phase~A (smooth chamfer).}
+A Canny edge detector~\cite{canny1986computational} applied to
+$I_{0}$ yields a target-edge pixel set $E$, from which we
+precompute an exact Euclidean distance
+transform~\cite{maurer2003linear,borgefors1986distance}
+\begin{equation}
+\label{eq:edt}
+    D_{E}(p) \;=\;
+    \min_{q \in E}\,\|\,p - q\,\|_{2}
+    \qquad \text{for each pixel } p \in \Omega.
+\end{equation}
+For candidate extrinsics $(R, \mathbf{t})$, let $P_{f}(R, \mathbf{t})$
+denote the projected edge pixels of the $f$-th visible cube face
+and $\mathcal{F}$ the set of visible faces. The per-face-normalised
+weighted chamfer cost is
+\begin{equation}
+\label{eq:chamfer}
+    \mathcal{L}_{\mathrm{cham}}(R, \mathbf{t})
+    \;=\;
+    \frac{1}{|\mathcal{F}|}
+    \sum_{f \in \mathcal{F}}
+    \frac{\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)\, D_{E}(p)}
+         {\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)},
+\end{equation}
+with $D_{E}(p)$ bilinearly interpolated from the EDT and
+$w(p)$ a product of three side-emphasis weights
+$w_{\mathrm{left}}(p_{x})$, $w_{\mathrm{top}}(p_{y})$, and
+$w_{\mathrm{bottom}}(p_{y})$.
+Per-face normalisation prevents long edges (e.g.\ the bottom wall)
+from dominating short ones. We minimise $\mathcal{L}_{\mathrm{cham}}$
+with L-BFGS-B~\cite{byrd1995limited,zhu1997algorithm} over the six
+DoF of a Rodrigues rotation vector~\cite{rodrigues1840lois} and a
+translation, box-clamped to $\pm 2.5^{\circ}$ and $\pm 2$\,cm around
+the Stage-$1$ prior $(\mathbf{r}_{0}, \mathbf{t}_{0})$.
+
+\emph{Phase~B (non-smooth IoU).}
+Starting from the Phase-$A$ solution, we maximise a weighted Jaccard
+similarity / pixel-IoU~\cite{jaccard1912distribution} between the
+rendered silhouette $M(R, \mathbf{t})$ and the target foreground $T$,
+\begin{equation}
+\label{eq:iou}
+    \mathrm{IoU}_{w}(R, \mathbf{t})
+    \;=\;
+    \frac{\sum_{p}\, w(p)\,[\,M(p)\wedge T(p)\,]}
+         {\sum_{p}\, w(p)\,[\,M(p)\vee T(p)\,]},
+\end{equation}
+with an adaptive Nelder--Mead~\cite{gao2012implementing} simplex of
+size $0.15^{\circ}/1.5$\,mm. Because $\mathrm{IoU}_{w}$ is
+discretised on the pixel grid it is non-differentiable; the
+L-BFGS-B phase on the smooth chamfer cost provides the warm start
+needed to avoid the combinatorial local minima of
+Eq.~\eqref{eq:iou}.
+
+\paragraph{Safety clamp.}
+After refinement we check the deviation from the Stage-$1$ prior,
+$\Delta_{\mathrm{rot}} = \|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ and
+$\Delta_{t} = \|\mathbf{t}^{*} - \mathbf{t}_{0}\|$; if either
+exceeds the threshold ($2.5^{\circ}$ or $2$\,cm) we fall back to
+the ChArUco extrinsic. This guards against strong local minima in
+either phase, particularly when ChArUco board placement is sloppy.
+
+\paragraph{Flow-front extraction.}
+Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
+$t_{1}, \dots, t_{8}$
+is binarised by HSV-intensity thresholding (threshold $128$, black
+foreground by default) followed by morphological opening and closing
+on a $3\times 3$ kernel~\cite{gonzalez2018digital}; only the largest
+connected foreground component is retained to reject spurious
+specks. We then extract the outer contour $\partial\Omega_{i}$ of
+the foreground mask at frame $i$ and back-project every contour
+pixel $\mathbf{u} = (u, v)$ to the world ground plane $y = 0$
+through the calibrated pinhole camera. With
+$\mathbf{C}_{w} = -R^{\!\top}\,\mathbf{t}$ the world-frame camera
+centre and
+$\mathbf{d}(\mathbf{u}) = R^{\!\top}\,\mathbf{K}_{0}^{-1}\,(u, v, 1)^{\!\top}$
+the world-frame ray direction, the ray
+\begin{equation}
+\label{eq:backproj}
+    \mathbf{P}_{w}(\tau)
+    \;=\; \mathbf{C}_{w} + \tau\,\mathbf{d}(\mathbf{u})
+\end{equation}
+meets the floor at
+$\tau^{\star} = -[\mathbf{C}_{w}]_{y}/[\mathbf{d}(\mathbf{u})]_{y}$.
+Let $\mathbf{v} \in \mathbb{R}^{2}$ be the unit flow direction in
+the world $xz$-plane ($\mathbf{v} = (1, 0)$ for our apparatus), and
+let $x^{\mathrm{front}}_{\mathrm{box}}$ be the container's
+front-wall position read from the experiment manifest. The flow
+distance at frame $t_{i}$ is the farthest signed projection of
+$\partial\Omega_{i}$ onto $\mathbf{v}$ relative to that front wall,
+\begin{equation}
+\label{eq:xi}
+    x_{i} \;=\;
+    \max_{\mathbf{u} \in \partial\Omega_{i}}
+    \Bigl[\mathbf{v}^{\!\top}
+          \bigl(\mathbf{P}_{w}(\tau^{\star}(\mathbf{u}))\bigr)_{xz}\Bigr]
+    \;-\; x^{\mathrm{front}}_{\mathrm{box}}.
+\end{equation}
+Finally, residual binarisation noise can introduce occasional
+backward jumps across frames; we guard against this with a monotone
+pass $x_{i} \leftarrow \max(x_{i}, x_{i-1})$ (equivalent to
+Eq.~\eqref{eq:mono} applied in physical space), producing the
+observation
+$\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8})
+\in \mathbb{R}_{\ge 0}^{8}$ that the inverse of
+Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
+
+\begin{algorithm}[!htbp]
+\caption{Stage 1 reprojection oracle.}
+\label{alg:reproj}
+\KwIn{$7$-vector $\boldsymbol{\theta}_{\mathrm{cam}} =
+  (l_{x}, l_{z}, \theta_{E}, \phi_{E}, \psi_{E}, \mathrm{fov}, d_{\mathrm{eye}})$;
+  board coordinates $\{\mathbf{P}_{i}\}_{i \in \mathcal{I}}$
+  of detected corners; image size $(W, H)$.}
+\KwOut{Projected pixel coordinates
+  $\{\pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})\}$.}
+\BlankLine
+$\mathbf{l} \leftarrow (l_{x}, 0, l_{z})^{\!\top}$\;
+$\mathbf{E} \leftarrow
+  d_{\mathrm{eye}}\,(\sin\theta_{E}\cos\phi_{E},\,\cos\theta_{E},\,
+      -\sin\theta_{E}\sin\phi_{E})^{\!\top}$
+  \tcp*{Eq.~\eqref{eq:eye}}
+$\tilde{\mathbf{C}}_{z} \leftarrow \mathbf{E} - \mathbf{l}$;\quad
+  $\mathbf{C}_{z} \leftarrow \tilde{\mathbf{C}}_{z}/\|\tilde{\mathbf{C}}_{z}\|$\;
+$\hat{\mathbf{C}}_{x} \leftarrow (C_{z,3},\,0,\,-C_{z,1})^{\!\top}$;\quad
+  $\mathbf{C}_{x} \leftarrow \hat{\mathbf{C}}_{x}/\|\hat{\mathbf{C}}_{x}\|$\;
+$\mathbf{C}_{y} \leftarrow \mathbf{C}_{z} \times \mathbf{C}_{x}$
+  \tcp*{Eq.~\eqref{eq:basis}}
+$s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
+  \tcp*{Eq.~\eqref{eq:scale}}
+\ForEach{corner $i \in \mathcal{I}$}{
+  $\mathbf{Y}_{i} \leftarrow \bigl(
+    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{x},\;
+    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{y},\;
+    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{z}\bigr)$
+    \tcp*{Eq.~\eqref{eq:screen}}
+  $u_{i,1} \leftarrow W/2 + sH\,[\mathbf{Y}_{i}]_{1}/|[\mathbf{Y}_{i}]_{3}|$\;
+  $u_{i,2} \leftarrow H/2 - sH\,[\mathbf{Y}_{i}]_{2}/|[\mathbf{Y}_{i}]_{3}|$
+    \tcp*{Eq.~\eqref{eq:project}}
+}
+\Return{$\{\mathbf{u}_{i}\}_{i \in \mathcal{I}}$.}
+\end{algorithm}
+
+\begin{algorithm}[!htbp]
+\caption{Two-stage camera calibration.}
+\label{alg:calib}
+\KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
+  reference frame $I_{0}$ at dam-release instant;
+  container dimensions $(W, H)$; image size $(W, H)$;
+  safety thresholds
+  $\Delta_{\mathrm{rot}}^{\max}=2.5^{\circ}$,
+  $\Delta_{t}^{\max}=2$\,cm;
+  Huber threshold $\delta=2$\,px.}
+\KwOut{Calibrated intrinsic $\mathbf{K}_{0}$ and extrinsic
+  $(R^{*}, \mathbf{t}^{*})$.}
+\BlankLine
+
+\tcp{\bf Stage 1: ChArUco prior.}
+Detect ChArUco corners in $I_{\mathrm{bg}}$ with sub-pixel
+  refinement~\cite{garrido2014automatic,forstner1987fast}; let
+  $\mathcal{I}$ be the detected ids with pixel observations
+  $\{\mathbf{u}_{i}\}$\;
+\While{Nelder--Mead not converged}{
+  Propose candidate $\boldsymbol{\theta}_{\mathrm{cam}}$\;
+  $\{\hat{\mathbf{u}}_{i}\} \leftarrow
+   \textbf{Algorithm}~\ref{alg:reproj}(\boldsymbol{\theta}_{\mathrm{cam}};
+    \{\mathbf{P}_{i}\})$\;
+  $\mathcal{L}_{1} \leftarrow \tfrac{1}{|\mathcal{I}|}
+    \sum_{i}\rho_{\delta}(\|\mathbf{u}_{i}-\hat{\mathbf{u}}_{i}\|)$
+    \tcp*{Eqs.~\eqref{eq:stage1},\eqref{eq:huber}}
+  Update simplex towards smaller $\mathcal{L}_{1}$\;
+}
+Extract $(\mathbf{K}_{0}, R_{0}, \mathbf{t}_{0})$ from
+  $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$ via
+  Eqs.~\eqref{eq:eye}--\eqref{eq:scale}\;
+
+\tcp{\bf Stage 2: silhouette-guided refinement (fix $\mathbf{K}_{0}$).}
+Canny-edge $I_{0}$ to obtain edge set $E$;
+  precompute EDT $D_{E}(\cdot)$ via Eq.~\eqref{eq:edt}\;
+Initialise $(\mathbf{r}, \mathbf{t}) \leftarrow (\mathbf{r}_{0}, \mathbf{t}_{0})$\;
+\emph{Phase A (L-BFGS-B, 6 DoF, smooth chamfer).}\;
+  $(\mathbf{r}_{A}, \mathbf{t}_{A}) \leftarrow
+   \arg\min_{(\mathbf{r},\mathbf{t})}
+   \mathcal{L}_{\mathrm{cham}}(R(\mathbf{r}), \mathbf{t})$
+   subject to
+   $\|\mathbf{r}-\mathbf{r}_{0}\|\le\Delta_{\mathrm{rot}}^{\max}$,
+   $\|\mathbf{t}-\mathbf{t}_{0}\|\le\Delta_{t}^{\max}$
+   \tcp*{Eq.~\eqref{eq:chamfer},~\cite{byrd1995limited,zhu1997algorithm}}
+\emph{Phase B (adaptive Nelder--Mead, non-smooth IoU).}\;
+  $(\mathbf{r}^{*}, \mathbf{t}^{*}) \leftarrow
+   \arg\max_{(\mathbf{r},\mathbf{t})}\mathrm{IoU}_{w}
+   (R(\mathbf{r}), \mathbf{t})$ starting at $(\mathbf{r}_{A}, \mathbf{t}_{A})$
+   with simplex radius $(0.15^{\circ},\,1.5\,\mathrm{mm})$
+   \tcp*{Eq.~\eqref{eq:iou}}
+
+\tcp{\bf Safety clamp against local minima.}
+\If{$\|\mathbf{r}^{*}-\mathbf{r}_{0}\|>\Delta_{\mathrm{rot}}^{\max}$
+  \textnormal{or}
+  $\|\mathbf{t}^{*}-\mathbf{t}_{0}\|>\Delta_{t}^{\max}$}{
+  $(\mathbf{r}^{*},\mathbf{t}^{*})\leftarrow(\mathbf{r}_{0},\mathbf{t}_{0})$
+    \tcp*{revert to Stage-$1$ extrinsic}
+}
+
+\Return{$\bigl(\mathbf{K}_{0},\,R(\mathbf{r}^{*}),\,\mathbf{t}^{*}\bigr)$.}
+\end{algorithm}
 
 
 \subsection{Algorithms}
