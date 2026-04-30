@@ -1073,18 +1073,21 @@ $\mathbf{P}_{w}$ to pixels via
 Rather than optimising $(K, R, \mathbf{t})$ as $11$ free scalars, we
 exploit the fact that our rig is level and the camera looks at a
 fixed target, and parameterise the whole camera by a compact
-$7$-vector
+$6$-vector
 \begin{equation}
 \label{eq:theta-cam}
     \boldsymbol{\theta}_{\mathrm{cam}}
     \;=\;
-    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,\psi_{E},\,
+    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,
     \mathrm{fov},\,d_{\mathrm{eye}}),
 \end{equation}
 where $\mathbf{l} = (l_{x}, 0, l_{z})^{\!\top}$ is the look-at point
-on the rig floor, $(\theta_{E}, \phi_{E}, \psi_{E})$ are spherical
-angles of the eye direction, $d_{\mathrm{eye}}$ is the eye--target
-distance, and $\mathrm{fov}$ is the vertical field of view. The eye position and
+on the rig floor, $(\theta_{E}, \phi_{E})$ are the polar and
+azimuthal angles of the eye direction, $d_{\mathrm{eye}}$ is the
+eye--target distance, and $\mathrm{fov}$ is the vertical field of
+view. The camera roll is held fixed by construction (the rig is
+level and the renderer enforces a horizontal $\mathbf{C}_{x}$ axis,
+Eq.~\eqref{eq:basis}). The eye position and
 an orthonormal camera basis are then reconstructed deterministically
 from $\boldsymbol{\theta}_{\mathrm{cam}}$:
 \begin{equation}
@@ -1166,10 +1169,12 @@ $\rho_{\delta}$ is the Huber loss with a $\delta = 2$\,px threshold,
     \end{cases}
 \end{equation}
 which prevents any single mis-refined corner from dominating the fit.
-The minimisation uses adaptive
-Nelder--Mead~\cite{nelder1965simplex,gao2012implementing} because
+The minimisation uses Nelder--Mead~\cite{nelder1965simplex} because
 $\pi$ is cheap to evaluate but awkward to differentiate under the
-$\boldsymbol{\theta}_{\mathrm{cam}}$ parameterisation. Stage~1
+$\boldsymbol{\theta}_{\mathrm{cam}}$ parameterisation; the adaptive
+variant of~\citet{gao2012implementing} is reserved for the
+non-smooth Phase~B below, where its larger contraction step helps
+escape pixel-grid plateaus of the IoU objective. Stage~1
 returns an intrinsic matrix $\mathbf{K}_{0}$ (derived from
 $\mathrm{fov}$ and the image size) and an initial extrinsic
 $(R_{0}, \mathbf{t}_{0})$ (derived from $\mathbf{E}, \mathbf{l}$
@@ -1240,9 +1245,13 @@ Eq.~\eqref{eq:iou}.
 After refinement we check the deviation from the Stage-$1$ prior,
 $\Delta_{\mathrm{rot}} = \|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ and
 $\Delta_{t} = \|\mathbf{t}^{*} - \mathbf{t}_{0}\|$; if either
-exceeds the threshold ($2.5^{\circ}$ or $2$\,cm) we fall back to
-the ChArUco extrinsic. This guards against strong local minima in
-either phase, particularly when ChArUco board placement is sloppy.
+exceeds the safety threshold ($3^{\circ}$ or $3$\,cm by default) we
+fall back to the ChArUco extrinsic. The safety threshold is set
+slightly looser than the Phase-$A$ box ($2.5^{\circ}/2$\,cm), so
+that the unbounded Phase-$B$ Nelder--Mead can in principle move
+beyond the box but only mild excursions are accepted; this guards
+against strong local minima in either phase, particularly when the
+ChArUco board placement is sloppy.
 
 \paragraph{Flow-front extraction.}
 Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
@@ -1293,7 +1302,7 @@ Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
 \caption{Stage 1 reprojection oracle.}
 \label{alg:reproj}
 \KwIn{$7$-vector $\boldsymbol{\theta}_{\mathrm{cam}} =
-  (l_{x}, l_{z}, \theta_{E}, \phi_{E}, \psi_{E}, \mathrm{fov}, d_{\mathrm{eye}})$;
+  (l_{x}, l_{z}, \theta_{E}, \phi_{E}, \mathrm{fov}, d_{\mathrm{eye}})$;
   board coordinates $\{\mathbf{P}_{i}\}_{i \in \mathcal{I}}$
   of detected corners; image size $(W, H)$.}
 \KwOut{Projected pixel coordinates
@@ -1331,9 +1340,12 @@ $s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
 \KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
   reference frame $I_{0}$ at dam-release instant;
   container dimensions $(W, H)$; image size $(W, H)$;
+  Phase-A box bounds
+  $\Delta_{\mathrm{rot}}^{\mathrm{box}}=2.5^{\circ}$,
+  $\Delta_{t}^{\mathrm{box}}=2$\,cm;
   safety thresholds
-  $\Delta_{\mathrm{rot}}^{\max}=2.5^{\circ}$,
-  $\Delta_{t}^{\max}=2$\,cm;
+  $\Delta_{\mathrm{rot}}^{\mathrm{safe}}=3^{\circ}$,
+  $\Delta_{t}^{\mathrm{safe}}=3$\,cm;
   Huber threshold $\delta=2$\,px.}
 \KwOut{Calibrated intrinsic $\mathbf{K}_{0}$ and extrinsic
   $(R^{*}, \mathbf{t}^{*})$.}
@@ -1367,8 +1379,8 @@ Initialise $(\mathbf{r}, \mathbf{t}) \leftarrow (\mathbf{r}_{0}, \mathbf{t}_{0})
    \arg\min_{(\mathbf{r},\mathbf{t})}
    \mathcal{L}_{\mathrm{cham}}(R(\mathbf{r}), \mathbf{t})$
    subject to
-   $\|\mathbf{r}-\mathbf{r}_{0}\|\le\Delta_{\mathrm{rot}}^{\max}$,
-   $\|\mathbf{t}-\mathbf{t}_{0}\|\le\Delta_{t}^{\max}$
+   $\|\mathbf{r}-\mathbf{r}_{0}\|\le\Delta_{\mathrm{rot}}^{\mathrm{box}}$,
+   $\|\mathbf{t}-\mathbf{t}_{0}\|\le\Delta_{t}^{\mathrm{box}}$
    \tcp*{Eq.~\eqref{eq:chamfer},~\cite{byrd1995limited,zhu1997algorithm}}
 \emph{Phase B (adaptive Nelder--Mead, non-smooth IoU).}\;
   $(\mathbf{r}^{*}, \mathbf{t}^{*}) \leftarrow
@@ -1378,9 +1390,9 @@ Initialise $(\mathbf{r}, \mathbf{t}) \leftarrow (\mathbf{r}_{0}, \mathbf{t}_{0})
    \tcp*{Eq.~\eqref{eq:iou}}
 
 \tcp{\bf Safety clamp against local minima.}
-\If{$\|\mathbf{r}^{*}-\mathbf{r}_{0}\|>\Delta_{\mathrm{rot}}^{\max}$
+\If{$\|\mathbf{r}^{*}-\mathbf{r}_{0}\|>\Delta_{\mathrm{rot}}^{\mathrm{safe}}$
   \textnormal{or}
-  $\|\mathbf{t}^{*}-\mathbf{t}_{0}\|>\Delta_{t}^{\max}$}{
+  $\|\mathbf{t}^{*}-\mathbf{t}_{0}\|>\Delta_{t}^{\mathrm{safe}}$}{
   $(\mathbf{r}^{*},\mathbf{t}^{*})\leftarrow(\mathbf{r}_{0},\mathbf{t}_{0})$
     \tcp*{revert to Stage-$1$ extrinsic}
 }
