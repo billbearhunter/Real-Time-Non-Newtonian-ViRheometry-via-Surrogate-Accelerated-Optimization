@@ -125,218 +125,196 @@ main contributions are:
 
 \section{Related Work}
 
-\subsection{Non-Newtonian Fluid Simulation}
+\subsection{Physical Measurements and Flow Rheology Signals}
 
-Our forward model inherits the material point method (MPM) lineage that
-brought continuum simulation into graphics~\cite{stomakhin2013material,
-jiang2015affine,hu2018moving,jiang2016material}. Within this family,
-shear-thinning and yield-stress rheology---captured by the
-Herschel--Bulkley model~\cite{herschel1926konsistenzmessungen}---has been
-realized through return-mapping formulations that encompass viscous,
-viscoplastic, and granular regimes under a common MPM
-substrate~\cite{yue2015continuum,ram2015material,klar2016drucker,
+Quantitative rheology is traditionally measured with rheometers
+(parallel-plate, cone-and-plate, or rotational) that apply a
+controlled laminar flow under known shear rate to recover the
+constitutive relation between shear stress and shear rate. These
+instruments require a narrow gap to enforce a clean shear profile,
+which excludes materials with millimeter-scale inclusions, as well
+as materials whose rheology evolves faster than the lab procedure
+can capture. Less-controlled but more accessible alternatives, such
+as the Bostwick consistometer, give a single readable measurement
+from a simple dam-break test.
+
+Gravity-driven flow has a long pedigree as a rheometric observation
+that complements idealized-flow rheometers. The slump test
+of~\citet{pashias1996fifty} recovers yield stress from a single
+geometric reading; \citet{roussel2005fiftycent} extend this argument
+to the spreading regime that matches dam-break geometry directly;
+the final-deposit shape of a stopped free-surface flow is itself a
+rheological signature~\cite{coussot1996rheological};
+and~\citet{ancey2007plasticity} frames the broader class of
+gravity-driven yield-stress flows as a standard rheometric regime.
+The relation between flow-front position and Herschel--Bulkley
+parameters is made quantitative by the similarity analyses
+of~\citet{liumei1989slow} and~\citet{balmforth2007two}, the same
+analytic framework leveraged by~\citet{hamamichi2023nonnewtonian}.
+
+Our forward simulator inherits the material point method (MPM)
+lineage that brought continuum simulation into
+graphics~\cite{stomakhin2013material,jiang2015affine,hu2018moving,
+jiang2016material}, with shear-thinning and yield-stress rheology
+realized through return-mapping
+formulations~\cite{yue2015continuum,ram2015material,klar2016drucker,
 tampubolon2017multi,wolper2019cdmpm}. We adopt the Herschel--Bulkley
-return map of Yue et al.~\cite{yue2015continuum}; the sauce-specific
-shear-thinning simulator of Nagasawa et al.~\cite{nagasawa2019mixing},
-from the same lab as our direct predecessor, shares our material focus.
-The forward simulator is implemented on Taichi~\cite{hu2019taichi}; a
-broader introduction to fluid simulation for graphics
-appears in~\cite{bridson2015fluid}.
+return map of~\citet{yue2015continuum} on a Taichi-based
+implementation~\cite{hu2019taichi}; the sauce-specific
+shear-thinning simulator of~\citet{nagasawa2019mixing}, from the
+same lab as our direct predecessor, shares our material focus. A
+broader introduction to fluid simulation for graphics appears
+in~\cite{bridson2015fluid}.
 
 
-\subsection{Video-Based Inverse Rheometry}
+\subsection{Video-Based Material Estimation}
 
 Estimating simulation parameters from video by matching rendered and
 observed dynamics has a long lineage in graphics and
 vision~\cite{bhat2002computing,monszpart2016smash}. Takahashi and
 Lin~\cite{takahashi2019video} established the video-to-parameter
 pattern for viscous fluids by matching rendered and observed
-dam-break silhouettes on a per-scene basis; Hamamichi et
-al.~\cite{hamamichi2023nonnewtonian} extended this to the
-non-Newtonian Herschel--Bulkley triple $(\sigma_Y,\eta,n)$ and is
-the direct predecessor of our work.
-Their treatment of the yield-stress/consistency degeneracy is more
-elaborate than a single remedy: they (i) diagnose the degeneracy by
-computing the loss Hessian $\mathbf{H}_{M;S}$ and identifying its
-small-eigenvalue directions as a local \emph{similarity set} of
-indistinguishable material parameters; (ii) replace the
-prohibitively expensive dam-break Hessian with an analytic
-plane-Poiseuille-flow surrogate $\mathbf{H}^{PP}_{M;S_{PP}}$ plus
-a learned map $S_{PP}=\Theta(M,S)$; (iii) use the Hessian condition
-number to \emph{actively select} successive setups whose eigenstructure
-complements the current similarity set; and (iv) run a sequential
-multi-setup CMA-ES over the selected setups, which they benchmark
-systematically across $30$ material-trial cases and demonstrate
-iteratively reduces relative error as $S$ grows from $1$ to $4$.
-We inherit their dam-break observation protocol, their
+dam-break silhouettes on a per-scene basis;
+Hamamichi~et~al.~\cite{hamamichi2023nonnewtonian} extended this to
+the non-Newtonian Herschel--Bulkley triple $(\sigma_Y,\eta,n)$ and is
+the direct predecessor of our work. Their treatment of the
+yield-stress/consistency degeneracy combines a loss-Hessian
+similarity analysis, a plane-Poiseuille-flow proxy for the Hessian,
+Hessian-guided active selection of successive setups, and iterative
+multi-setup CMA-ES; the protocol is sound and was validated on $30$
+material-trial cases, but it inherits the per-iterate MPM cost. We
+inherit their dam-break observation protocol, their
 Herschel--Bulkley inverse objective, and their
-simulation-in-the-loop formulation. Our treatment of the degeneracy
-follows a \emph{complementary} path: we do not compute Hessians or
-select setups, relying instead on a nearest-neighbor warm-start from
-the routed expert's training data and a data-honest log-$\sigma_Y$
-soft prior anchored at that neighbor (\S\ref{sec:inverse}), combined
-with a joint---rather than sequential---multi-setup inversion
-(\S\ref{sec:method}). The surrogate makes both the
-single-setup inverse and the multi-setup joint inverse cheap enough
-to run per material by default, rather than as a dedicated validation
-sweep.
+simulation-in-the-loop formulation, and contribute the surrogate
+machinery that makes the same multi-setup machinery affordable per
+material rather than only per showcase.
 
-Related work recovers material parameters from other visual modalities:
-video-based cloth friction~\cite{rasheed2020visual},
+Related work recovers material parameters from other visual
+modalities: video-based cloth friction~\cite{rasheed2020visual},
 particle-image-velocimetry-based rheology through physics-informed
-networks~\cite{thakur2025learning}, and consumer-video neural regression
-for scalar viscosity~\cite{rauzan2024protorheology}. These target
-different material classes or observation modalities and do not recover
-the full Herschel--Bulkley triple. The physical basis for encoding
-rheology in dam-break fronts was established analytically by
-Balmforth et al.~\cite{balmforth2007two}, and free-surface extraction
-from experimental video is treated in~\cite{cochard2009tracking}. The
-inverse-rheometry problem has also been approached in the
-geophysical-flow setting using shallow-water forward models and adjoint
-methods~\cite{martin2010inverse}; our formulation differs in using a
-full three-dimensional MPM forward model and a derivative-free inverse
-over a learned surrogate.
-
-
-\subsection{Differentiable MPM for Inverse Problems}
+networks~\cite{thakur2025learning}, and consumer-video neural
+regression for scalar viscosity~\cite{rauzan2024protorheology}. These
+target different material classes or observation modalities and do
+not recover the full Herschel--Bulkley triple. Free-surface
+extraction from experimental video is treated
+in~\cite{cochard2009tracking}. Inverse rheometry has also been
+approached in the geophysical-flow setting using shallow-water
+forward models and adjoint methods~\cite{martin2010inverse}; our
+formulation differs in using a full three-dimensional MPM forward
+model and a derivative-free inverse over a learned surrogate.
 
 An alternative paradigm pursues parameter recovery via differentiable
-simulation, using gradients through the forward model for gradient-based
-inverse search. The differentiable MLS-MPM
+simulation. The differentiable MLS-MPM
 family~\cite{hu2019chainqueen,hu2020difftaichi,huang2021plasticinelab}
-has been applied to deformable and plastic materials, and end-to-end
-differentiable physics with differentiable rendering has been
-demonstrated by gradSim~\cite{murthy2021gradsim}. Most relevant to
-non-Newtonian parameter recovery from video,
+has been applied to deformable and plastic materials;
+gradSim~\cite{murthy2021gradsim} demonstrates end-to-end
+differentiable physics with differentiable rendering. Most relevant
+to non-Newtonian recovery from video,
 PAC-NeRF~\cite{li2023pacnerf} couples differentiable MPM with NeRF
 rendering to recover viscosity parameters from multi-view video, and
-Eastman~\cite{eastman2024recovery} recovers Herschel--Bulkley parameters
-from a ketchup column-collapse video via differentiable MPM and neural
-rendering. These approaches optimize per scene and do not amortize a
-reusable surrogate across materials. Further, evidence from
+Eastman~\cite{eastman2024recovery} recovers Herschel--Bulkley
+parameters from a ketchup column-collapse video via differentiable
+MPM and neural rendering. These approaches optimize per scene and do
+not amortize a reusable surrogate across materials. Evidence from
 PlasticineLab~\cite{huang2021plasticinelab} indicates that gradients
-through non-smooth plastic return maps are ill-conditioned, motivating
-our choice of a gradient-free inverse over a probabilistic surrogate.
+through non-smooth plastic return maps are ill-conditioned,
+motivating our choice of a gradient-free inverse over a
+probabilistic surrogate.
 
 
-\subsection{Gaussian-Process Surrogates and Mixtures of Experts}
+\subsection{Identifiability of Free-Surface Observations}
+
+A prerequisite for replacing simulation-in-the-loop inversion with a
+surrogate is that the chosen observation
+$\mathbf{y}_{\mathrm{obs}}$ carries enough information to identify
+$(\sigma_Y,\eta,n)$. Recent inverse-analysis work establishes that
+free-surface evolution alone is sufficient:
+\citet{martinpritchard2022inferring} show that the full generalized
+Newtonian constitutive function is in principle uniquely recoverable
+from free-surface evolution; \citet{ahmadi2022identification}
+compute linearly-independent sensitivity coefficients of the three
+Herschel--Bulkley parameters with respect to free-surface readings;
+and~\citet{muchiri2024identification} demonstrate inverse recovery
+of yield stress and consistency from shallow-water elevation
+hydrographs under viscoplastic rheology. Our scalar flow-front trace
+$\mathbf{y}_{\mathrm{obs}}$ is a low-dimensional summary of this
+evolution, and the residual yield-stress/consistency degeneracy we
+address in~\S\ref{sec:inverse} is therefore not a fundamental
+information-theoretic limit of the phone-video observation but a
+practical ill-conditioning that arises in the low-$\sigma_Y$ regime
+where the yield term is dominated by the viscous contribution.
+
+
+\subsection{Surrogate-Accelerated Inverse}
 
 Gaussian-process regression~\cite{rasmussen2006gaussian} provides a
-natural surrogate model for expensive simulators because it couples
+natural surrogate for expensive simulators because it couples
 flexible nonparametric regression with calibrated predictive
-uncertainty. For data sizes beyond exact-GP feasibility, variational and
-sparse approximations~\cite{snelson2006sparse,quinonero2005unifying,
-titsias2009variational,hensman2013gaussian,matthews2016sparse} replace
-the full covariance with an inducing-variable approximation; each expert
-in our surrogate is an exact GP trained on a gate-routed subset, with
-SVGP backends available at larger scales.
-
-A single global GP is insufficient for functions with heterogeneous
-local structure. Mixture-of-experts (MoE)
+uncertainty. For data sizes beyond exact-GP feasibility, sparse and
+variational approximations~\cite{snelson2006sparse,
+quinonero2005unifying,titsias2009variational,hensman2013gaussian,
+matthews2016sparse} replace the full covariance with an
+inducing-variable approximation. A single global GP is insufficient
+for functions with heterogeneous local structure;
+mixture-of-experts (MoE)
 models~\cite{jordan1994hierarchical,yuksel2012twenty} decompose
 prediction into multiple specialists with a gating mechanism, and
 mixtures of GPs instantiate this idea with GP
 experts~\cite{tresp2001mixtures,rasmussen2002infinite,
-meeds2006alternative,nguyen2008local,yuan2008variational,trapp2020deep}.
-Among these, Meeds and Osindero~\cite{meeds2006alternative} (a Gaussian
-mixture over inputs coupled with GP outputs) and Nguyen-Tuong et
-al.~\cite{nguyen2008local} (hard input-space partitioning with
-independent per-region GPs and nearest-neighbor fusion) are the closest
-architectural ancestors of our surrogate. We extend this pattern with a
-two-level Bayesian Gaussian mixture gate---first on container geometry
-$(W, H)$, then on an observation signature---and replace
-nearest-neighbor fusion with robust committee-machine aggregation.
+meeds2006alternative,nguyen2008local,yuan2008variational,
+trapp2020deep}. For aggregating independent GP predictions, the
+Bayesian Committee Machine~\cite{tresp2000bayesian} and its
+variants~\cite{cao2014generalized,deisenroth2015distributed,
+liu2018generalized} provide closed-form variance-weighted fusion;
+sparse-expert plus committee aggregation has recently been applied
+to physics emulation~\cite{cohen2024sparse}.
 
-For aggregating independent GP predictions, the Bayesian Committee
-Machine~\cite{tresp2000bayesian} and its modern variants---generalized
-Product of Experts~\cite{cao2014generalized}, robust BCM
-(rBCM)~\cite{deisenroth2015distributed}, and generalized robust BCM
-(GRBCM)~\cite{liu2018generalized}---provide closed-form
-variance-weighted fusion. We adopt
-rBCM~\cite{deisenroth2015distributed} with top-1 routing; our ablations
-(\S\ref{sec:ablation}) show that the additional communication expert of
-GRBCM does not justify its inference-time overhead given our peaked
-gate posterior. Sparse-expert plus BCM aggregation has recently been
-applied to physics emulation~\cite{cohen2024sparse}, providing modern
-precedent for our approach.
-
-
-\subsection{Surrogate-Accelerated Inverse and Derivative-Free Optimization}
-
-Inverting expensive simulators has been addressed under the headings of
-Bayesian calibration of computer models~\cite{kennedy2001bayesian} and
-simulation-based inference~\cite{cranmer2020frontier}, with efficient
-global optimization~\cite{jones1998efficient} and Bayesian
-optimization~\cite{snoek2012practical,shahriari2016taking} providing the
+Inverting expensive simulators has been addressed under the headings
+of Bayesian calibration of computer models~\cite{kennedy2001bayesian}
+and simulation-based inference~\cite{cranmer2020frontier}, with
+efficient global optimization~\cite{jones1998efficient} and Bayesian
+optimization~\cite{snoek2012practical,shahriari2016taking} as the
 dominant search strategies when the objective is expensive and
-derivative-free. Our inverse is closest to the ``CMA-ES on a GP
-surrogate'' pattern~\cite{bajaj2019gaussian,hansen2016cma}, which has
-been applied to inverse
-viscoplasticity~\cite{vandamme2021bayesian} and
-viscoelasticity~\cite{hashemi2025bayesian}. We depart from this pattern
-in two respects: first, each inverse is routed through a hierarchical
-surrogate rather than a single global GP; second, we introduce an
-observation-space nearest-neighbor warm-start and a
-training-data-anchored log-$\sigma_Y$ prior to address the yield-stress
-identifiability degeneracy that is specific to Herschel--Bulkley
-inversion and not resolved by generic BO machinery.
-
-The substitution of an expensive simulator $\mathcal{S}$ by a trained
-surrogate $\tilde{\mathcal{S}}$ inside a Bayesian / derivative-free
+derivative-free. The pattern of running derivative-free optimization
+on a GP surrogate~\cite{bajaj2019gaussian,hansen2016cma} has been
+applied to inverse viscoplasticity~\cite{vandamme2021bayesian} and
+viscoelasticity~\cite{hashemi2025bayesian}. The substitution of an
+expensive simulator by a trained surrogate inside a derivative-free
 inverse is not heuristic: \citet{stuart2018posterior} prove that the
 Hellinger distance between a GP-surrogate-based posterior and the
 true simulator-based posterior is bounded by moments of the
-surrogate's predictive error, and \citet{teckentrup2020convergence}
+surrogate's predictive error, and~\citet{teckentrup2020convergence}
 extends the guarantee to the realistic setting in which kernel
-hyperparameters are themselves estimated from data. Our surrogate
-satisfies the premise of both results at evaluation time---the rBCM
-aggregator returns calibrated predictive error natively---so the
-replacement of MPM-in-the-loop by our hierarchical GP committee
-inherits the same posterior-fidelity guarantees that justify
-Bayesian calibration~\cite{kennedy2001bayesian} and modern
-simulation-based inference~\cite{cranmer2020frontier}.
+hyperparameters are estimated from data. The replacement of
+MPM-in-the-loop by a learned GP surrogate therefore inherits the
+same posterior-fidelity guarantees that justify Bayesian
+calibration~\cite{kennedy2001bayesian} and modern simulation-based
+inference~\cite{cranmer2020frontier}.
 
 
-\subsection{Flow Observations as Rheometric Signals}
+\subsection{Camera Calibration}
 
-A second prerequisite for replacing simulation-in-the-loop inversion
-with a surrogate is that the chosen observation $\mathbf{y}_{\mathrm{obs}}$
-actually carries enough information about
-$(\sigma_Y,\eta,n)$ to be worth inverting at all. The single scalar
-flow-front trace extracted from a phone-video dam-break looks
-information-poor at first sight, but gravity-driven spreading of
-viscoplastic fluids has a long pedigree as a rheometric observation:
-the slump test of \citet{pashias1996fifty} recovers yield stress
-from a single geometric reading, and \citet{roussel2005fiftycent}
-extend the argument to the spreading regime that matches our
-dam-break geometry directly. Final-deposit shapes of stopped
-free-surface flows are themselves a recognised rheological
-signature~\cite{coussot1996rheological}, and
-\citet{ancey2007plasticity} frames the broader class of
-gravity-driven yield-stress flows as a standard rheometric regime.
-The relation between flow-front position and
-Herschel--Bulkley parameters is made quantitative by the similarity
-analyses of \citet{liumei1989slow} and
-\citet{balmforth2007two}---the same similarity structure leveraged
-by~\citet{hamamichi2023nonnewtonian}.
-
-Recent inverse-analysis work sharpens these classical arguments into
-explicit identifiability statements for our observation class.
-\citet{martinpritchard2022inferring} show that the full generalized
-Newtonian constitutive function is, in principle, uniquely
-recoverable from free-surface evolution;
-\citet{ahmadi2022identification} compute linearly-independent
-sensitivity coefficients of the three Herschel--Bulkley parameters
-with respect to free-surface readings; and
-\citet{muchiri2024identification} demonstrate inverse recovery of
-yield stress and consistency from shallow-water elevation
-hydrographs under viscoplastic rheology. The residual
-yield-stress / consistency degeneracy we address in~\S\ref{sec:inverse}
-is therefore not a fundamental information-theoretic limit of the
-phone-video observation---it is a practical ill-conditioning that
-arises only in the low-$\sigma_Y$ regime where the yield term is
-dominated by the viscous contribution, which our data-honest
-log-$\sigma_Y$ prior is designed to mitigate rather than paper over.
+Estimating camera pose and intrinsics from images is a foundational
+computer-vision task; the textbook treatment of multi-view geometry
+appears in~\cite{hartley2004multiple}. Marker-based calibration
+provides closed-form initial poses through detected fiducials:
+AprilTag~\cite{olson2011apriltag},
+ARTag~\cite{fiala2005artag}, and the
+ArUco / ChArUco family~\cite{garrido2014automatic,
+garrido2016generation} all yield 3D-to-2D correspondences solvable
+via PnP variants such as EPnP~\cite{lepetit2009epnp}. Sub-pixel
+corner refinement using the gradient-based detector
+of~\citet{forstner1987fast} sharpens correspondences before pose
+recovery. Beyond marker-driven initialization, silhouette- and
+edge-based refinement aligns the camera against object boundaries
+through chamfer-distance optimization on a Euclidean distance
+transform~\cite{borgefors1986distance,maurer2003linear}, with edge
+maps from the Canny detector~\cite{canny1986computational}. Our
+calibration pipeline (\S\ref{sec:calib}) combines a ChArUco initial
+pose with a two-phase silhouette-edge refinement, replacing the
+manual fSpy-and-Photoshop workflow used
+by~\cite{hamamichi2023nonnewtonian} and removing the largest fixed
+cost from each capture.
 
 
 \section{Background}
