@@ -1001,87 +1001,45 @@ $\tilde{\mathcal{S}}(\boldsymbol{\theta}; W, H)$.
 \begin{algorithm}[!htbp]
 \caption{Offline construction of the HVIMoGP-rBCM surrogate.}
 \label{alg:train}
-\KwData{Training corpus
-  $\mathcal{D}_{\mathrm{all}}=\{(\boldsymbol{\theta}_{i}, W_{i}, H_{i},
-  \mathbf{y}_{i})\}_{i=1}^{N}$, $N=295{,}419$.}
-\KwIn{$K_{\mathrm{geo}}=12$; $\{K_{\phi}^{(g)}\}_{g=1}^{12}$ from
-  per-geo BIC scan (Eqs.~\eqref{eq:layer1},\,\eqref{eq:layer2});
-  expert training budget $T_{\mathrm{gp}}=100$, learning rate
-  $5\cdot 10^{-2}$; cell size thresholds
-  $N_{\min}=30$, $N_{\max}=2500$; polynomial degree $2$, ridge
-  $\alpha=10^{-3}$; hotfix threshold $\tau_{\mathrm{mae}}=0.15$.}
+\KwData{Training corpus $\{(\boldsymbol{\theta}_{i}, W_{i}, H_{i},
+  \mathbf{y}_{i})\}_{i=1}^{N}$, $N{=}295{,}419$.}
+\KwIn{Hyperparameters from Table~\ref{tab:hyper}.}
 \KwOut{Frozen checkpoint: scalers, two-level BGM gate, $540$
   per-cell GP experts, polynomial residual coefficients.}
 \BlankLine
 
-\tcp{\bf (1) Normalisation.}
-Compute $(\boldsymbol{\mu}_{X}, \boldsymbol{\sigma}_{X})$ on
-  $\{\mathbf{x}_{\log, i}\}$ (Eq.~\eqref{eq:xscale})
-  and $\boldsymbol{\mu}_{Y}$ on $\{\mathbf{y}_{i}\}$
-  (Eq.~\eqref{eq:yscale})\;
+Standardise $\mathbf{x}_{\log,i}$ and $\mathbf{y}_{i}$ to obtain
+  $(\boldsymbol{\mu}_{X},\boldsymbol{\sigma}_{X},\boldsymbol{\mu}_{Y})$
+  (Eqs.~\eqref{eq:xscale},\eqref{eq:yscale})\;
 
-\tcp{\bf (2) Level-1 Bayesian Gaussian mixture on geometry.}
-Fit $p^{\mathrm{geo}}$ (DP weight prior, full covariance,
-  $K=K_{\mathrm{geo}}$) on standardised $\{(W_{i},H_{i})\}$
-  \tcp*{Eq.~\eqref{eq:layer1}}
-Assign each training point
-  $g_{i}\leftarrow g^{\star}(W_{i}, H_{i})$
-  via Eq.~\eqref{eq:layer1}\;
+Fit Layer-$1$ BGM $p^{\mathrm{geo}}$ on $\{(W_{i},H_{i})\}$ and assign
+  $g_{i}{\leftarrow}g^{\star}(W_{i},H_{i})$ (Eq.~\eqref{eq:layer1})\;
 
-\tcp{\bf (3) Per-geo level-2 BGM on observation signatures.}
-\ForEach{geo group $g\in\{1,\dots,K_{\mathrm{geo}}\}$}{
-  Compute
-    $\boldsymbol{\phi}_{i}=\boldsymbol{\phi}(\mathbf{y}_{i},W_{i},H_{i})$
-    for $i\in g$ (Eq.~\eqref{eq:phi})\;
-  Fit $p^{\phi\mid g}$ (DP weight prior, full covariance,
-    $K=K_{\phi}^{(g)}$) on standardised
-    $\{\boldsymbol{\phi}_{i}\}_{i\in g}$\;
-  Assign $k_{i}\leftarrow k^{\star}(\boldsymbol{\phi}_{i},g)$
-    via Eq.~\eqref{eq:layer2}\;
+\ForEach{geo group $g$}{
+  Compute $\boldsymbol{\phi}_{i}$ (Eq.~\eqref{eq:phi}); fit Layer-$2$
+    BGM $p^{\phi\mid g}$ ($K{=}K_{\phi}^{(g)}$) and assign
+    $k_{i}{\leftarrow}k^{\star}(\boldsymbol{\phi}_{i},g)$
+    (Eq.~\eqref{eq:layer2})\;
 }
 
-\tcp{\bf (4) Train one ExactGP expert per cell.}
-\ForEach{cell $(g,k)$}{
-  $\mathcal{D}_{(g,k)}\leftarrow\{i:g_{i}=g\land k_{i}=k\}$\;
-  \If{$|\mathcal{D}_{(g,k)}|<N_{\min}$}{skip cell (absorbed by
-    neighbour at inference)\;}
-  \If{$|\mathcal{D}_{(g,k)}|>N_{\max}$}{stratified subsample
-    to $N_{\max}$ rows\;}
-  \For{$d=1,\dots,D_{Y}=8$}{
-    Initialise Mat\'ern-$5/2$ ARD kernel hyperparameters
-      $(\sigma_{f}^{\,2},\{\ell_{\delta}\}_{\delta=1}^{5},
-      \sigma_{n,k,d}^{\,2})$ and constant mean
-      (Eq.~\eqref{eq:matern})\;
-    Maximise the exact log-marginal likelihood
-      (Eq.~\eqref{eq:gp-mll}) by Adam for $T_{\mathrm{gp}}$ iterations\;
+\ForEach{cell $(g,k)$ with $|\mathcal{D}_{(g,k)}|\!\in\![N_{\min},N_{\max}]$}{
+  \For{$d=1,\dots,8$}{
+    Maximise exact log-marginal likelihood (Eq.~\eqref{eq:gp-mll},
+      Mat\'ern-$5/2$ ARD) by Adam for $T_{\mathrm{gp}}$ iterations\;
   }
 }
 
-\tcp{\bf (5) Diagnostic + hotfix for high-MAE experts.}
-On a held-out split, compute per-expert forward MAE
-  $\bar{m}_{(g,k)}$\;
-\ForEach{cell $(g,k)$ with $\bar{m}_{(g,k)}\ge\tau_{\mathrm{mae}}$}{
-  Re-train expert $(g,k)$ with an \emph{isotropic-baseline}
-    kernel (single shared lengthscale across $d$) for $300$
-    iterations to reduce the MAE tail\;
+Re-train each cell with $\bar{m}_{(g,k)}\!\ge\!\tau_{\mathrm{mae}}$
+  using an isotropic-baseline kernel ($300$ iterations)\;
+
+\ForEach{cell $(g,k)$, dim $d$}{
+  Solve the closed-form ridge regression on the degree-$2$ basis
+    $\boldsymbol{\Psi}\!\in\!\mathbb{R}^{|\mathcal{D}_{(g,k)}|\times 21}$
+    against the GP residual to obtain $\mathbf{c}_{(g,k),d}$\;
 }
 
-\tcp{\bf (6) Polynomial residual correction.}
-\ForEach{cell $(g,k)$}{
-  Assemble degree-$2$ monomial basis
-    $\boldsymbol{\Psi}\in\mathbb{R}^{|\mathcal{D}_{(g,k)}|\times 21}$
-    on $\mathcal{D}_{(g,k)}$\;
-  \For{$d=1,\dots,D_{Y}$}{
-    Compute GP residual
-      $\mathbf{r}_{(g,k),d}=\tilde{\mathbf{y}}_{d}-\mu_{(g,k),d}$\;
-    Solve ridge regression (legacy poly-residual step) in closed form
-      (Eq.~a closed-form ridge regression) to obtain
-      $\mathbf{c}_{(g,k),d}$\;
-  }
-}
-
-\Return{$(\boldsymbol{\mu}_{X},\boldsymbol{\sigma}_{X},\boldsymbol{\mu}_{Y},
-  p^{\mathrm{geo}},\{p^{\phi\mid g}\}_{g=1}^{12},
+\Return{frozen checkpoint $(\boldsymbol{\mu}_{X},\boldsymbol{\sigma}_{X},
+  \boldsymbol{\mu}_{Y},p^{\mathrm{geo}},\{p^{\phi\mid g}\},
   \{\mathrm{expert}_{(g,k)}\},\{\mathbf{c}_{(g,k),d}\})$.}
 \end{algorithm}
 
@@ -1089,54 +1047,32 @@ On a held-out split, compute per-expert forward MAE
 \caption{Online forward pass
   $\hat{\mathbf{y}}=\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)$.}
 \label{alg:forward}
-\KwIn{Parameter $\boldsymbol{\theta}=(n,\eta,\sigma_{Y})$, geometry
-  $(W,H)$; optional observation signature $\boldsymbol{\phi}$
-  (at inverse time derived from $\mathbf{y}_{\mathrm{obs}}$;
-  in data-gen mode the MPM output is used instead).}
-\KwOut{Predicted flow curve
-  $\hat{\mathbf{y}}\in\mathbb{R}_{\ge 0}^{8}$ (monotone
-  non-decreasing).}
+\KwIn{Parameter $\boldsymbol{\theta}{=}(n,\eta,\sigma_{Y})$, geometry
+  $(W,H)$; signature $\boldsymbol{\phi}$ (from
+  $\mathbf{y}_{\mathrm{obs}}$ at inverse time, MPM output at data-gen).}
+\KwOut{Monotone $\hat{\mathbf{y}}\in\mathbb{R}_{\ge 0}^{8}$.}
 \BlankLine
 
-\tcp{\bf Input standardisation.}
-$\mathbf{x}_{\log}\leftarrow
-  (n,\log(\eta+\varepsilon),\log(\sigma_{Y}+\varepsilon),W,H)^{\!\top}$\;
-$\tilde{\mathbf{x}}\leftarrow
-  (\mathbf{x}_{\log}-\boldsymbol{\mu}_{X})/\boldsymbol{\sigma}_{X}$
-  \tcp*{Eq.~\eqref{eq:xscale}}
+Standardise: $\tilde{\mathbf{x}}{\leftarrow}(\mathbf{x}_{\log}-\boldsymbol{\mu}_{X})/\boldsymbol{\sigma}_{X}$
+  (Eq.~\eqref{eq:xscale})\;
+Route top-$1$: $g^{\star}{\leftarrow}\arg\max_{g}\pi_{g}^{\mathrm{geo}}
+  \mathcal{N}((W,H);\cdot)$ (Eq.~\eqref{eq:layer1});
+  $k^{\star}{\leftarrow}\arg\max_{k}p_{k}^{\phi\mid g^{\star}}(\boldsymbol{\phi})$
+  (Eq.~\eqref{eq:layer2})\;
 
-\tcp{\bf Hierarchical top-1 routing.}
-$g^{\star}\leftarrow\arg\max_{g}\pi_{g}^{\mathrm{geo}}
-  \mathcal{N}\!\bigl((W,H);\boldsymbol{\mu}_{g}^{\mathrm{geo}},
-                     \boldsymbol{\Sigma}_{g}^{\mathrm{geo}}\bigr)$
-  \tcp*{Eq.~\eqref{eq:layer1}}
-$k^{\star}\leftarrow\arg\max_{k}p_{k}^{\phi\mid g^{\star}}(\boldsymbol{\phi})$
-  \tcp*{Eq.~\eqref{eq:layer2}}
-
-\tcp{\bf Expert prediction (eight one-dimensional GPs).}
 \For{$d=1,\dots,8$}{
-  $(\mu_{k^{\star},d},\sigma_{k^{\star},d}^{\,2})\leftarrow
-    \text{GP predictive for expert }(g^{\star},k^{\star})$ at
-    $\tilde{\mathbf{x}}$
-    \tcp*{Eq.~\eqref{eq:gp-predictive}}
+  Predict $(\mu_{k^{\star},d},\sigma_{k^{\star},d}^{2})$ from
+    expert $(g^{\star},k^{\star})$ at $\tilde{\mathbf{x}}$
+    (Eq.~\eqref{eq:gp-predictive})\;
 }
+Aggregate via top-$1$ rBCM (Eq.~\eqref{eq:top1}, $|\mathcal{R}|{=}1$);
+  apply polynomial correction (if hotfixed)
+  $\mu_{\star,d}{+}\boldsymbol{\psi}(\mathbf{x})^{\!\top}\mathbf{c}_{(g^{\star},k^{\star}),d}$\;
+De-standardise and enforce monotonicity:
+  $\hat{y}_{d}{\leftarrow}\max_{j\le d}(\mu_{\star,j}+\mu_{Y,j})$
+  (Eq.~\eqref{eq:mono})\;
 
-\tcp{\bf rBCM aggregation with top-1 routing.}
-$(\mu_{\star,d},\sigma_{\star,d}^{\,2})\leftarrow
-  (\mu_{k^{\star},d},\sigma_{k^{\star},d}^{\,2})$
-  \tcp*{Eq.~\eqref{eq:top1} with $|\mathcal{R}|=1$}
-
-\tcp{\bf Polynomial residual correction (if the cell was hotfixed).}
-$\mu_{\star,d}\leftarrow
-  \mu_{\star,d}+\boldsymbol{\psi}(\mathbf{x})^{\!\top}\mathbf{c}_{(g^{\star},k^{\star}),d}$
-  \tcp*{Eq.~the legacy polynomial-residual step}
-
-\tcp{\bf De-standardise + enforce monotonicity.}
-$\hat{y}_{d}\leftarrow\mu_{\star,d}+\mu_{Y,d}$ for $d=1,\dots,8$\;
-$\hat{y}_{d}\leftarrow\max_{j\le d}\hat{y}_{j}$
-  \tcp*{Eq.~\eqref{eq:mono}}
-
-\Return{$\hat{\mathbf{y}}=(\hat{y}_{1},\dots,\hat{y}_{8})$.}
+\Return{$\hat{\mathbf{y}}$.}
 \end{algorithm}
 
 \subsection{Identifiability-Aware Inverse}
@@ -1393,140 +1329,103 @@ weight to the joint forward likelihood.
   $(\mathbf{y}_{\mathrm{obs}},W,H)\mapsto\hat{\boldsymbol{\theta}}$.
   Solves~(\ref{eq:Pprime}).}
 \label{alg:invert}
-\KwIn{Observation $\mathbf{y}_{\mathrm{obs}}\in\mathbb{R}^{8}$,
-  geometry $(W,H)$, trained surrogate $\tilde{\mathcal{S}}$.
-  CMA-ES: popsize $P=12$, $\sigma_{0}=0.5$,
-  $T_{\mathrm{cma}}=60$ with tol-x / tol-f early stopping.
-  Prior: $\lambda=10^{-5}$, $w=1$.
-  Bound pad: $p_{\eta}=p_{\sigma_{Y}}=p_{n}=0.02$.}
-\KwOut{$\hat{\boldsymbol{\theta}}=(\hat{n},\hat{\eta},
-  \hat{\sigma}_{Y})$ and forward prediction $\hat{\mathbf{y}}$.}
+\KwIn{Observation $\mathbf{y}_{\mathrm{obs}}\in\mathbb{R}^{8}$, geometry
+  $(W,H)$, surrogate $\tilde{\mathcal{S}}$. CMA-ES:
+  popsize $P{=}12$, $\sigma_{0}{=}0.5$, $T_{\mathrm{cma}}{=}60$,
+  tol-x/tol-f early stop. Prior: $\lambda{=}10^{-5}$, $w{=}1$.
+  Bound pad: $p_{d}{=}0.02$.}
+\KwOut{$\hat{\boldsymbol{\theta}}{=}(\hat{n},\hat{\eta},\hat{\sigma}_{Y})$
+  and $\hat{\mathbf{y}}$.}
 \BlankLine
 
-\tcp{\bf (1) Compute observation signature, route through gate.}
-$\boldsymbol{\phi}\leftarrow
-  \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}},W,H)$
-  \tcp*{Eq.~\eqref{eq:phi}}
-$(g^{\star},k^{\star})\leftarrow
-  \text{hierarchical route}(W,H,\boldsymbol{\phi})$
-  \tcp*{Eqs.~\eqref{eq:layer1},\eqref{eq:layer2}}
-
-\tcp{\bf (2) Per-expert bound tightening.}
-Compute
-  $\theta_{d}^{\,k^{\star},\min},\theta_{d}^{\,k^{\star},\max}$
-  for $d\in\{n,\eta,\sigma_{Y}\}$
-  over $\mathcal{D}_{k^{\star}}$\;
-$\Theta_{k^{\star}}\leftarrow\Theta\cap\bigotimes_{d}
-  [\theta_{d}^{\,k^{\star},\min}(1-p_{d}),\,
-   \theta_{d}^{\,k^{\star},\max}(1+p_{d})]$
-  \tcp*{Eq.~\eqref{eq:tight-box}}
-
-\tcp{\bf (3) Observation-space nearest-neighbour warm-start.}
-$i^{\star}\leftarrow\arg\min_{i\in\mathcal{D}_{k^{\star}}}
+Compute signature
+  $\boldsymbol{\phi}{\leftarrow}\boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}},W,H)$
+  (Eq.~\eqref{eq:phi}); route $(g^{\star},k^{\star})$
+  (Eqs.~\eqref{eq:layer1},\eqref{eq:layer2})\;
+Tighten box: $\Theta_{k^{\star}}{\leftarrow}\Theta\cap\bigotimes_{d}
+  [\theta_{d}^{\,\min}(1{-}p_{d}),\,\theta_{d}^{\,\max}(1{+}p_{d})]$
+  using extrema over $\mathcal{D}_{k^{\star}}$
+  (Eq.~\eqref{eq:tight-box})\;
+Warm-start: $i^{\star}{\leftarrow}\arg\min_{i\in\mathcal{D}_{k^{\star}}}
   \|\mathbf{y}_{i}-\mathbf{y}_{\mathrm{obs}}\|^{2}/
-  \max(\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}},10^{-12})$
-  \tcp*{Eq.~\eqref{eq:nn}}
-$\boldsymbol{\theta}^{\mathrm{NN}}
-  \leftarrow\boldsymbol{\theta}_{i^{\star}}$,\quad
-$\sigma_{Y}^{\mathrm{NN}}\leftarrow
-  [\boldsymbol{\theta}^{\mathrm{NN}}]_{\sigma_{Y}}$\;
+  \overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}$ (Eq.~\eqref{eq:nn});
+  set $\boldsymbol{\theta}^{\mathrm{NN}}{\leftarrow}\boldsymbol{\theta}_{i^{\star}}$,
+  $\sigma_{Y}^{\mathrm{NN}}{\leftarrow}[\boldsymbol{\theta}^{\mathrm{NN}}]_{\sigma_{Y}}$\;
 
-\tcp{\bf (4) Loss oracle.}
-Define
-  $\tilde{\mathcal{L}}:\boldsymbol{\theta}\mapsto
-    \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)
-         -\mathbf{y}_{\mathrm{obs}}\|^{2}}
-         {\overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}}
-    +\lambda
-    \left(\tfrac{\log\sigma_{Y}-\log\sigma_{Y}^{\mathrm{NN}}}{w}\right)^{\!2}$
-    \tcp*{Eq.~\eqref{eq:Pprime}}
+Define loss
+  $\tilde{\mathcal{L}}(\boldsymbol{\theta}){=}
+  \|\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)
+   -\mathbf{y}_{\mathrm{obs}}\|^{2}/
+   \overline{\mathbf{y}_{\mathrm{obs}}^{\,2}}
+  +\lambda((\log\sigma_{Y}-\log\sigma_{Y}^{\mathrm{NN}})/w)^{2}$
+  (Eq.~\eqref{eq:Pprime})\;
 
-\tcp{\bf (5) Bounded CMA-ES search.}
-Initialise CMA-ES on $\Theta_{k^{\star}}$ with
-  $\mathbf{x}_{0}=\boldsymbol{\theta}^{\mathrm{NN}}$,
-  step size $\sigma_{0}$, popsize $P$\;
+Initialise CMA-ES on $\Theta_{k^{\star}}$ at
+  $\boldsymbol{\theta}^{\mathrm{NN}}$ with $(\sigma_{0},P)$\;
 \For{$t=1,\dots,T_{\mathrm{cma}}$}{
-  Sample $\{\boldsymbol{\theta}^{(p)}\}_{p=1}^{P}\subset\Theta_{k^{\star}}$\;
-  Batch-evaluate $\tilde{\mathcal{L}}(\boldsymbol{\theta}^{(p)})$
-    through $\tilde{\mathcal{S}}$\;
-  Update CMA-ES mean, covariance, step size\;
-  \If{tol-x or tol-f satisfied}{break\;}
+  Sample $\{\boldsymbol{\theta}^{(p)}\}\!\subset\!\Theta_{k^{\star}}$,
+    batch-evaluate $\tilde{\mathcal{L}}$ through $\tilde{\mathcal{S}}$,
+    update CMA-ES; \textbf{break} on tol-x/tol-f\;
 }
-$\hat{\boldsymbol{\theta}}\leftarrow$ best-ever sample\;
-$\hat{\mathbf{y}}\leftarrow\tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W,H)$\;
-
+$\hat{\boldsymbol{\theta}}{\leftarrow}$ best-ever;
+  $\hat{\mathbf{y}}{\leftarrow}\tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W,H)$\;
 \Return{$(\hat{\boldsymbol{\theta}},\hat{\mathbf{y}})$.}
 \end{algorithm}
 
 \begin{algorithm}[!htbp]
 \caption{Online joint multi-setup inverse
   $\{(\mathbf{y}_{\mathrm{obs}}^{(s)},W_{s},H_{s})\}_{s=1}^{S}
-  \mapsto\hat{\boldsymbol{\theta}}$.
-  Solves~(\ref{eq:Pstar}).}
+  \mapsto\hat{\boldsymbol{\theta}}$. Solves~(\ref{eq:Pstar}).}
 \label{alg:joint}
-\KwIn{$S\ge 2$ observations of the \emph{same} material under
+\KwIn{$S\!\ge\!2$ observations of the \emph{same} material under
   different geometries. Optional stage-$1$ result
-  $(\hat{\boldsymbol{\theta}}_{1},\sigma_{Y}^{(1)})$; otherwise
-  obtained by running Algorithm~\ref{alg:invert}.
-  Joint prior:
-  $\lambda_{\mathrm{joint}}=5\cdot 10^{-2}$ (with a stage-$1$
-  anchor) or $10^{-3}$ (fallback), $w=1$. CMA-ES settings as in
+  $(\hat{\boldsymbol{\theta}}_{1},\sigma_{Y}^{(1)})$ from
+  Algorithm~\ref{alg:invert}. Joint prior:
+  $\lambda_{\mathrm{joint}}{=}5{\cdot}10^{-2}$ (with stage-$1$ anchor)
+  or $10^{-3}$ (fallback), $w{=}1$. CMA-ES settings as in
   Algorithm~\ref{alg:invert}.}
 \KwOut{$\hat{\boldsymbol{\theta}}$ shared across all $S$ setups.}
 \BlankLine
 
-\tcp{\bf Stage 1: single-setup inverse on setup~$1$.}
+\tcp*[h]{Stage 1: single-setup inverse on setup~$1$.}
 \If{$\hat{\boldsymbol{\theta}}_{1}$ not supplied}{
-  $(\hat{\boldsymbol{\theta}}_{1},\hat{\mathbf{y}}_{1})\leftarrow
-    \textbf{Algorithm}~\ref{alg:invert}
+  $(\hat{\boldsymbol{\theta}}_{1},\hat{\mathbf{y}}_{1})
+    {\leftarrow}\textbf{Algorithm~\ref{alg:invert}}
     (\mathbf{y}_{\mathrm{obs}}^{(1)},W_{1},H_{1})$\;
 }
-$\sigma_{Y}^{\mathrm{anchor}}\leftarrow
+$\sigma_{Y}^{\mathrm{anchor}}{\leftarrow}
   [\hat{\boldsymbol{\theta}}_{1}]_{\sigma_{Y}}$\;
 
-\tcp{\bf Per-setup routing and per-setup tightened boxes.}
 \ForEach{$s=1,\dots,S$}{
-  $\boldsymbol{\phi}_{s}\leftarrow
-    \boldsymbol{\phi}(\mathbf{y}_{\mathrm{obs}}^{(s)},W_{s},H_{s})$\;
-  $(g_{s}^{\star},k_{s}^{\star})\leftarrow
-    \text{route}(W_{s},H_{s},\boldsymbol{\phi}_{s})$\;
-  $\Theta_{k_{s}^{\star}}\leftarrow$ per-expert hull
+  Route $(g_{s}^{\star},k_{s}^{\star}){\leftarrow}
+    \mathrm{route}(W_{s},H_{s},\boldsymbol{\phi}_{s})$
+    and build $\Theta_{k_{s}^{\star}}$
     (Eq.~\eqref{eq:tight-box})\;
 }
-$\Theta_{\mathrm{joint}}\leftarrow
-  \Theta\cap\bigcap_{s=1}^{S}\Theta_{k_{s}^{\star}}$\;
-\If{$\Theta_{\mathrm{joint}}$ degenerate}{
-  $\Theta_{\mathrm{joint}}\leftarrow\Theta$
-  \tcp*{fallback to global bounds}
-}
+$\Theta_{\mathrm{joint}}{\leftarrow}\Theta\cap
+  \bigcap_{s}\Theta_{k_{s}^{\star}}$;
+  if degenerate, fallback $\Theta_{\mathrm{joint}}{\leftarrow}\Theta$\;
 
-\tcp{\bf Joint loss (Eq.~\eqref{eq:Pstar}).}
-Define
-  $\tilde{\mathcal{L}}_{\mathrm{joint}}:\boldsymbol{\theta}\mapsto
-    \sum_{s=1}^{S}
-    \frac{\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W_{s},H_{s})
-         -\mathbf{y}_{\mathrm{obs}}^{(s)}\|^{2}}
-         {\overline{(\mathbf{y}_{\mathrm{obs}}^{(s)})^{2}}}
-    +\lambda_{\mathrm{joint}}
-    \left(\tfrac{\log\sigma_{Y}-
-                  \log\sigma_{Y}^{\mathrm{anchor}}}{w}\right)^{\!2}$\;
+Define joint loss (Eq.~\eqref{eq:Pstar}):
+  $\tilde{\mathcal{L}}_{\mathrm{joint}}(\boldsymbol{\theta}){=}
+  \sum_{s}\|\tilde{\mathcal{S}}(\boldsymbol{\theta};W_{s},H_{s})
+   -\mathbf{y}_{\mathrm{obs}}^{(s)}\|^{2}/
+   \overline{(\mathbf{y}_{\mathrm{obs}}^{(s)})^{2}}
+  +\lambda_{\mathrm{joint}}
+  ((\log\sigma_{Y}-\log\sigma_{Y}^{\mathrm{anchor}})/w)^{2}$\;
 
-\tcp{\bf Stage 2: CMA-ES over joint loss, anchored at $\hat{\boldsymbol{\theta}}_{1}$.}
-Initialise CMA-ES on $\Theta_{\mathrm{joint}}$ with
-  $\mathbf{x}_{0}=\hat{\boldsymbol{\theta}}_{1}$, popsize $P$,
-  $\sigma_{0}=0.5$\;
+\tcp*[h]{Stage 2: CMA-ES anchored at $\hat{\boldsymbol{\theta}}_{1}$.}
+Initialise CMA-ES on $\Theta_{\mathrm{joint}}$ at
+  $\hat{\boldsymbol{\theta}}_{1}$ with $(\sigma_{0},P)$\;
 \For{$t=1,\dots,T_{\mathrm{cma}}$}{
-  Sample $\{\boldsymbol{\theta}^{(p)}\}$; batch-evaluate
-    $\tilde{\mathcal{L}}_{\mathrm{joint}}$ across all $S$ setups\;
-  Update CMA-ES; early stop on tol-x / tol-f\;
+  Sample, batch-evaluate $\tilde{\mathcal{L}}_{\mathrm{joint}}$
+    across all $S$ setups, update CMA-ES; \textbf{break} on
+    tol-x/tol-f\;
 }
-$\hat{\boldsymbol{\theta}}\leftarrow$ best-ever sample\;
-$\hat{\mathbf{y}}_{s}\leftarrow
-  \tilde{\mathcal{S}}(\hat{\boldsymbol{\theta}};W_{s},H_{s})$
-  for $s=1,\dots,S$\;
-
-\Return{$\hat{\boldsymbol{\theta}}$ and
-  $\{\hat{\mathbf{y}}_{s}\}_{s=1}^{S}$.}
+$\hat{\boldsymbol{\theta}}{\leftarrow}$ best-ever;
+  $\hat{\mathbf{y}}_{s}{\leftarrow}\tilde{\mathcal{S}}
+   (\hat{\boldsymbol{\theta}};W_{s},H_{s})$ for all $s$\;
+\Return{$\hat{\boldsymbol{\theta}}$ and $\{\hat{\mathbf{y}}_{s}\}$.}
 \end{algorithm}
 
 \section{Camera Calibration}
@@ -1789,103 +1688,70 @@ Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
 \begin{algorithm}[!htbp]
 \caption{Stage 1 reprojection oracle.}
 \label{alg:reproj}
-\KwIn{$7$-vector $\boldsymbol{\theta}_{\mathrm{cam}} =
-  (l_{x}, l_{z}, \theta_{E}, \phi_{E}, \mathrm{fov}, d_{\mathrm{eye}})$;
-  board coordinates $\{\mathbf{P}_{i}\}_{i \in \mathcal{I}}$
-  of detected corners; image size $(W, H)$.}
-\KwOut{Projected pixel coordinates
-  $\{\pi(\mathbf{P}_{i};\,\boldsymbol{\theta}_{\mathrm{cam}})\}$.}
+\KwIn{$6$-vector $\boldsymbol{\theta}_{\mathrm{cam}}{=}
+  (l_{x},l_{z},\theta_{E},\phi_{E},\mathrm{fov},d_{\mathrm{eye}})$;
+  board coordinates $\{\mathbf{P}_{i}\}_{i\in\mathcal{I}}$;
+  image size $(W,H)$.}
+\KwOut{Projected pixels $\{\pi(\mathbf{P}_{i};
+  \boldsymbol{\theta}_{\mathrm{cam}})\}$.}
 \BlankLine
-$\mathbf{l} \leftarrow (l_{x}, 0, l_{z})^{\!\top}$\;
-$\mathbf{E} \leftarrow
-  d_{\mathrm{eye}}\,(\sin\theta_{E}\cos\phi_{E},\,\cos\theta_{E},\,
-      -\sin\theta_{E}\sin\phi_{E})^{\!\top}$
-  \tcp*{Eq.~\eqref{eq:eye}}
-$\tilde{\mathbf{C}}_{z} \leftarrow \mathbf{E} - \mathbf{l}$;\quad
-  $\mathbf{C}_{z} \leftarrow \tilde{\mathbf{C}}_{z}/\|\tilde{\mathbf{C}}_{z}\|$\;
-$\hat{\mathbf{C}}_{x} \leftarrow (C_{z,3},\,0,\,-C_{z,1})^{\!\top}$;\quad
-  $\mathbf{C}_{x} \leftarrow \hat{\mathbf{C}}_{x}/\|\hat{\mathbf{C}}_{x}\|$\;
-$\mathbf{C}_{y} \leftarrow \mathbf{C}_{z} \times \mathbf{C}_{x}$
-  \tcp*{Eq.~\eqref{eq:basis}}
-$s \leftarrow 1/\bigl(2\tan(\mathrm{fov}/2)\bigr)$
-  \tcp*{Eq.~\eqref{eq:scale}}
-\ForEach{corner $i \in \mathcal{I}$}{
-  $\mathbf{Y}_{i} \leftarrow \bigl(
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{x},\;
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{y},\;
-    (\mathbf{P}_{i}-\mathbf{E})\!\cdot\!\mathbf{C}_{z}\bigr)$
-    \tcp*{Eq.~\eqref{eq:screen}}
-  $u_{i,1} \leftarrow W/2 + sH\,[\mathbf{Y}_{i}]_{1}/|[\mathbf{Y}_{i}]_{3}|$\;
-  $u_{i,2} \leftarrow H/2 - sH\,[\mathbf{Y}_{i}]_{2}/|[\mathbf{Y}_{i}]_{3}|$
-    \tcp*{Eq.~\eqref{eq:project}}
+
+Set $\mathbf{l}{=}(l_{x},0,l_{z})^{\!\top}$ and compute eye position
+  $\mathbf{E}$ (Eq.~\eqref{eq:eye})\;
+Build orthonormal basis $(\mathbf{C}_{x},\mathbf{C}_{y},\mathbf{C}_{z})$
+  with $\mathbf{C}_{x}$ horizontal (Eq.~\eqref{eq:basis}); set
+  $s{=}1/(2\tan(\mathrm{fov}/2))$ (Eq.~\eqref{eq:scale})\;
+
+\ForEach{corner $i\in\mathcal{I}$}{
+  Camera-frame coordinates $\mathbf{Y}_{i}$ (Eq.~\eqref{eq:screen});
+    project to pixels via Eq.~\eqref{eq:project}\;
 }
-\Return{$\{\mathbf{u}_{i}\}_{i \in \mathcal{I}}$.}
+\Return{$\{\mathbf{u}_{i}\}_{i\in\mathcal{I}}$.}
 \end{algorithm}
 
 \begin{algorithm}[!htbp]
 \caption{Two-stage camera calibration.}
 \label{alg:calib}
-\KwIn{Background photo with ChArUco board $I_{\mathrm{bg}}$;
-  reference frame $I_{0}$ at dam-release instant;
-  container dimensions $(W, H)$; image size $(W, H)$;
-  Phase-A box bounds
-  $\Delta_{\mathrm{rot}}^{\mathrm{box}}=2.5^{\circ}$,
-  $\Delta_{t}^{\mathrm{box}}=2$\,cm;
-  safety thresholds
-  $\Delta_{\mathrm{rot}}^{\mathrm{safe}}=3^{\circ}$,
-  $\Delta_{t}^{\mathrm{safe}}=3$\,cm;
-  Huber threshold $\delta=2$\,px.}
-\KwOut{Calibrated intrinsic $\mathbf{K}_{0}$ and extrinsic
-  $(R^{*}, \mathbf{t}^{*})$.}
+\KwIn{Background photo $I_{\mathrm{bg}}$ with ChArUco board;
+  reference frame $I_{0}$ at dam release; container $(W,H)$;
+  image size $(W,H)$; Phase-A box bounds $(2.5^{\circ},2\,\mathrm{cm})$;
+  safety thresholds $(3^{\circ},3\,\mathrm{cm})$;
+  Huber $\delta{=}2$\,px.}
+\KwOut{Calibrated $(\mathbf{K}_{0},R^{*},\mathbf{t}^{*})$.}
 \BlankLine
 
-\tcp{\bf Stage 1: ChArUco prior.}
+\tcp*[h]{Stage 1: ChArUco prior.}
 Detect ChArUco corners in $I_{\mathrm{bg}}$ with sub-pixel
-  refinement~\cite{garrido2014automatic,forstner1987fast}; let
-  $\mathcal{I}$ be the detected ids with pixel observations
-  $\{\mathbf{u}_{i}\}$\;
-\While{Nelder--Mead not converged}{
-  Propose candidate $\boldsymbol{\theta}_{\mathrm{cam}}$\;
-  $\{\hat{\mathbf{u}}_{i}\} \leftarrow
-   \textbf{Algorithm}~\ref{alg:reproj}(\boldsymbol{\theta}_{\mathrm{cam}};
-    \{\mathbf{P}_{i}\})$\;
-  $\mathcal{L}_{1} \leftarrow \tfrac{1}{|\mathcal{I}|}
-    \sum_{i}\rho_{\delta}(\|\mathbf{u}_{i}-\hat{\mathbf{u}}_{i}\|)$
-    \tcp*{Eqs.~\eqref{eq:stage1},\eqref{eq:huber}}
-  Update simplex towards smaller $\mathcal{L}_{1}$\;
-}
-Extract $(\mathbf{K}_{0}, R_{0}, \mathbf{t}_{0})$ from
-  $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$ via
-  Eqs.~\eqref{eq:eye}--\eqref{eq:scale}\;
+  refinement~\cite{garrido2014automatic,forstner1987fast}\;
+Run Nelder--Mead on $\boldsymbol{\theta}_{\mathrm{cam}}$ to minimise
+  Huber reprojection loss $\mathcal{L}_{1}$ (Eqs.~\eqref{eq:stage1},
+  \eqref{eq:huber}), using Algorithm~\ref{alg:reproj} for $\pi$\;
+Extract $(\mathbf{K}_{0},R_{0},\mathbf{t}_{0})$ from
+  $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$
+  (Eqs.~\eqref{eq:eye}--\eqref{eq:scale})\;
 
-\tcp{\bf Stage 2: silhouette-guided refinement (fix $\mathbf{K}_{0}$).}
-Canny-edge $I_{0}$ to obtain edge set $E$;
-  precompute EDT $D_{E}(\cdot)$ via Eq.~\eqref{eq:edt}\;
-Initialise $(\mathbf{r}, \mathbf{t}) \leftarrow (\mathbf{r}_{0}, \mathbf{t}_{0})$\;
-\emph{Phase A (L-BFGS-B, 6 DoF, smooth chamfer).}\;
-  $(\mathbf{r}_{A}, \mathbf{t}_{A}) \leftarrow
-   \arg\min_{(\mathbf{r},\mathbf{t})}
-   \mathcal{L}_{\mathrm{cham}}(R(\mathbf{r}), \mathbf{t})$
-   subject to
-   $\|\mathbf{r}-\mathbf{r}_{0}\|\le\Delta_{\mathrm{rot}}^{\mathrm{box}}$,
-   $\|\mathbf{t}-\mathbf{t}_{0}\|\le\Delta_{t}^{\mathrm{box}}$
-   \tcp*{Eq.~\eqref{eq:chamfer},~\cite{byrd1995limited,zhu1997algorithm}}
-\emph{Phase B (adaptive Nelder--Mead, non-smooth IoU).}\;
-  $(\mathbf{r}^{*}, \mathbf{t}^{*}) \leftarrow
-   \arg\max_{(\mathbf{r},\mathbf{t})}\mathrm{IoU}_{w}
-   (R(\mathbf{r}), \mathbf{t})$ starting at $(\mathbf{r}_{A}, \mathbf{t}_{A})$
-   with simplex radius $(0.15^{\circ},\,1.5\,\mathrm{mm})$
-   \tcp*{Eq.~\eqref{eq:iou}}
+\tcp*[h]{Stage 2: silhouette-guided refinement (fix $\mathbf{K}_{0}$).}
+Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
+  (Eq.~\eqref{eq:edt})\;
+\emph{Phase A:} L-BFGS-B on chamfer cost
+  $\mathcal{L}_{\mathrm{cham}}$ (Eq.~\eqref{eq:chamfer}) over
+  $(\mathbf{r},\mathbf{t})$, box-clamped to
+  $\pm\Delta_{\mathrm{rot}}^{\mathrm{box}}/\pm\Delta_{t}^{\mathrm{box}}$
+  around $(\mathbf{r}_{0},\mathbf{t}_{0})$~\cite{byrd1995limited,
+  zhu1997algorithm}\;
+\emph{Phase B:} adaptive Nelder--Mead on $-\mathrm{IoU}_{w}$
+  (Eq.~\eqref{eq:iou}) starting at the Phase-A solution; simplex
+  radius $(0.15^{\circ},1.5\,\mathrm{mm})$\;
 
-\tcp{\bf Safety clamp against local minima.}
-\If{$\|\mathbf{r}^{*}-\mathbf{r}_{0}\|>\Delta_{\mathrm{rot}}^{\mathrm{safe}}$
+\tcp*[h]{Safety clamp.}
+\If{$\|\mathbf{r}^{*}{-}\mathbf{r}_{0}\|{>}\Delta_{\mathrm{rot}}^{\mathrm{safe}}$
   \textnormal{or}
-  $\|\mathbf{t}^{*}-\mathbf{t}_{0}\|>\Delta_{t}^{\mathrm{safe}}$}{
-  $(\mathbf{r}^{*},\mathbf{t}^{*})\leftarrow(\mathbf{r}_{0},\mathbf{t}_{0})$
-    \tcp*{revert to Stage-$1$ extrinsic}
+  $\|\mathbf{t}^{*}{-}\mathbf{t}_{0}\|{>}\Delta_{t}^{\mathrm{safe}}$}{
+  Revert $(\mathbf{r}^{*},\mathbf{t}^{*}){\leftarrow}
+    (\mathbf{r}_{0},\mathbf{t}_{0})$\;
 }
 
-\Return{$\bigl(\mathbf{K}_{0},\,R(\mathbf{r}^{*}),\,\mathbf{t}^{*}\bigr)$.}
+\Return{$(\mathbf{K}_{0},R(\mathbf{r}^{*}),\mathbf{t}^{*})$.}
 \end{algorithm}
 
 
