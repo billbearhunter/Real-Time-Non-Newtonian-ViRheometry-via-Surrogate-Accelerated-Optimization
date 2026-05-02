@@ -764,7 +764,7 @@ top-1 routing.
 \paragraph{Three-Layer Deterministic Partition.}
 \label{sec:surr-3layer}
 
-\begin{figure}[t]
+\begin{figure*}[t]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder F-PARTITION: 2$\times$3 panel
@@ -793,7 +793,7 @@ top-1 routing.
     K-means --- plus per-cell sub statistics across all 25 geo
     cells.}
     \label{fig:partition}
-\end{figure}
+\end{figure*}
 
 The gate is a top-1 hard routing produced by the composition of three
 deterministic functions
@@ -2181,7 +2181,7 @@ All rows in Table~\ref{tab:ablation} use identical gate routing,
 identical experts, the same $10$-sample inverse set, and the frozen
 CMA-ES budget ($12\times 25 = 300$ surrogate calls).
 
-\begin{table}[!htbp]
+\begin{table*}[!htbp]
 \centering
 \small
 \caption{Ablation of inverse-side design choices; medians over
@@ -2200,7 +2200,7 @@ rBCM warm, no prior     & 0.109 & 0.201 & 0.459 & $\mathbf{9.5{\times}10^{-6}}$ 
 \textbf{Ours (rBCM warm $+$ prior)} & 0.160 & 0.202 & \textbf{0.298} & $1.4{\times}10^{-5}$ & 12.0 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 Three findings.
 
@@ -2416,7 +2416,7 @@ $\hat{\boldsymbol{\theta}}$ essentially at the measurement instant.
 We score both against the true $\boldsymbol{\theta}(t_k)$ in
 per-parameter log-relative error.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6.5cm]{Placeholder: two-panel tracking figure
@@ -2443,7 +2443,7 @@ per-parameter log-relative error.
     the lagging baseline versus near-constant low error for the
     surrogate estimator.}
     \label{fig:freshness}
-\end{figure}
+\end{figure*}
 
 Figure~\ref{fig:freshness} shows the tracking error over $20$
 consecutive measurements. The sim-in-loop baseline systematically
@@ -2548,7 +2548,7 @@ window.
     \label{fig:fresh-demos}
 \end{figure*}
 
-\begin{table}[!htbp]
+\begin{table*}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -2570,7 +2570,7 @@ Cooling chocolate & --- & --- & --- & --- & crystallisation     & N \\
 Lotion uncovered  & --- & --- & --- & --- & solvent evapor.\    & Y \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 
 \subsection{Characterising Rheometer-Infeasible Materials}
@@ -2588,7 +2588,7 @@ instead by \emph{sim--real replay}: we run MPM with the recovered
 $\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
 silhouette against the original phone video frame by frame.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
@@ -2610,7 +2610,7 @@ silhouette against the original phone video frame by frame.
     onto the original phone-video frame at the end of the dam-break,
     showing close agreement.}
     \label{fig:chunky}
-\end{figure}
+\end{figure*}
 
 Figure~\ref{fig:chunky} shows one representative material. Across
 the six samples, silhouette IoU between recovered-MPM replay and
@@ -2676,7 +2676,7 @@ overlay the recovered HB flow curve against the rheometer reference.
 Each material is captured at two to three $(W, H)$ setups per
 \S\ref{sec:multi} and inverted jointly.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[6cm]{Placeholder: recovered HB flow curve
@@ -2700,7 +2700,7 @@ Each material is captured at two to three $(W, H)$ setups per
     observation; the dashed extension beyond that range indicates
     extrapolation.}
     \label{fig:rheometer-overlay}
-\end{figure}
+\end{figure*}
 
 On materials in the identifiability-friendly regime (clearly
 shear-thinning or clearly yield-stress behaviour within the
