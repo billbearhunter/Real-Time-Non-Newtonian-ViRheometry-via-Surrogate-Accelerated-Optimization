@@ -360,10 +360,10 @@ response is therefore characterised by the three-parameter vector
     \boldsymbol{\theta} \;=\; (\sigma_Y,\,\eta,\,n) \in \Theta \subset
     \mathbb{R}^{3}.
 \end{equation}
-This parameter triple coincides with that of prior non-Newtonian video
-rheometry~\cite{hamamichi2023nonnewtonian}; our goal is not to
-propose a new constitutive model, but to recover $\boldsymbol{\theta}$
-from visual observations at a latency compatible with real-world use.
+This parameter triple is the same one used by prior non-Newtonian
+video rheometry~\cite{hamamichi2023nonnewtonian}; we treat the
+constitutive model as fixed and focus on recovering
+$\boldsymbol{\theta}$ at video-rate latency.
 
 
 \subsection{Dam-Break MPM Forward Model}
@@ -391,28 +391,24 @@ in cm. By construction $x_1 \le x_2 \le \dots \le x_8$, since the
 flow front cannot retract. We write the forward simulator as
 $\mathbf{y} = \mathcal{S}(\boldsymbol{\theta};\,W, H)$.
 
-\paragraph{Boundary, free-surface, and silhouette details.}
-Three implementation choices in the forward model bear mention.
-First, the solid walls of the dam-break container are treated with
-sticky boundaries: momentum on grid cells interior to the container
-geometry is zeroed on every step, and any particle that penetrates a
-wall box is flagged as \emph{interior} and excluded from the
-downstream silhouette so that wall-embedded fluid cannot produce
-spurious bright pixels in
-$\mathbf{y} = \mathcal{S}(\boldsymbol{\theta}; W, H)$. Second, the
-fluid surface is extracted by Laplacian-then-biharmonic smoothing of
-a rasterised signed-distance field, with per-cell $\varphi$ clamped at
-every smoothing step to the range
-$[\varphi_{\min}, \varphi_{\max}]$ admitted by the local particle-radius
-bounds; this automatic clamp replaces the manual per-frame $\varphi$
-adjustment used in earlier iterations of the pipeline and prevents
-smoothing-induced surface inflation without hand tuning. Third, the
-resulting zero-level set is meshed by marching cubes and rendered
-through the calibrated camera $(\mathbf{K}_{0}, R^{*}, \mathbf{t}^{*})$ of
-\S\ref{sec:calib} to a binary silhouette frame-compatible with
-$\mathbf{y}_{\mathrm{obs}}$, closing the loop between the MPM
-particles and the $8$-dimensional flow-distance vector that the
-inverse operates on.
+\paragraph{Implementation details.}
+Three details of the forward simulator deserve mention.
+\emph{(i)~Container walls} use sticky boundaries: momentum on
+interior grid cells is zeroed each step, and any particle that
+penetrates a wall is flagged as interior and excluded from the
+downstream silhouette so wall-embedded fluid cannot produce
+spurious bright pixels in $\mathcal{S}(\boldsymbol{\theta}; W, H)$.
+\emph{(ii)~The fluid surface} is extracted by Laplacian-then-biharmonic
+smoothing of a rasterised signed-distance field, with per-cell
+$\varphi$ clamped each smoothing step to the range
+$[\varphi_{\min},\,\varphi_{\max}]$ admitted by the local
+particle-radius bounds; this automatic clamp removes the per-frame
+$\varphi$ tuning used in earlier pipelines.
+\emph{(iii)~The rendered silhouette} is produced by marching-cubes
+meshing of the zero-level set followed by projection through the
+calibrated camera $(\mathbf{K}_{0}, R^{*}, \mathbf{t}^{*})$ of
+\S\ref{sec:calib}, closing the loop from MPM particles to the
+$8$-dimensional flow-distance vector $\mathbf{y}$.
 
 
 \subsection{Observation Pipeline}
@@ -486,25 +482,22 @@ governed by $(\eta, n)$ alone; formally
     \;\longrightarrow\; 0.
 \end{equation}
 If the observed dam-break regime lies largely above
-$\dot\gamma^{\star}$, the observation $\mathbf{y}_{\mathrm{obs}}$
-becomes effectively insensitive to $\sigma_Y$ while still constraining
-$(\eta, n)$, producing a continuum of nearly-equal-loss solutions
-that trade $\sigma_Y$ for a compensating increase in $\eta$.
-Hamamichi et al.~\cite{hamamichi2023nonnewtonian} identify this
-degeneracy by dimensional-similarity analysis and propose joint
-inversion over multiple $(W, H)$ setups as the mitigation; however,
-under their simulation-in-the-loop cost, multi-setup inversion is
-$N$ times more expensive than the already hours-long single-setup
-inverse.
+$\dot\gamma^{\star}$, $\mathbf{y}_{\mathrm{obs}}$ becomes effectively
+insensitive to $\sigma_Y$ while still constraining $(\eta, n)$, so a
+continuum of near-equal-loss solutions trade $\sigma_Y$ for a
+compensating increase in $\eta$. \citet{hamamichi2023nonnewtonian}
+identify this degeneracy through dimensional-similarity analysis
+and propose multi-setup joint inversion as a mitigation, paying
+the simulation-in-the-loop cost $N$ times for an $N$-setup
+estimate.
 
-Finally, in many practical scenarios the target material itself
-evolves during the measurement window (sedimentation, aging,
-temperature drift, mixing history, cooking cooldown), so that the
-true parameter state $\boldsymbol{\theta}_{t}$ drifts during the
-inverse. A delayed estimate may therefore no longer correspond to the
-current material condition, motivating estimation latency short
-enough to track the evolving state rather than merely reduce
-amortised compute cost.
+In addition, when the target material itself evolves during the
+measurement window---sedimentation, aging, temperature drift,
+mixing, cooking cooldown---the true parameter state
+$\boldsymbol{\theta}_{t}$ drifts during the inverse, and an
+hour-scale estimate no longer describes the current condition. We
+therefore want estimation latency short enough to \emph{track} the
+evolving state, not just to reduce amortised compute cost.
 
 \section{Method (Surrogate-Accelerated Inverse)}
 \label{sec:method-block}
