@@ -2950,7 +2950,7 @@ fieldable-capture, and multi-setup capabilities of
 rather than nominal.
 
 
-\section{Discussion}
+\section{Discussion and Conclusion}
 \label{sec:discussion}
 
 \subsection{What the Acceleration Unlocks}
@@ -3021,65 +3021,7 @@ surrogate is precisely what enables the seconds-scale per-video
 latency and the community-asset property of \S6.2.
 
 
-\section{Limitations and Future Work}
-\label{sec:limitations}
-
-\paragraph{Information-theoretic $\sigma_Y$ limit.}
-The identifiability-aware inverse of \S\ref{sec:inverse} resolves
-the yield-stress/consistency degeneracy whenever the dam-break
-observation carries \emph{some} signal about $\sigma_Y$, but it
-cannot recover information that is not in the observation. For
-materials in which $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ across the
-entire dam-break shear-rate range, the flow front encodes
-essentially no information about $\sigma_Y$, and any inverse---ours
-included---returns an estimate determined by the prior and the
-training distribution rather than by the data. Among the $10$
-held-out samples of Table~\ref{tab:main}, one such material
-($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa in a low-$\eta$ regime)
-pushes the $\sigma_Y$ \emph{mean} to $7.0$ while the nine remaining
-samples sit at median $0.298$. This is a task-level bound, not a
-method bound; the appropriate mitigation is the multi-setup protocol
-of \S\ref{sec:multi}.
-
-\paragraph{Dependence on training-set coverage.}
-The surrogate is trustworthy only inside the input box on which it
-was trained. Queries outside this box trigger the per-expert bound
-tightening (\S\ref{sec:inverse}), which relies on the routed
-expert's training inputs as the admissible region and therefore
-does not extrapolate. Out-of-distribution materials require an
-extension of the training corpus. rBCM predictive variance flags
-out-of-distribution queries but does not by itself correct them.
-
-\paragraph{Fidelity of the forward model.}
-A surrogate can only be as accurate as the simulator it learns from.
-Our MPM forward (\S3.2) models HB rheology, gravity, and no-slip
-boundaries, but not surface tension, elastic overshoot, thixotropy,
-or viscoelastic memory. Materials exhibiting these phenomena deviate
-systematically from the HB forward, and this deviation cannot be
-recovered by any HB inverse. Richer constitutive
-families---viscoelastic extensions and damage-MPM
-variants~\cite{wolper2019cdmpm}---are natural but out-of-scope
-directions.
-
-\paragraph{Capture and geometry requirements.}
-The level-$1$ gate is trained on rectangular cube-like containers
-with $W, H \in [2, 7]$\,cm. Curved or irregular containers require
-retraining the geometry gate on a broader container descriptor.
-Camera calibration uses a printed ChArUco marker board; markerless
-calibration from natural scene content is possible in principle but
-not demonstrated here.
-
-\paragraph{Real-time is a direction, not a destination.}
-Our median wall-clock is $12$\,s per video on a single consumer
-GPU---seconds-scale but not millisecond-scale. The ``real-time'' of
-our title should be read as \emph{fast enough to fit within a single
-user interaction} rather than strict continuous-time inversion.
-Reducing latency further through surrogate distillation, query-time
-adaptive $K_{\mathrm{geo}}$ selection, or amortised cross-material
-inverse is an open direction.
-
-
-\section{Conclusion}
+\subsection{Conclusion}
 
 We presented a surrogate-accelerated framework for non-Newtonian
 video rheometry that compresses the Herschel--Bulkley inverse from
@@ -3118,6 +3060,64 @@ is an accelerator of a physics-grounded inverse, not a substitute
 for physics; what this acceleration enables, at seconds per video,
 is what brings the technique within reach of time-sensitive,
 iterative, and situated measurement.
+
+
+\section{Limitations and Future Work}
+\label{sec:limitations}
+
+\subsection{Information-Theoretic $\sigma_Y$ Limit}
+The identifiability-aware inverse of \S\ref{sec:inverse} resolves
+the yield-stress/consistency degeneracy whenever the dam-break
+observation carries \emph{some} signal about $\sigma_Y$, but it
+cannot recover information that is not in the observation. For
+materials in which $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ across the
+entire dam-break shear-rate range, the flow front encodes
+essentially no information about $\sigma_Y$, and any inverse---ours
+included---returns an estimate determined by the prior and the
+training distribution rather than by the data. Among the $10$
+held-out samples of Table~\ref{tab:main}, one such material
+($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa in a low-$\eta$ regime)
+pushes the $\sigma_Y$ \emph{mean} to $7.0$ while the nine remaining
+samples sit at median $0.298$. This is a task-level bound, not a
+method bound; the appropriate mitigation is the multi-setup protocol
+of \S\ref{sec:multi}.
+
+\subsection{Dependence on Training-Set Coverage}
+The surrogate is trustworthy only inside the input box on which it
+was trained. Queries outside this box trigger the per-expert bound
+tightening (\S\ref{sec:inverse}), which relies on the routed
+expert's training inputs as the admissible region and therefore
+does not extrapolate. Out-of-distribution materials require an
+extension of the training corpus. rBCM predictive variance flags
+out-of-distribution queries but does not by itself correct them.
+
+\subsection{Fidelity of the Forward Model}
+A surrogate can only be as accurate as the simulator it learns from.
+Our MPM forward (\S3.2) models HB rheology, gravity, and no-slip
+boundaries, but not surface tension, elastic overshoot, thixotropy,
+or viscoelastic memory. Materials exhibiting these phenomena deviate
+systematically from the HB forward, and this deviation cannot be
+recovered by any HB inverse. Richer constitutive
+families---viscoelastic extensions and damage-MPM
+variants~\cite{wolper2019cdmpm}---are natural but out-of-scope
+directions.
+
+\subsection{Capture and Geometry Requirements}
+The level-$1$ gate is trained on rectangular cube-like containers
+with $W, H \in [2, 7]$\,cm. Curved or irregular containers require
+retraining the geometry gate on a broader container descriptor.
+Camera calibration uses a printed ChArUco marker board; markerless
+calibration from natural scene content is possible in principle but
+not demonstrated here.
+
+\subsection{Real-Time as a Direction}
+Our median wall-clock is $12$\,s per video on a single consumer
+GPU---seconds-scale but not millisecond-scale. The ``real-time'' of
+our title should be read as \emph{fast enough to fit within a single
+user interaction} rather than strict continuous-time inversion.
+Reducing latency further through surrogate distillation, query-time
+adaptive $K_{\mathrm{geo}}$ selection, or amortised cross-material
+inverse is an open direction.
 
 
 % --- Acknowledgements -------------------------------------------------
