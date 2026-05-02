@@ -652,9 +652,8 @@ Scale dependence
     (log + marginalised nuisance)
   & \S\ref{sec:inverse} \\
 (iii) Identifiability\,(joint only)
-  & add $\lambda_{\sigma_Y}\!\left(
-    \tfrac{\log\sigma_Y - \log\hat{\sigma}_Y^{\,\mathrm{anc}}}
-          {w_{\sigma_Y}}\right)^{\!2}$
+  & add $\lambda_\sigma
+    \bigl((\log\sigma_Y\!-\!\log\sigma_Y^{a})/w\bigr)^{2}$
   & \S\ref{sec:inverse} \\
 \bottomrule
 \end{tabular}
@@ -1253,12 +1252,13 @@ per-setup estimates $\hat{\sigma}_{Y}^{(s)}$. The joint anchor is
 their geometric mean and its log spread:
 \begin{equation}
 \label{eq:sy-anchor}
+\begin{aligned}
     \log\hat{\sigma}_{Y}^{\mathrm{anc}}
-    = \tfrac{1}{S}\sum_{s=1}^{S}\log\hat{\sigma}_{Y}^{(s)},
-    \qquad
+    &= \tfrac{1}{S}\sum_{s=1}^{S}\log\hat{\sigma}_{Y}^{(s)}, \\
     w_{\sigma_Y}
-    = \max\!\bigl(w_{\min},\,
+    &= \max\!\bigl(w_{\min},\,
         \tfrac{1}{2}\,\mathrm{disagree}_{s}\,\log\hat{\sigma}_{Y}^{(s)}\bigr),
+\end{aligned}
 \end{equation}
 where $\mathrm{disagree}_{s}$ is the per-setup absolute deviation
 from the geometric mean and $w_{\min} = 0.4$ floors the prior width
@@ -1371,15 +1371,17 @@ $\Theta_{\mathrm{joint}} = \Theta \cap
 combined objective
 \begin{equation}
 \label{eq:Pstar-full}
+\begin{aligned}
     \boldsymbol{\theta}^{\star}
     = \arg\min_{\mathbf{z}\in\Theta_{\mathrm{joint}}}\;
-    \tfrac{1}{S}\!\sum_{s=1}^{S}
+    & \tfrac{1}{S}\!\sum_{s=1}^{S}
         \mathcal{L}_{\mathrm{obs}}\bigl(
             \tilde{\mathcal{S}}(\boldsymbol{\theta}; W_{s}, H_{s}),
-            \mathbf{y}_{\mathrm{obs}}^{(s)}\bigr)
-    + p_{\mathrm{sup}}\!\cdot\!
+            \mathbf{y}_{\mathrm{obs}}^{(s)}\bigr) \\
+    & + p_{\mathrm{sup}}\,
         \overline{\mathcal{L}}_{\mathrm{box}}(\mathbf{z})
     + \mathcal{L}_{\sigma_Y}(\boldsymbol{\theta}),
+\end{aligned}
 \end{equation}
 where $\overline{\mathcal{L}}_{\mathrm{box}}$ averages the per-sub
 support penalties. Sharing $\boldsymbol{\theta}$ across setups while
@@ -2554,23 +2556,24 @@ window.
 
 \begin{table}[!htbp]
 \centering
-\small
+\footnotesize
+\setlength{\tabcolsep}{3pt}
 \caption{Per-material aging-window drift summary
 (\textsc{tab:fresh-drift}, \textbf{placeholder}: numbers populated
 from the time-series experiment).}
 \label{tab:fresh-drift}
-\begin{tabular}{@{}lcccccc@{}}
+\begin{tabular}{@{}lccccll@{}}
 \toprule
 Material & $\Delta n$ & $\Delta\!\log\eta$ & $\Delta\!\log\sigma_{Y}$
-         & peak rate & mechanism & rheometer covers? \\
+         & rate & mechanism & rheo.? \\
 \midrule
 Whipped cream     & --- & --- & --- & --- & air-bubble loss     & N \\
 Plaster slurry    & --- & --- & --- & --- & yield setting       & N \\
 Mayonnaise        & --- & --- & --- & --- & emulsion break      & Y/N \\
 Bread dough       & --- & --- & --- & --- & gluten network      & Y \\
-Stirred yogurt    & --- & --- & --- & --- & thixotropic recovery & N \\
+Stirred yogurt    & --- & --- & --- & --- & thixotropy           & N \\
 Cooling chocolate & --- & --- & --- & --- & crystallisation     & N \\
-Lotion uncovered  & --- & --- & --- & --- & solvent evaporation & Y \\
+Lotion uncovered  & --- & --- & --- & --- & solvent evapor.\    & Y \\
 \bottomrule
 \end{tabular}
 \end{table}
