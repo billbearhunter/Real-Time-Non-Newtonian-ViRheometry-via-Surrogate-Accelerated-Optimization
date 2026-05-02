@@ -578,7 +578,7 @@ soft prior centred on that anchor.
 \end{figure*}
 
 
-\paragraph{Formal statement.}\label{sec:problem}
+\paragraph{Formal statement.}\label{sec:problem-formal}
 We frame the entire paper around a single inverse problem and its
 two successively more tractable forms. The canonical
 simulation-in-the-loop inverse
@@ -623,12 +623,13 @@ sub's training-input box.
 
 \begin{table}[!htbp]
 \centering
-\small
+\footnotesize
+\setlength{\tabcolsep}{4pt}
 \caption{The three substitutions that transform the canonical inverse
 (\ref{eq:P}) into the tractable single-setup form~(\ref{eq:Pprime}),
 plus the multi-setup augmentation~(\ref{eq:Pstar}).}
 \label{tab:subs}
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}p{0.30\linewidth}p{0.46\linewidth}p{0.16\linewidth}@{}}
 \toprule
 Difficulty & Substitution & Section \\
 \midrule
@@ -704,10 +705,10 @@ The remainder of this section describes the machinery needed to
 solve (\ref{eq:Pprime}) and (\ref{eq:Pstar}) at seconds-per-video
 latency: the input and output representation (\S\ref{sec:repr}), the
 hierarchical mixture-of-GP surrogate (\S\ref{sec:surrogate}), the
-identifiability-aware inverse (\S\ref{sec:inverse}), the algorithm
-pseudocode (\S\ref{sec:algs}), and the training data and frozen
-configuration that produces a single reusable checkpoint
-(\S\ref{sec:data}).
+identifiability-aware inverse (\S\ref{sec:inverse}; the algorithm
+pseudocode for both the surrogate and the inverse is embedded
+inline), and the training data and frozen configuration that
+produces a single reusable checkpoint (\S\ref{sec:data}).
 
 
 \subsection{Input and Output Representation}
@@ -1235,9 +1236,9 @@ from extrapolating into regions where the sub has no training mass.
     \label{fig:ridge}
 \end{figure}
 
-The data-honest log-$\sigma_Y$ prior of our earlier surrogate
-\cite{ours-prelim} anchored on a single nearest-neighbour training
-sample. We replace it with a multi-setup anchor that uses
+The data-honest log-$\sigma_Y$ prior of our earlier
+single-setup pipeline anchored on a single nearest-neighbour
+training sample. We replace it with a multi-setup anchor that uses
 \emph{the inverse on each setup} as evidence. Stage-1 runs the
 single-setup inverse independently on each available
 $\bigl(W_{s}, H_{s}, \mathbf{y}_{\mathrm{obs}}^{(s)}\bigr)$ to obtain
