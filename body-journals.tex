@@ -1575,64 +1575,148 @@ Table~\ref{tab:hyper} and a fixed seed.
 
 We first verify that the trained surrogate predicts MPM outputs
 accurately enough to justify replacing the simulator inside the
-inverse. On $T_{\mathrm{sim}}$, the full HVIMoGP-rBCM surrogate
-attains aggregate MAE $0.042$\,cm and $R^2 > 0.999$ across all
-eight flow-front dimensions. Errors concentrate near partition
-boundaries of the hierarchical gate---where a slightly mis-routed
-query lands between specialised experts---and in sparsely sampled
-regions of the input box. The degree-$2$ polynomial residual
-correction (Eq.~the legacy polynomial-residual step) is specifically designed to suppress
-the former, reducing the $p_{999}$ row-max error by roughly a factor
-of two.
+inverse. The canonical test split ($T_{\mathrm{sim}}$,
+$42{,}583$ rows) is a strict held-out 10\,\% slice of the
+training corpus, with each row carrying its assignment to a unique
+sub-expert (the assignment used at training time, not seen by that
+sub during fitting). For each test row we forward the assigned
+sub's exact GP at the row's true
+$\boldsymbol{\theta}=(n,\eta,\sigma_Y)$ and setup geometry $(W,H)$,
+and compare the prediction $\hat{\mathbf{y}}$ to the MPM ground
+truth $\mathbf{y}$. The full $42{,}583$-row evaluation visits all
+$25$ geometry sub-banks and all $1{,}396$ sub-experts.
+
+\paragraph{Aggregate fidelity.}
+Across all eight flow-front dimensions and all 1396 sub-experts,
+the surrogate attains aggregate MAE
+$\mathrm{MAE}=0.038$\,cm and $R^2 = 0.9989$. The median row-max
+absolute error is $0.029$\,cm, the $p_{95}$ row-max is $0.26$\,cm,
+the $p_{99}$ row-max is $0.58$\,cm, and the $p_{99.9}$ row-max is
+$1.92$\,cm. The per-dim MAE rises mildly from $0.005$\,cm at the
+first frame to $0.064$\,cm at the eighth (Tab.~\ref{tab:fidelity}),
+reflecting the larger dynamic range of later flow-front distances;
+the per-dim $R^2$ stays above $0.996$ across all eight frames, with
+the small drop at $d=8$ ($R^2 = 0.9967$) tracking a thin extrapolation
+tail in a handful of subs (the absolute worst row sits at $29$\,cm
+displacement in $\hat y_8$, single-figure occurrence over $42{,}583$
+rows). Such tail rows do not arise inside the inverse loop: the
+GP-aware likelihood (\S\ref{sec:inv-loss}) down-weights any
+residual that exceeds the GP variance, and the top-$k$ rerank
+(\S\ref{sec:surr-top1}) routes such queries away from boundary
+subs.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
+($N=42{,}583$ held-out MPM rows, all $1{,}396$ sub-experts visited).
+Per-dim numbers are computed on the residual $\hat y_d - y_d$ across
+all rows.}
+\label{tab:fidelity}
+\begin{tabular}{@{}lccccccccc@{}}
+\toprule
+Frame $d$        & $1$ & $2$ & $3$ & $4$ & $5$ & $6$ & $7$ & $8$ & overall \\
+\midrule
+MAE (cm)         & 0.005 & 0.014 & 0.026 & 0.038 & 0.047 & 0.053 & 0.057 & 0.064 & 0.038 \\
+$R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 & 0.9967 & 0.9989 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Per-sub regression quality.}
+Across the $1{,}396$ sub-experts, the median per-sub $R^2$ is
+$0.998$ (Fig.~\ref{fig:expert-r2}). The lower $5\,\%$ tail of subs
+sits at $R^2 = 0.968$; these are subs near the partition boundaries
+or with the smallest training-set sizes (the smallest sub holds
+$63$ MPM samples), but even on those subs the held-out per-sub MAE
+stays under $0.5$\,cm. The upper $95\,\%$ tail of subs reaches the
+floating-point ceiling at $R^2 \approx 1.000$; these are well-supported
+subs in the dense interior of the parameter box. The single worst
+sub-expert has $R^2 = 0.836$ on $20$ test rows
+(out of $168$ training rows), driven by a single extrapolation
+spike on the last frame; no other sub falls below $R^2 = 0.87$.
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder: parity plot of surrogate
-      prediction $\hat{\mathbf{y}}$ versus MPM ground truth
-      $\mathbf{y}$ across $22{,}209$ held-out $T_{\mathrm{sim}}$
-      samples, coloured by routed expert id. To be regenerated with
-      the frozen surrogate checkpoint.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
-    \fi
-    \caption{Surrogate parity plot on $T_{\mathrm{sim}}$. Each point
-    is one of $22{,}209$ held-out MPM samples; colour encodes the
-    routed expert. $R^2 > 0.999$ across all eight output dimensions.}
-    \Description{Scatter plot of surrogate-predicted flow-front
-    displacement versus MPM ground truth across 22,209 held-out
-    samples, tightly following the $y=x$ identity line over three
-    orders of magnitude, with points colour-coded by routed expert.}
+    \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
+    \caption{Surrogate parity on $N=42{,}583$ held-out MPM rows,
+    one panel per flow-front frame $d=1\!\dots\!8$. Each row is
+    forwarded by its training-time sub-expert assignment (oracle
+    routing); points are an $8{,}000$-row random subsample. Per-frame
+    $R^2$ and MAE are computed over all $42{,}583$ rows. The point
+    cloud sits within line-width of the identity across three orders
+    of magnitude in flow-front distance.}
+    \Description{Eight scatter plots of surrogate-predicted flow-front
+    displacement versus MPM ground truth across 42583 held-out
+    samples; the cloud follows the identity line within line width
+    across the full range for each of the eight flow-front frames.}
     \label{fig:parity}
 \end{figure}
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder: per-expert $R^{2}$
-      distribution across $540$ GP cells, grouped by geometry
-      cluster $g = 1, \ldots, 12$ (violin or boxplot). Horizontal
-      line at median $R^{2} = 0.9995$ and marker at $p_{5}$ tail.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
-    \fi
-    \caption{Per-expert $R^2$ distribution across the $540$ cells.
-    Median $R^2 = 0.9995$; the lower tail corresponds to experts on
-    cluster boundaries and sparse regions of the box, which the
-    polynomial correction is designed to reinforce.}
+    \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
+    \caption{Per-sub-expert $R^2$ distribution across all $1{,}396$
+    sub-experts, grouped by the $25$ geometry sub-banks. Median
+    $R^2 = 0.998$ (red dashed line), $p_5 = 0.968$ (grey dotted line),
+    upper-tail subs reach $R^2 \approx 1.000$. The single outlier near
+    $R^2 = 0.84$ is one sub in $g=8$ whose extrapolation tail trips
+    one row on frame~$8$; no other sub drops below $R^2 = 0.87$.}
     \Description{Box plot of coefficient-of-determination R-squared
-    values across 540 trained Gaussian-process experts, showing a
-    median near 0.9995 and a lower tail above 0.99, with the weakest
-    experts concentrated on partition boundaries.}
+    values across all 1396 sub-experts grouped by 25 geometry
+    sub-banks; the distribution is tight, centered above 0.99, with
+    a single isolated outlier at 0.84.}
     \label{fig:expert-r2}
 \end{figure}
 
-Figure~\ref{fig:parity} shows the surrogate parity plot;
-Figure~\ref{fig:expert-r2} shows the per-expert $R^2$ distribution.
-Across $540$ experts the median $R^2$ is $0.9995$, and the lowest
-$5\%$ tail sits above $0.993$. The calibration of the rBCM predictive
-variance against empirical squared error is reported in the
-supplementary material.
+\paragraph{Posterior-uncertainty calibration.}
+Because the inverse loop weights residuals by $\sigma_{\mathrm{pred}}$
+(\S\ref{sec:inv-loss}, the GP-aware likelihood), we also check
+that the per-row predictive variance is meaningful. Binning the
+$42{,}583\times 8$ residuals by predicted $\sigma_{\mathrm{pred}}$
+and comparing the empirical RMSE in each bin against the bin's mean
+$\sigma_{\mathrm{pred}}$ (Fig.~\ref{fig:sigma-cal}, left) shows that
+empirical RMSE rises monotonically with $\sigma_{\mathrm{pred}}$ but
+sits a factor of $\sim 2$ \emph{below} the diagonal. The
+distribution of standardised residuals
+$z = (\hat y - y)/\sigma_{\mathrm{pred}}$ has empirical standard
+deviation $0.50$ (Fig.~\ref{fig:sigma-cal}, right), confirming that
+the GP posterior is conservative by roughly a factor of two on the
+held-out set. We deliberately keep this conservative scale rather
+than rescaling: in production the residual to be explained is the
+real-vs-MPM gap, not the MPM-vs-GP gap measured here, so an
+inflated $\sigma$ at the surrogate level acts as the correct
+``unknown unknowns'' budget when the likelihood is evaluated against
+real-camera observations.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/sigma_calibration.png}
+    \caption{GP posterior-variance calibration on $T_{\mathrm{sim}}$.
+    \emph{Left:} bin-mean predicted $\sigma_{\mathrm{pred}}$ vs.\
+    bin empirical RMSE; the curve is monotone but lies below the
+    identity, indicating that the GP posterior over-estimates noise
+    by a factor of $\sim\!2$ relative to held-out residuals.
+    \emph{Right:} histogram of standardised residuals
+    $z = (\hat y - y)/\sigma_{\mathrm{pred}}$ versus
+    $\mathcal{N}(0,1)$ (black). Empirical $\mathrm{std}(z) = 0.50$,
+    consistent with the calibration plot.}
+    \Description{Two-panel figure showing GP posterior variance
+    calibration: scatter of predicted vs empirical noise lying below
+    the identity, and histogram of standardised residuals narrower
+    than a unit normal.}
+    \label{fig:sigma-cal}
+\end{figure}
+
+Tab.~\ref{tab:fidelity} therefore establishes that the routed
+sub-expert reproduces MPM forward outputs to well within the
+flow-front extraction noise of the captured data
+(\S\ref{sec:obs-pipeline}), and Fig.~\ref{fig:sigma-cal} shows
+that the GP's predictive $\sigma$ supplies a meaningful, slightly
+conservative noise budget for the inverse likelihood. Together
+these justify substituting MPM by the surrogate inside the
+inverse loop.
 
 
 \subsection{Synthetic Validation at Scale}
