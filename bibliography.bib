@@ -552,17 +552,6 @@
   doi     = {10.1145/3197517.3201293}
 }
 
-@article{gao2018gpu,
-  title   = {{GPU} Optimization of Material Point Methods},
-  author  = {Gao, Ming and Wang, Xinlei and Wu, Kui and Pradhana, Andre and Sifakis, Eftychios and Yuksel, Cem and Jiang, Chenfanfu},
-  journal = {ACM Transactions on Graphics (TOG)},
-  volume  = {37},
-  number  = {6},
-  pages   = {254:1--254:12},
-  year    = {2018},
-  doi     = {10.1145/3272127.3275044}
-}
-
 @inproceedings{jiang2015affine,
   title     = {The Affine Particle-in-Cell Method},
   author    = {Jiang, Chenfanfu and Schroeder, Craig and Selle, Andrew and Teran, Joseph and Stomakhin, Alexey},
@@ -732,24 +721,6 @@
   year         = {2024},
   note         = {MIT DSpace 1721.1/157204; also APS DFD 2024}
 }
-
-@article{cheng2025structural,
-  title   = {Structural Identification of Material Properties and Load Parameters Using a Differentiable Material Point Method},
-  author  = {Cheng, Wei and others},
-  journal = {Computer-Aided Civil and Infrastructure Engineering},
-  year    = {2025},
-  doi     = {10.1111/mice.70042}
-}
-
-@inproceedings{liang2019differentiable,
-  title     = {Differentiable Cloth Simulation for Inverse Problems},
-  author    = {Liang, Junbang and Lin, Ming C. and Koltun, Vladlen},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  volume    = {32},
-  pages     = {771--780},
-  year      = {2019}
-}
-
 
 %% ----------------------------------------------------------------------
 %% §E.    Visual / video-based rheometry (task, not method)
@@ -1012,18 +983,7 @@
   isbn      = {9780133356724}
 }
 
-%% -- §H.8 Optional feature-based extrinsic prior (SIFT + PnP) --
-
-@article{lowe2004distinctive,
-  title   = {Distinctive Image Features from Scale-Invariant Keypoints},
-  author  = {Lowe, David G.},
-  journal = {International Journal of Computer Vision},
-  volume  = {60},
-  number  = {2},
-  pages   = {91--110},
-  year    = {2004},
-  doi     = {10.1023/B:VISI.0000029664.99615.94}
-}
+%% -- §H.8 Optional feature-based extrinsic prior (PnP) --
 
 @article{lepetit2009epnp,
   title   = {{EPnP}: An Accurate {O}({$n$}) Solution to the {PnP} Problem},
@@ -1169,4 +1129,117 @@
   pages   = {013115},
   year    = {2024},
   doi     = {10.1063/5.0179211}
+}
+%% ----------------------------------------------------------------------
+%% §F  Time-resolved rheology / freshness panel
+%% ----------------------------------------------------------------------
+
+@article{avrami1939kinetics,
+  title   = {Kinetics of Phase Change. I. {G}eneral Theory},
+  author  = {Avrami, Melvin},
+  journal = {The Journal of Chemical Physics},
+  volume  = {7},
+  number  = {12},
+  pages   = {1103--1112},
+  year    = {1939},
+  doi     = {10.1063/1.1750380}
+}
+
+@article{mewis2009thixotropy,
+  title   = {Thixotropy},
+  author  = {Mewis, Jan and Wagner, Norman J.},
+  journal = {Advances in Colloid and Interface Science},
+  volume  = {147--148},
+  pages   = {214--227},
+  year    = {2009},
+  doi     = {10.1016/j.cis.2008.09.005}
+}
+
+@book{bates1988nonlinear,
+  title     = {Nonlinear Regression Analysis and Its Applications},
+  author    = {Bates, Douglas M. and Watts, Donald G.},
+  publisher = {Wiley},
+  year      = {1988}
+}
+
+@article{miles1985gelation,
+  title   = {The Roles of Amylose and Amylopectin in the Gelation and Retrogradation of Starch},
+  author  = {Miles, Michael J. and Morris, Victor J. and Ring, Stephen G.},
+  journal = {Carbohydrate Research},
+  volume  = {135},
+  number  = {2},
+  pages   = {257--269},
+  year    = {1985},
+  doi     = {10.1016/S0008-6215(00)90778-X}
+}
+
+@article{karim2000methods,
+  title   = {Methods for the Study of Starch Retrogradation},
+  author  = {Karim, A. Abd and Norziah, M. H. and Seow, C. C.},
+  journal = {Food Chemistry},
+  volume  = {71},
+  number  = {1},
+  pages   = {9--36},
+  year    = {2000},
+  doi     = {10.1016/S0308-8146(00)00130-8}
+}
+
+@article{hoover2001composition,
+  title   = {Composition, Molecular Structure, and Physicochemical Properties of Tuber and Root Starches: a Review},
+  author  = {Hoover, R.},
+  journal = {Carbohydrate Polymers},
+  volume  = {45},
+  number  = {3},
+  pages   = {253--267},
+  year    = {2001},
+  doi     = {10.1016/S0144-8617(00)00260-5}
+}
+
+@book{larson1999structure,
+  title     = {The Structure and Rheology of Complex Fluids},
+  author    = {Larson, Ronald G.},
+  publisher = {Oxford University Press},
+  year      = {1999}
+}
+
+@book{macosko1994rheology,
+  title     = {Rheology: Principles, Measurements, and Applications},
+  author    = {Macosko, Christopher W.},
+  publisher = {Wiley-VCH},
+  year      = {1994}
+}
+
+@book{roache1998verification,
+  title     = {Verification and Validation in Computational Science and Engineering},
+  author    = {Roache, Patrick J.},
+  publisher = {Hermosa},
+  year      = {1998}
+}
+
+@book{box1987empirical,
+  title     = {Empirical Model-Building and Response Surfaces},
+  author    = {Box, George E. P. and Draper, Norman R.},
+  publisher = {Wiley},
+  year      = {1987}
+}
+
+@book{roos1995phase,
+  title     = {Phase Transitions in Foods},
+  author    = {Roos, Yrjö H.},
+  publisher = {Academic Press},
+  year      = {1995}
+}
+
+@book{murphy2012machine,
+  title     = {Machine Learning: A Probabilistic Perspective},
+  author    = {Murphy, Kevin P.},
+  publisher = {MIT Press},
+  year      = {2012}
+}
+
+@book{mackay2003information,
+  title     = {Information Theory, Inference, and Learning Algorithms},
+  author    = {MacKay, David J. C.},
+  publisher = {Cambridge University Press},
+  year      = {2003}
 }
