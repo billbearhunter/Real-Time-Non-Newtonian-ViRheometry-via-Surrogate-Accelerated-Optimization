@@ -1625,10 +1625,10 @@ sub's exact GP at the row's true
 $\boldsymbol{\theta}=(n,\eta,\sigma_Y)$ and setup geometry $(W,H)$,
 and compare the prediction $\hat{\mathbf{y}}$ to the MPM ground
 truth $\mathbf{y}$. The full $42{,}583$-row evaluation visits all
-$25$ geometry sub-banks and all $1{,}396$ sub-experts.
+$25$ geometry sub-banks and all $1{,}491$ sub-experts.
 
 \paragraph{Aggregate fidelity.}
-Across all eight flow-front dimensions and all 1396 sub-experts,
+Across all eight flow-front dimensions and all $1{,}491$ sub-experts,
 the surrogate attains aggregate MAE
 $\mathrm{MAE}=0.038$\,cm and $R^2 = 0.9989$. The median row-max
 absolute error is $0.029$\,cm, the $p_{95}$ row-max is $0.26$\,cm,
@@ -1651,7 +1651,7 @@ subs.
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
-($N=42{,}583$ held-out MPM rows, all $1{,}396$ sub-experts visited).
+($N=42{,}583$ held-out MPM rows, all $1{,}491$ sub-experts visited).
 Per-dim numbers are computed on the residual $\hat y_d - y_d$ across
 all rows.}
 \label{tab:fidelity}
@@ -1666,17 +1666,21 @@ $R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 
 \end{table}
 
 \paragraph{Per-sub regression quality.}
-Across the $1{,}396$ sub-experts, the median per-sub $R^2$ is
+Among the $1{,}484$ sub-experts that received at least five held-out
+MPM rows, the median per-sub $R^2$ is
 $0.998$ (Fig.~\ref{fig:expert-r2}). The lower $5\,\%$ tail of subs
-sits at $R^2 = 0.968$; these are subs near the partition boundaries
+sits at $R^2 = 0.965$; these are subs near the partition boundaries
 or with the smallest training-set sizes (the smallest sub holds
 $63$ MPM samples), but even on those subs the held-out per-sub MAE
 stays under $0.5$\,cm. The upper $95\,\%$ tail of subs reaches the
 floating-point ceiling at $R^2 \approx 1.000$; these are well-supported
 subs in the dense interior of the parameter box. The single worst
-sub-expert has $R^2 = 0.836$ on $20$ test rows
-(out of $168$ training rows), driven by a single extrapolation
-spike on the last frame; no other sub falls below $R^2 = 0.87$.
+sub-expert has $R^2 = 0.705$ on $25$ test rows; this and the next
+handful of low-$R^2$ subs are recently infilled local cells whose
+training set has not yet been densified to the same level as the
+production interior, and which the inverse-time top-$1$ rerank
+(\S\ref{sec:surr-top1}) avoids except for explicitly near-boundary
+queries.
 
 \begin{figure}[!htbp]
     \centering
@@ -1698,16 +1702,19 @@ spike on the last frame; no other sub falls below $R^2 = 0.87$.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
-    \caption{Per-sub-expert $R^2$ distribution across all $1{,}396$
-    sub-experts, grouped by the $25$ geometry sub-banks. Median
-    $R^2 = 0.998$ (red dashed line), $p_5 = 0.968$ (grey dotted line),
-    upper-tail subs reach $R^2 \approx 1.000$. The single outlier near
-    $R^2 = 0.84$ is one sub in $g=8$ whose extrapolation tail trips
-    one row on frame~$8$; no other sub drops below $R^2 = 0.87$.}
+    \caption{Per-sub-expert $R^2$ distribution across the $1{,}484$
+    sub-experts with $\ge 5$ held-out test rows, grouped by the $25$
+    geometry sub-banks. Median $R^2 = 0.998$ (red dashed line),
+    $p_5 = 0.965$ (grey dotted line), upper-tail subs reach
+    $R^2 \approx 1.000$. The lowest outliers come from recently
+    infilled cells in $g\in\{1,2,5\}$ whose training set has not yet
+    been densified to the same level as the production interior; the
+    inverse-time top-$1$ rerank avoids these except for explicitly
+    near-boundary queries.}
     \Description{Box plot of coefficient-of-determination R-squared
-    values across all 1396 sub-experts grouped by 25 geometry
-    sub-banks; the distribution is tight, centered above 0.99, with
-    a single isolated outlier at 0.84.}
+    values across 1484 sub-experts grouped by 25 geometry sub-banks;
+    the distribution is tight, centered above 0.99, with a small
+    number of outliers in recently-infilled cells.}
     \label{fig:expert-r2}
 \end{figure}
 
@@ -1722,7 +1729,7 @@ empirical RMSE rises monotonically with $\sigma_{\mathrm{pred}}$ but
 sits a factor of $\sim 2$ \emph{below} the diagonal. The
 distribution of standardised residuals
 $z = (\hat y - y)/\sigma_{\mathrm{pred}}$ has empirical standard
-deviation $0.50$ (Fig.~\ref{fig:sigma-cal}, right), confirming that
+deviation $0.52$ (Fig.~\ref{fig:sigma-cal}, right), confirming that
 the GP posterior is conservative by roughly a factor of two on the
 held-out set. We deliberately keep this conservative scale rather
 than rescaling: in production the residual to be explained is the
@@ -1741,7 +1748,7 @@ real-camera observations.
     by a factor of $\sim\!2$ relative to held-out residuals.
     \emph{Right:} histogram of standardised residuals
     $z = (\hat y - y)/\sigma_{\mathrm{pred}}$ versus
-    $\mathcal{N}(0,1)$ (black). Empirical $\mathrm{std}(z) = 0.50$,
+    $\mathcal{N}(0,1)$ (black). Empirical $\mathrm{std}(z) = 0.52$,
     consistent with the calibration plot.}
     \Description{Two-panel figure showing GP posterior variance
     calibration: scatter of predicted vs empirical noise lying below
@@ -1833,40 +1840,48 @@ sampling~\cite{mckay1979comparison} from the parameter box, with
 five random initial setups per material as in the predecessor's
 protocol.
 
-\paragraph{Setup-count ablation: $1\to 2\to 3$.}
-For each of the $N$ cases we run, in sequence, a single-setup
-inverse, a joint two-setup inverse with the second geometry obtained
-from the Hessian-orthogonal proposer of \S\ref{sec:proposer}, and a
-joint three-setup inverse where the third geometry is the same
-proposer applied to the joint two-setup posterior. The recovered
+\paragraph{Setup-count ablation: $1\to 2$.}
+For each of the $N=300$ cases we run, in sequence, a single-setup
+inverse and a joint two-setup inverse whose second geometry is
+selected by the Hessian-orthogonal proposer of \S\ref{sec:proposer}
+applied to the single-setup posterior. The recovered
 $\hat{\boldsymbol{\theta}}$ at each setup count is scored against
 ground truth by Eq.~\eqref{eq:erel}. Table~\ref{tab:setup-ablation}
 reports the share of cases reaching the $E_{\mathrm{rel}}\le 0.1$
 threshold and the median per-parameter relative error;
 Fig.~\ref{fig:erel-curve} shows the full distribution of
-$E_{\mathrm{rel}}$ across the panel.
+$E_{\mathrm{rel}}$ across the panel. The single-setup row already
+matches the predecessor's $11/30$ ($37\%$) pass
+rate~\cite{hamamichi2023nonnewtonian}, while running roughly
+$10^4\times$ faster per case (s versus h).
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Synthetic recovery on $N=300$ cases at one, two, and three
-setups. ``$\le 0.1$'' is the share reaching
+\caption{Synthetic recovery on the same $N=300$ panel at one and two
+setups, sim\_precision routing.  ``$\le 0.1$'' is the share reaching
 $E_{\mathrm{rel}}\le 0.1$ in the sense of~\eqref{eq:erel}. The three
 $\mathrm{relE}$ columns are per-parameter medians, defined as
-$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$. The per-case
-wall-clock is the median over the panel on a single consumer GPU,
-versus the per-case predecessor estimate from
-\citet{hamamichi2023nonnewtonian}.}
+$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.  Six of the $300$
+cases ($2\%$) failed in the proposer (no admissible $(W_2,H_2)$ at
+the single-setup posterior) and are excluded.  Wall-clock is the
+median per case on a single consumer GPU, including the headless
+MPM forward at $(W_2^{\!\star},H_2^{\!\star},\boldsymbol{\theta}^{\!\star})$
+needed to synthesize $\mathbf{y}_{\mathrm{obs}}^{(2)}$ for the
+$2$-setup row.  Predecessor wall-clocks are sim-in-loop
+estimates~\cite{hamamichi2023nonnewtonian}.
+$^{\dagger}$The joint two-setup row uses the same
+\texttt{sim\_precision} routing for both setups; we discuss the
+non-trivial behaviour of joint recovery in this regime below.}
 \label{tab:setup-ablation}
 \begin{tabular}{@{}cccccrr@{}}
 \toprule
 Setups & $\le 0.1$ & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ &
 $\mathrm{relE}\,\sigma_Y$ & Wall-clock & Sim-in-loop \\
 \midrule
-$1$ & --- & --- & --- & --- & $\sim\!12$\,s & $\sim\!8$\,h \\
-$2$ & --- & --- & --- & --- & $\sim\!24$\,s & $\sim\!16$\,h \\
-$3$ & --- & --- & --- & --- & $\sim\!36$\,s & $\sim\!24$\,h \\
+$1$ & $112/294$ ($38.1\%$) & $0.113$ & $0.150$ & $0.152$ & $\sim\!3$\,s & $\sim\!8$\,h \\
+$2$\textsuperscript{$\dagger$} & $66/294$ ($22.4\%$) & $0.170$ & $0.241$ & $0.239$ & $\sim\!13$\,s & $\sim\!16$\,h \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1884,18 +1899,77 @@ $3$ & --- & --- & --- & --- & $\sim\!36$\,s & $\sim\!24$\,h \\
       \includegraphics[width=\columnwidth]{figs/results/erel_cdf.pdf}
     \fi
     \caption{Cumulative distribution of relative error
-    $E_{\mathrm{rel}}$ across the $N=300$ synthetic panel for one,
-    two, and three setups. The dashed vertical line at $E_{\mathrm{rel}}=0.1$
+    $E_{\mathrm{rel}}$ across the $N=294$ successful cases of the
+    synthetic panel for one and two setups (\texttt{sim\_precision}
+    routing).  The dashed vertical line at $E_{\mathrm{rel}}=0.1$
     marks the success threshold of~\citet{hamamichi2023nonnewtonian}.
-    The fraction of the panel passing this threshold rises with
-    setup count, while the per-case wall-clock remains under one
-    minute.}
+    The single-setup curve crosses the threshold at $38\%$, matching
+    the predecessor's $11/30=37\%$ at roughly $10^{4}\times$ smaller
+    per-case wall-clock; the joint two-setup curve under
+    \texttt{sim\_precision} routing sits to the right of the
+    single-setup curve, an effect we attribute to a routing/loss
+    coupling discussed in the text.}
     \Description{Cumulative distribution function of recovery
-    relative error on the synthetic panel. Adding a second and third
-    setup shifts the curves left, indicating systematically smaller
-    relative error.}
+    relative error on the synthetic panel for one and two setups.
+    The single-setup curve crosses the success threshold at the
+    predecessor's pass rate.}
     \label{fig:erel-curve}
 \end{figure}
+
+\paragraph{Single-setup parity with the simulation-in-the-loop
+predecessor.}  The single-setup row of
+Tab.~\ref{tab:setup-ablation} matches the predecessor's
+$11/30 = 37\%$ pass rate ($112/294 = 38\%$ here) while running at
+$\sim\!3$\,s per case versus $\sim\!8$\,h sim-in-loop -- a
+$10^{4}\times$ throughput gain on the same accuracy bar. The
+median per-parameter relative errors $(11\%, 15\%, 15\%)$ for
+$(n,\eta,\sigma_Y)$ are individually small; the cases that fail the
+$E_{\mathrm{rel}}\le 0.1$ threshold do so because all three errors
+sum simultaneously.
+
+\paragraph{Tail diagnosis of the single-setup panel.}
+We classify the $187/300$ single-setup failures by replaying the
+\texttt{sim\_precision} routing on each failed row and checking
+whether the true $\boldsymbol{\theta}^{\!\star}$ lies inside the
+routed sub's training bounding box.  Only $3/187$ failures are
+routing-out-of-bounds (all in $\sigma_Y$, on rows whose true
+$\sigma_Y$ falls below the smallest training cell);
+the remaining $184/187$ have $\boldsymbol{\theta}^{\!\star}$ inside
+the routed sub's box, meaning the GP forward could in principle
+reproduce the observed flow front, but the inverse converged to a
+different point on the $(\eta,\sigma_Y)$ identifiability ridge.
+This confirms the single-geometry identifiability problem
+identified in \S\ref{sec:inv-sy} and motivates either (a) a second
+setup with sufficiently different proposer-suggested geometry, or
+(b) the rheometer-anchored joint inverse used in
+\S\ref{sec:rheometer}.
+
+\paragraph{Joint two-setup under simulator-matched routing.}
+Adding a Hessian-orthogonal second setup with
+\texttt{sim\_precision} routing on both legs does not improve the
+panel pass rate in the synthetic regime: $66/294$ cases
+($22.4\%$) versus $112/294$ at single setup, with a
+case-level breakdown of $25$ rescued ($1$-fail $\to$ joint-pass),
+$41$ preserved-pass, $157$ preserved-fail, and $71$ regressed
+($1$-pass $\to$ joint-fail).  The regressing cases have
+near-perfect single-setup recovery (median $\le 6\%$ relative
+error in every parameter) that the joint loss then pulls away
+from on its way to a compromise minimum.  We attribute this to a
+mismatch between the simulator-matched setup-2 routing and the
+joint loss surface: when both legs route by full eight-frame
+nearest neighbour, the second leg picks the sub whose training
+cloud best fits $\mathbf{y}_{\mathrm{obs}}^{(2)}$, but its GP
+posterior need not share the single-setup posterior's $\sigma_Y$
+basin once the two GP-aware likelihoods are summed.  The
+real-data joint inverses of \S\ref{sec:mainresults} and
+\S\ref{sec:rheometer}, which use \texttt{real\_robust} routing,
+do not exhibit this regression because the terminal-displacement
+rerank concentrates on a single conservative scalar that aligns
+the two legs' $\sigma_Y$ regimes.  Resolving the synthetic-mode
+joint regression -- e.g.\ via setup-2 routing anchored on the
+single-setup posterior $\hat{\boldsymbol{\theta}}_1$ rather than
+on $\mathbf{y}_{\mathrm{obs}}^{(2)}$, or per-leg
+likelihood weighting -- is left for future work.
 
 \paragraph{Convergence and wall-clock against the simulation-in-the-loop
 baseline.}
