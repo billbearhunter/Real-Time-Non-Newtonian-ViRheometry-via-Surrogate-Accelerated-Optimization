@@ -56,25 +56,21 @@ capabilities available within a practical workflow. Our technical
 core couples three components.
 
 \emph{(i)}~A \emph{hierarchical mixture of Gaussian-process experts}
-replaces MPM inside the optimizer. The hierarchy is motivated by the
-fact that the Herschel--Bulkley inverse landscape is not globally
-homogeneous: the flow regime changes morphologically with container
-geometry $(W, H)$ and discretely across the yield threshold. Routing
-proceeds in stages---first over container geometry, then over
-observation signatures, then over yield-stress strata---each stage
-restricting the effective domain that any single Gaussian process
-must cover, so the leaf experts can be fitted accurately at the
-resolution required for inversion.
+replaces MPM inside the optimizer. The production surrogate bank
+partitions the forward map by container geometry, terminal flow
+distance, and normalized trajectory shape. At runtime the observable
+tuple $(W,H,\mathbf{y})$ deterministically routes each query to a
+local exact GP expert, with a final $y_8$-quantile reranking step that
+keeps the selected expert aligned with the observed runout regime.
 
-\emph{(ii)}~An \emph{identifiability-aware inverse} addresses the
+\emph{(ii)}~A \emph{GP-aware inverse likelihood} addresses the
 yield-stress/consistency ridge that arises when the observed
-shear-rate range is dominated by the consistency term. We exploit
-the fact that the surrogate's training corpus densely covers the
-parameter space, and use this coverage to constrain the optimizer:
-candidates near training samples are ranked by their training-data
-support, and the recovered yield stress is anchored against
-data-supported priors rather than allowed to drift along the
-unidentifiable ridge.
+shear-rate range is dominated by the consistency term. CMA-ES
+minimizes a log-space Type-II marginal-likelihood objective that uses
+the routed GP's predictive variance, an observation-noise floor, and
+the corresponding Occam term. The remaining ridge is reported through
+multi-start dispersion and local Laplace confidence intervals rather
+than hidden by a hand-tuned yield-stress prior.
 
 \emph{(iii)}~An \emph{algorithmic camera-calibration pipeline}
 replaces the manual fSpy-and-Photoshop workflow that precedes the
@@ -94,22 +90,22 @@ proxy for the Hessian, Hessian-guided active selection of successive
 setups, and iterative multi-setup CMA-ES; the protocol is sound and
 was validated on $30$ material-trial cases, but it inherits the
 per-iterate MPM cost. By porting the inverse pipeline onto a learned
-surrogate, the same setup-selection and multi-setup machinery becomes
+surrogate, the same setup-selection and two-setup joint machinery becomes
 affordable per material rather than only per showcase, and the inverse
 returns within the latency required by the three uses above. The
 main contributions are:
 
 \begin{itemize}
     \item A \emph{hierarchical mixture of Gaussian-process experts}
-    that replaces MPM inside the inverse loop, fitted to a corpus of
-    MPM dam-break simulations and structured to handle the geometric
-    and yield-threshold non-stationarities of the Herschel--Bulkley
-    inverse landscape.
-    \item An \emph{identifiability-aware inverse} that uses the
-    surrogate's training corpus as a structural prior, constraining
-    the optimizer to data-supported regions of parameter space and
-    addressing the yield-stress/consistency ridge through this
-    constraint.
+    that replaces MPM inside the inverse loop with a frozen bank of
+    routed exact GP experts, structured by geometry, trajectory
+    length, and normalized shape to handle the non-stationarity of the
+    Herschel--Bulkley forward map.
+    \item A \emph{GP-aware inverse} that uses predictive uncertainty
+    directly in the likelihood, warm-starts and bounds CMA-ES within
+    the routed subproblem, and reports the residual
+    yield-stress/consistency ridge through restart and Hessian-based
+    uncertainty diagnostics.
     \item An \emph{algorithmic two-stage camera-calibration pipeline}
     based on ChArUco markers and silhouette-edge refinement,
     replacing the manual workflow of prior work and removing the
@@ -501,6 +497,516 @@ evolving state, not just to reduce amortised compute cost.
 
 \section{Method (Surrogate-Accelerated Inverse)}
 \label{sec:method-block}
+
+\subsection{Problem Statement}
+\label{sec:problem}
+
+We keep the physical forward model of
+Eq.~\eqref{eq:inverse-generic}, but replace each in-loop MPM call by
+a frozen production surrogate whose code path is
+\texttt{Models/yshape\_mogp\_production} and
+\texttt{Optimization/libs/selector.py}. The online estimator receives
+a calibrated dam-break observation
+$\mathbf{y}_{\mathrm{obs}}\in\mathbb{R}^{8}$ and setup geometry
+$(W,H)$, routes the observation to a small set of local GP experts,
+and solves for
+$\boldsymbol{\theta}=(n,\eta,\sigma_Y)$ with a GP-aware
+Type-II maximum-likelihood loss. The same machinery handles a second
+observation of the same material by sharing one
+$\boldsymbol{\theta}$ across both setups.
+
+Figure~\ref{fig:overview} summarises the implemented pipeline. Offline,
+MPM simulations are partitioned by geometry and by the observed
+flow-front trajectory, and one exact GP expert is trained for each
+resulting sub-region. Online, the observable tuple
+$(W,H,\mathbf{y}_{\mathrm{obs}})$ selects a primary sub-expert by
+deterministic routing with a final $y_8$-quantile re-rank; CMA-ES then
+optimises over the routed expert's padded training box. A first setup
+can also propose the next physical experiment through the analytical
+Hessian-orthogonal rule inherited from
+\citet{hamamichi2023nonnewtonian}.
+
+\begin{figure*}[t]
+    \centering
+    \iffigplaceholder
+      \figplaceholderwide[6cm]{Production pipeline placeholder:
+      calibrated video $\to$ eight flow-front distances
+      $\mathbf{y}_{\mathrm{obs}}$; offline MPM corpus $\to$
+      25 geometry gids and per-gid y-shape sub-experts; online
+      $y_8$-quantile top-1 routing $\to$ exact GP posterior
+      mean/variance; GP-aware Type-II ML loss $\to$ five-restart
+      CMA-ES; optional Hessian-orthogonal setup-2 proposal and
+      two-setup joint inverse.}
+    \else
+      \includegraphics[width=\textwidth]{figs/method_overview.pdf}
+    \fi
+    \caption{Production pipeline implemented by the accompanying code.
+    The user supplies an observed flow-front vector
+    $\mathbf{y}_{\mathrm{obs}}$ and setup geometry $(W,H)$. A frozen
+    bank of local exact-GP experts first routes the observation through
+    a geometry and y-shape partition, then evaluates a GP-aware
+    likelihood inside a bounded CMA-ES inverse. For a two-setup
+    material, both observations share one
+    $\boldsymbol{\theta}$ while retaining their own routed experts.}
+    \Description{Block diagram of the production inverse pipeline:
+    observation extraction, hierarchical routing to a local GP expert,
+    GP-aware likelihood, CMA-ES inverse, and optional two-setup joint
+    recovery.}
+    \label{fig:overview}
+\end{figure*}
+
+\paragraph{Formal statement.}\label{sec:problem-formal}
+The original simulation-in-the-loop inverse is
+\begin{taggedeqn}{P}{P}
+    \hat{\boldsymbol{\theta}}
+    =
+    \arg\min_{\boldsymbol{\theta}\in\Theta}
+    \left\|\mathcal{S}(\boldsymbol{\theta};W,H)
+    -\mathbf{y}_{\mathrm{obs}}\right\|^2 .
+\end{taggedeqn}
+Our single-setup production estimator replaces
+$\mathcal{S}$ by a routed GP surrogate
+$\tilde{\mathcal{S}}_{k^\star}$ and minimises the negative log
+marginal likelihood
+\begin{taggedeqn}{P$'$}{Pprime}
+    \hat{\boldsymbol{\theta}}
+    =
+    \arg\min_{\mathbf{z}\in\Theta_{k^\star}}
+    \mathcal{L}_{\mathrm{GP}}\!\left(
+      \tilde{\mathcal{S}}_{k^\star}(\mathbf{z};W,H),
+      \mathbf{y}_{\mathrm{obs}}\right)
+    + p_{\mathrm{sup}}\,
+      \mathcal{L}_{\mathrm{box}}(\mathbf{z};k^\star),
+\end{taggedeqn}
+where $\mathbf{z}=(n,\log\eta,\log\sigma_Y)$, $k^\star$ is selected
+from $(W,H,\mathbf{y}_{\mathrm{obs}})$, and
+$\Theta_{k^\star}$ is the routed sub's padded training box. For two
+setups $a,b$ of the same material, conditional independence gives the
+joint objective
+\begin{taggedeqn}{P$^{\star}$}{Pstar}
+    \hat{\boldsymbol{\theta}}
+    =
+    \arg\min_{\mathbf{z}\in\Theta_{a,b}}
+    \mathcal{L}_{\mathrm{GP}}^{(a)}(\mathbf{z})
+    + \mathcal{L}_{\mathrm{GP}}^{(b)}(\mathbf{z})
+    + p_{\mathrm{sup}}\,
+      \tfrac{1}{2}\!\left(
+      \mathcal{L}_{\mathrm{box}}^{(a)}(\mathbf{z})+
+      \mathcal{L}_{\mathrm{box}}^{(b)}(\mathbf{z})\right).
+\end{taggedeqn}
+The current production path does not use an explicit
+$\sigma_Y$ anchor prior; uncertainty along the HB ridge is instead
+reported through multi-start dispersion and a local Laplace Hessian.
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Implemented substitutions relative to the canonical
+simulation-in-the-loop inverse.}
+\label{tab:subs}
+\begin{tabular}{@{}p{0.30\linewidth}p{0.48\linewidth}p{0.14\linewidth}@{}}
+\toprule
+Difficulty & Production substitution & Section \\
+\midrule
+Forward cost
+  & $\mathcal{S}\mapsto\tilde{\mathcal{S}}_{k^\star}$:
+    routed local exact-GP expert
+  & \S\ref{sec:surrogate} \\
+Non-stationarity
+  & observation-conditioned routing and padded per-sub box
+  & \S\ref{sec:surrogate}, \S\ref{sec:inverse} \\
+Scale and model uncertainty
+  & log-space Type-II ML loss using GP predictive variance and
+    an observation-noise floor
+  & \S\ref{sec:inv-loss} \\
+Ridge diagnosis
+  & five-restart CMA-ES dispersion and optional Laplace 95\% CI
+  & \S\ref{sec:inv-cma} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Input and Output Representation}
+\label{sec:repr}
+
+Each surrogate query uses the five-dimensional physical input
+\begin{equation}
+    \mathbf{x}=(n,\eta,\sigma_Y,W,H)^\top ,
+\end{equation}
+with logarithms applied to $\eta$ and $\sigma_Y$ before standardisation,
+\begin{equation}
+\label{eq:xscale}
+    \tilde{\mathbf{x}}
+    =
+    \frac{\mathbf{x}_{\log}-\boldsymbol{\mu}_X}
+         {\boldsymbol{\sigma}_X},
+    \qquad
+    \mathbf{x}_{\log}
+    =
+    (n,\log\eta,\log\sigma_Y,W,H)^\top .
+\end{equation}
+The output is the eight-frame flow-front vector
+$\mathbf{y}\in\mathbb{R}^{8}$; the output scaler subtracts a frozen
+training mean,
+\begin{equation}
+\label{eq:yscale}
+    \tilde{\mathbf{y}}=\mathbf{y}-\boldsymbol{\mu}_Y .
+\end{equation}
+At inverse time, the observed vector
+$\mathbf{y}_{\mathrm{obs}}$ is used both as likelihood data and as a
+routing signal.
+
+\subsection{Hierarchical Mixture-of-GP Surrogate}
+\label{sec:surrogate}
+
+\paragraph{Three-Layer Deterministic Partition.}
+\label{sec:surr-3layer}
+The production model bank is organised as
+\texttt{state\_gid\_\{0..24\}}. A query is routed by
+\begin{equation}
+\label{eq:gate}
+    (W,H,\mathbf{y}_{\mathrm{obs}})
+    \xrightarrow{L_1} g^\star
+    \xrightarrow{L_2} b^\star
+    \xrightarrow{L_3} s^\star .
+\end{equation}
+Layer 1 assigns the setup geometry to one of 25 geometry ids,
+\begin{equation}
+\label{eq:layer1}
+    g^\star = G(W,H), \qquad g^\star\in\{0,\ldots,24\}.
+\end{equation}
+Within that gid, Layer 2 places the final flow distance $y_8$ into the
+stored length bin,
+\begin{equation}
+\label{eq:layer2}
+    b^\star
+    =
+    \mathrm{bin}\!\left(y_{\mathrm{obs},8};
+    \{e_j^{(g^\star)}\}\right),
+\end{equation}
+clamping to the nearest bin outside the empirical range. Layer 3 uses
+the normalised flow-shape feature
+\begin{equation}
+\label{eq:phi}
+    \boldsymbol{\phi}(\mathbf{y})
+    =
+    \frac{(y_2-y_1,\ldots,y_8-y_1)^\top}{\max(y_8,\epsilon)}
+\end{equation}
+standardised by the bin-specific scaler, projected by the bin-specific
+PCA, and assigned to the nearest K-means centroid,
+\begin{equation}
+\label{eq:layer3}
+    s^\star
+    =
+    \arg\min_s
+    \left\|
+      \mathrm{PCA}_{g^\star,b^\star}(\boldsymbol{\phi})
+      -\mathbf{c}_{g^\star,b^\star,s}
+    \right\|_2 .
+\end{equation}
+The final production rerank is the $y_8$-quantile criterion: among the
+PCA-nearest candidate subs, choose the one for which the observed
+$y_8$ is most central in that sub's training distribution,
+\begin{equation}
+\label{eq:y8q}
+    s_{\mathrm{prod}}
+    =
+    \arg\min_s
+    \frac{|y_{\mathrm{obs},8}-\mathrm{median}(Y_{s,8})|}
+         {\max(\mathrm{std}(Y_{s,8}),\,0.1)} .
+\end{equation}
+In all reported production runs, \texttt{shape\_top\_k=1}; the
+log-sum-exp top-$K$ mixture path remains in code for diagnostics but
+is not the default estimator.
+
+\begin{figure*}[t]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder F-PARTITION: geometry gids,
+      length bins, PCA/K-means shape clusters, and per-sub size /
+      support statistics for the production y-shape bank.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/method/partition_3layer.pdf}
+    \fi
+    \caption{Production routing bank. The model is split by geometry,
+    final displacement, and normalised trajectory shape; a final
+    $y_8$-quantile rerank selects the primary sub-expert used by the
+    inverse.}
+    \Description{Three-layer routing visualisation for geometry,
+    length, shape, and final y8 quantile selection.}
+    \label{fig:partition}
+\end{figure*}
+
+\paragraph{Why Deterministic Routing.}
+\label{sec:surr-deterministic}
+At inverse time the material parameters are unknown, but
+$(W,H,\mathbf{y}_{\mathrm{obs}})$ are observed. Routing on observable
+quantities avoids a circular gate that would require the unknown
+$\boldsymbol{\theta}$, and makes out-of-support cases diagnosable by
+checking the selected sub's training box.
+
+\paragraph{Per-Cell Gaussian-Process Experts.}
+\label{sec:surr-experts}
+Each sub contains one \texttt{ExactExpert}: eight independent exact
+GP regressors sharing the same scaled 5-D input and using a
+Mat\'ern-$5/2$ ARD kernel,
+\begin{equation}
+\label{eq:matern}
+    k_{5/2}(\mathbf{a},\mathbf{b})
+    =
+    \sigma_f^2
+    \left(1+\sqrt{5}r+\tfrac{5}{3}r^2\right)
+    e^{-\sqrt{5}r},
+    \quad
+    r^2=\sum_{d=1}^{5}\frac{(a_d-b_d)^2}{\ell_d^2}.
+\end{equation}
+For output frame $d$, the posterior mean and variance are
+\begin{align}
+\label{eq:gp-predictive}
+    \mu_{s,d}(\tilde{\mathbf{x}})
+    &=
+    \mathbf{k}_*^\top
+    (K_s+\sigma_{n,s,d}^2 I)^{-1}\tilde{\mathbf{y}}_{s,d},
+\nonumber\\
+    \sigma_{s,d}^2(\tilde{\mathbf{x}})
+    &=
+    k_{5/2}(\tilde{\mathbf{x}},\tilde{\mathbf{x}})
+    -
+    \mathbf{k}_*^\top
+    (K_s+\sigma_{n,s,d}^2 I)^{-1}\mathbf{k}_* .
+\end{align}
+Hyperparameters are fitted by maximising the exact GP marginal
+likelihood,
+\begin{equation}
+\label{eq:gp-mll}
+\begin{aligned}
+    \log p(\tilde{\mathbf{y}}_{s,d}\mid X_s)
+    =
+    &-\tfrac{1}{2}
+      \tilde{\mathbf{y}}_{s,d}^{\top}
+      (K_s+\sigma_{n,s,d}^2I)^{-1}
+      \tilde{\mathbf{y}}_{s,d}
+      -\tfrac{1}{2}\log|K_s+\sigma_{n,s,d}^2I| \\
+    &-\tfrac{|X_s|}{2}\log 2\pi .
+\end{aligned}
+\end{equation}
+
+\paragraph{Top-1 Routing Without Aggregation.}
+\label{sec:surr-top1}
+The production predictor uses the primary sub directly,
+\begin{equation}
+\label{eq:top1}
+    \tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)
+    =
+    \mu_{s_{\mathrm{prod}}}(\tilde{\mathbf{x}}).
+\end{equation}
+Earlier rBCM/GRBCM aggregation paths are useful ablations but are not
+part of the current production estimator.
+
+\paragraph{Monotonic Post-Processing.}
+\label{sec:surr-mono}
+The physical flow-front distance is non-decreasing, so the decoded GP
+mean is monotonised by
+\begin{equation}
+\label{eq:mono}
+    \hat{y}_d\leftarrow \max_{j\le d}\hat{y}_j,
+    \qquad d=1,\ldots,8 .
+\end{equation}
+
+\begin{algorithm}[!htbp]
+\caption{Offline construction of the production y-shape GP bank.}
+\label{alg:train}
+\KwData{MPM corpus $\{(\boldsymbol{\theta}_i,W_i,H_i,\mathbf{y}_i)\}$.}
+\KwOut{Frozen bank \texttt{state\_gid\_\{0..24\}} with scalers,
+route metadata, sub assignments, and \texttt{sub\_NNNN.pt} experts.}
+\BlankLine
+Fit global input/output scalers (Eqs.~\eqref{eq:xscale}, \eqref{eq:yscale})\;
+\ForEach{geometry gid $g$}{
+  build length bins from $y_8$ and, within each bin, PCA/K-means
+  shape clusters from Eq.~\eqref{eq:phi}\;
+  merge undersized clusters and write \texttt{sub\_assignments.csv}\;
+  \ForEach{sub $s$}{
+    train an eight-output \texttt{ExactExpert} by Eq.~\eqref{eq:gp-mll}\;
+    store $X_{\mathrm{phys}},Y_{\mathrm{phys}}$, validation error,
+    $y_8$ median/std, and optional calibration scale\;
+  }
+}
+\Return{production model bank.}
+\end{algorithm}
+
+\begin{algorithm}[!htbp]
+\caption{Online forward pass
+$\hat{\mathbf{y}}=\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)$.}
+\label{alg:forward}
+\KwIn{$\boldsymbol{\theta}$, geometry $(W,H)$, observed routing vector
+$\mathbf{y}_{\mathrm{obs}}$.}
+\KwOut{Monotone predicted flow-front vector $\hat{\mathbf{y}}$.}
+\BlankLine
+Route $(W,H,\mathbf{y}_{\mathrm{obs}})$ through
+Eqs.~\eqref{eq:gate}--\eqref{eq:y8q} to select $s_{\mathrm{prod}}$\;
+standardise $\mathbf{x}_{\log}$ and evaluate the selected ExactGP
+(Eq.~\eqref{eq:gp-predictive})\;
+decode the mean to physical units and apply Eq.~\eqref{eq:mono}\;
+\Return{$\hat{\mathbf{y}}$ and GP predictive std.}
+\end{algorithm}
+
+\subsection{GP-Aware Inverse}
+\label{sec:inverse}
+
+\paragraph{Within-Sub Warm-Start.}
+\label{sec:inv-nn}
+CMA-ES is initialised at the routed sub's nearest training point in
+observation space,
+\begin{equation}
+\label{eq:nn}
+    \mathbf{z}^{\mathrm{NN}}
+    =
+    \mathbf{z}_{i^\star},\quad
+    i^\star
+    =
+    \arg\min_{i\in\mathcal{D}_{s_{\mathrm{prod}}}}
+    \frac{1}{8}\sum_{d=1}^{8}
+    w_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
+\end{equation}
+The default frame weights are
+$(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$.
+
+\paragraph{Per-Sub Bound Tightening.}
+\label{sec:inv-box}
+The search box is the union of the selected top-$K$ sub supports
+(top-$K=1$ in production), padded in $z$-space and clipped to the
+global HB bounds,
+\begin{equation}
+\label{eq:tight-box}
+    \Theta_{k^\star}
+    =
+    \Theta\cap
+    [\mathbf{z}_{\min}-p\mathbf{s},\,
+     \mathbf{z}_{\max}+p\mathbf{s}],
+    \qquad p=0.10 .
+\end{equation}
+The objective also adds a soft support penalty with weight
+$p_{\mathrm{sup}}=0.25$ outside the unpadded sub support.
+
+\paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
+\label{sec:inv-sy}
+Herschel--Bulkley observations can remain weakly identified along a
+$(\eta,\sigma_Y)$ ridge. The production estimator does not break this
+ridge with a hand-written $\sigma_Y$ prior; instead, it exposes the
+remaining ambiguity through five CMA-ES restarts and an optional
+finite-difference Hessian/Laplace confidence interval. This keeps the
+reported uncertainty tied to the GP likelihood rather than to a
+user-chosen anchor.
+
+\begin{figure}[t]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[5.5cm]{Placeholder F-RIDGE: contours of predicted
+      $y_8$ over $(\log\eta,\log\sigma_Y)$, showing the HB ridge and
+      how two setup likelihoods or Hessian diagnostics reveal the
+      weakly identified direction.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/method/ridge_identifiability.pdf}
+    \fi
+    \caption{HB ridge diagnosis. Single-setup flow-front observations
+    can be nearly constant along a coupled
+    $(\log\eta,\log\sigma_Y)$ direction. We use joint setup likelihoods,
+    restart dispersion, and local Hessian intervals to report this
+    ambiguity rather than imposing an explicit $\sigma_Y$ prior.}
+    \Description{Contour plot of the HB identifiability ridge and its
+    diagnosis by joint likelihood and uncertainty estimates.}
+    \label{fig:ridge}
+\end{figure}
+
+\paragraph{GP-Aware Type-II ML Loss.}
+\label{sec:inv-loss}
+For a candidate $\mathbf{z}$, the selected GP provides both
+$\hat{y}_d(\mathbf{z})$ and predictive standard deviation
+$\sigma_{\mathrm{GP},d}(\mathbf{z})$. We work in log-space and add a
+measurement-noise floor $\sigma_{\mathrm{obs,log}}=0.20$:
+\begin{equation}
+\label{eq:gp-var}
+    v_d(\mathbf{z})
+    =
+    \left(
+    \frac{\sigma_{\mathrm{GP},d}(\mathbf{z})}
+         {\max(\hat{y}_d(\mathbf{z}),\epsilon)}
+    \right)^2
+    + \sigma_{\mathrm{obs,log}}^2 .
+\end{equation}
+The per-setup negative log marginal likelihood is
+\begin{equation}
+\label{eq:obs-loss}
+    \mathcal{L}_{\mathrm{GP}}(\mathbf{z})
+    =
+    \frac{1}{8}\sum_{d=1}^{8}
+    \left[
+      \frac{w_d^2 r_d(\mathbf{z})^2}{2v_d(\mathbf{z})}
+      +\frac{1}{2}\log v_d(\mathbf{z})
+    \right],
+    \qquad
+    r_d=\log\hat{y}_d-\log y_{\mathrm{obs},d}.
+\end{equation}
+The log-variance term is the Occam factor: it prevents the optimiser
+from preferring regions only because the GP is uncertain there. In
+production, stored post-hoc calibration factors are ignored
+(\texttt{shape\_disable\_calib=True}); they can be re-enabled for
+retrospective ablations.
+
+\paragraph{CMA-ES Configuration and Uncertainty Output.}
+\label{sec:inv-cma}
+We optimise Eq.~\eqref{eq:Pprime} with CMA-ES on
+$\mathbf{z}=(n,\log\eta,\log\sigma_Y)$ using population $12$, initial
+step $0.25$, at most $30$ generations, and five deterministic
+restarts. The best restart is reported as the MAP estimate, while the
+standard deviation across restart optima is retained as a
+truth-blind ridge diagnostic. When enabled, a numerical Hessian of
+Eq.~\eqref{eq:obs-loss} at the MAP gives a local Laplace
+95\% interval for $(n,\eta,\sigma_Y)$.
+
+\paragraph{Joint Two-Setup Inverse.}
+\label{sec:inv-joint}
+For two observations $a,b$ of the same material, the two routed
+setups retain their own GP experts but share the same
+$\boldsymbol{\theta}$. The production implementation minimises
+Eq.~\eqref{eq:Pstar}; if the two sub boxes overlap, the intersection
+is used, otherwise their padded union provides a conservative search
+box. An optional warm-start reads the first setup's
+\texttt{theta\_hat.json}, allowing the second-stage command-line tool
+to reuse a strong setup-1 estimate.
+
+\begin{algorithm}[!htbp]
+\caption{Online single-setup inverse.}
+\label{alg:invert}
+\KwIn{$\mathbf{y}_{\mathrm{obs}}$, $(W,H)$, production GP bank.}
+\KwOut{$\hat{\boldsymbol{\theta}}$, posterior diagnostics.}
+\BlankLine
+Route $(W,H,\mathbf{y}_{\mathrm{obs}})$ to the primary sub
+(Eq.~\eqref{eq:y8q})\;
+construct the padded box $\Theta_{k^\star}$ and nearest-neighbour
+warm start (Eqs.~\eqref{eq:tight-box}, \eqref{eq:nn})\;
+run five-restart CMA-ES on Eq.~\eqref{eq:Pprime}\;
+optionally evaluate the Hessian interval at the best point\;
+\Return{$\hat{\boldsymbol{\theta}}$ and diagnostics.}
+\end{algorithm}
+
+\begin{algorithm}[!htbp]
+\caption{Online joint two-setup inverse.}
+\label{alg:joint}
+\KwIn{Two observations of the same material,
+$(\mathbf{y}^{(a)},W_a,H_a)$ and
+$(\mathbf{y}^{(b)},W_b,H_b)$.}
+\KwOut{Shared $\hat{\boldsymbol{\theta}}$.}
+\BlankLine
+Route both setups independently to their primary subs\;
+form the joint search box from the two sub supports\;
+minimise the summed GP-aware likelihood of Eq.~\eqref{eq:Pstar}
+with five-restart CMA-ES\;
+\Return{shared $\hat{\boldsymbol{\theta}}$ and two-setup diagnostics.}
+\end{algorithm}
+
+\iffalse
 
 \subsection{Problem Statement}
 \label{sec:problem}
@@ -1428,6 +1934,8 @@ $\hat{\boldsymbol{\theta}}{\leftarrow}$ best-ever;
 \Return{$\hat{\boldsymbol{\theta}}$ and $\{\hat{\mathbf{y}}_{s}\}$.}
 \end{algorithm}
 
+\fi
+
 \section{Camera Calibration}
 \label{sec:calib}
 
@@ -1758,72 +2266,60 @@ Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
 \section{Training Data and Frozen Configuration}
 \label{sec:data}
 
-The training corpus comprises $N = 295{,}419$ MPM dam-break
-simulations spanning the parameter box
-$n \in [0.3, 1.0]$,
-$\eta \in [10^{-3},\,3{\times}10^{2}]$\,Pa$\cdot$s$^{n}$,
-$\sigma_Y \in [10^{-3},\,4{\times}10^{2}]$\,Pa, and
-$W, H \in [2, 7]$\,cm, sampled by Latin-hypercube coverage of the
-log-scaled parameter space and supplemented by an adaptive-infill
-batch of $2{,}500$ samples targeting $\sigma_Y \le 1$\,Pa (the regime
-in which the identifiability ridge is most pronounced). The level-2
-component counts, chosen per geo group by BIC, are
-\begin{equation*}
-    \bigl(K_{\phi}^{(g)}\bigr)_{g=1}^{12}
-    \;=\;
-    (45,\,50,\,40,\,40,\,30,\,50,\,50,\,50,\,45,\,50,\,45,\,45),
-\end{equation*}
-summing to $540$ experts. All reported results use this single
-frozen checkpoint with the hyperparameters in
-Table~\ref{tab:hyper}; ablations over gate granularity, aggregation
-scheme, and inverse augmentations are in \S\ref{sec:ablation}.
+All reported production results use a single frozen y-shape bank,
+\texttt{Models/yshape\_mogp\_production}. The bank contains
+$25$ geometry states and $1{,}396$ exact-GP sub-experts. The
+assignment tables contain $425{,}831$ routed MPM training rows in
+total (between $13{,}581$ and $25{,}032$ rows per gid), spanning
+$n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
+$\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and
+$W,H\in[2,7]$ cm. The bank is the only production checkpoint used by
+the inverse entry points; older rBCM/BGM banks are treated as
+ablations or historical baselines.
 
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Frozen configuration used throughout the evaluation. All
-reported numbers use this single fixed setting.}
+\caption{Frozen production configuration used throughout the
+evaluation. These values correspond to the public application entry
+points rather than to archived ablation scripts.}
 \label{tab:hyper}
 \begin{tabular}{@{}ll@{}}
 \toprule
 \textit{Training data} & \\
-\quad $N$                           & $295{,}419$ MPM dam-break samples \\
-\quad infill batch                  & $2{,}500$ at $\sigma_Y\le 1$\,Pa \\
+\quad assignment rows               & $425{,}831$ routed MPM samples \\
+\quad parameter box                 & $n\in[0.3,1.0]$,
+                                      $\eta\in[10^{-3},300]$,
+                                      $\sigma_Y\in[10^{-3},400]$ \\
 \midrule
-\textit{Hierarchical gate} & \\
-\quad $K_{\mathrm{geo}}$            & $12$ (BGM, full cov., DP prior) \\
-\quad $K_{\phi}^{(g)}$              & BIC-selected per group,
-                                      $\sum_{g}K_{\phi}^{(g)}=540$ \\
-\quad signature $\boldsymbol{\phi}$ & $18$-D (Eq.~\eqref{eq:phi}) \\
+\textit{Production bank} & \\
+\quad state root                    & \texttt{Models/yshape\_mogp\_production} \\
+\quad geometry states               & $25$ gids \\
+\quad sub-experts                   & $1{,}396$ total; $24$--$71$ per gid \\
+\quad routing                       & geometry gid + length bin +
+                                      PCA/K-means shape + $y_8$ quantile \\
 \midrule
 \textit{Per-cell GP expert} & \\
 \quad kernel                        & Mat\'ern-$5/2$ ARD on $\mathbb{R}^{5}$ \\
-\quad training                      & Adam, lr $5\cdot 10^{-2}$, $100$ iter \\
-\quad cell-size range               & $[30, 2500]$ (stratified subsample) \\
+\quad outputs                       & $8$ independent exact GPs per sub \\
+\quad variance calibration          & stored but disabled in production \\
 \midrule
-\textit{Hotfix \& residual correction} & \\
-\quad MAE threshold $\tau_{\mathrm{mae}}$ & $0.15$ \\
-\quad retrain                       & isotropic baseline, Adam $300$ iter \\
-\quad residual basis                & degree-$2$ monomials,
-                                      $\Phi\in\mathbb{R}^{21}$ \\
-\quad ridge $\alpha$                & $10^{-3}$, intercept unregularised \\
-\midrule
-\textit{Aggregation (paper)}        & rBCM, top-$1$ routing \\
+\textit{Routing / aggregation} & \\
+\quad \texttt{shape\_weight\_mode}  & \texttt{y8\_quantile} \\
+\quad \texttt{shape\_top\_k}        & $1$ (top-1; no rBCM aggregation) \\
+\quad oversample                    & $3$ PCA-nearest candidates before
+                                      $y_8$ rerank \\
 \midrule
 \textit{Inverse CMA-ES} & \\
-\quad popsize $P$                   & $12$ (benchmark) / $16$ (user-facing) \\
-\quad $\sigma_{0}$                  & $0.5$ (log-space) \\
-\quad $T_{\mathrm{cma}}$            & $60$ / $700$; tol-x / tol-f early stop \\
-\quad bound pad                     & $2\%$ log on $\eta,\sigma_{Y}$;
-                                      $2\%$ linear on $n$ \\
+\quad popsize $P$                   & $12$ \\
+\quad $\sigma_{0}$                  & $0.25$ in $z=(n,\log\eta,\log\sigma_Y)$ \\
+\quad generations / restarts        & $30$ / $5$ \\
+\quad box pad / support weight      & $0.10$ / $0.25$ \\
 \midrule
-\textit{Priors} & \\
-\quad single-setup $\lambda$        & $10^{-5}$ at $\sigma_{Y}^{\mathrm{NN}}$
-                                      (data-honest) \\
-\quad joint-stage $\lambda_{\mathrm{joint}}$ & $5\cdot 10^{-2}$ at
-                                               $\sigma_{Y}^{(1)}$
-                                               (stage-coupling) \\
-\quad prior width $w$               & $1$ (log-std) \\
+\textit{Likelihood / UQ} & \\
+\quad loss                          & GP-aware Type-II ML in log space \\
+\quad noise floor                   & $\sigma_{\mathrm{obs,log}}=0.20$ \\
+\quad CI reporting                  & numerical Hessian / Laplace 95\% CI \\
 \bottomrule
 \end{tabular}
 \end{table}
