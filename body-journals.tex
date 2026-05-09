@@ -881,10 +881,21 @@ observation space,
     =
     \arg\min_{i\in\mathcal{D}_{s_{\mathrm{prod}}}}
     \frac{1}{8}\sum_{d=1}^{8}
-    w_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
+    \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
 \end{equation}
-The default frame weights are
-$(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$.
+The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8)
+=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$ progressively emphasise the
+late frames. The schedule is empirical, motivated by the
+\emph{real--sim gap} on the early gate-release frames: at the moment
+of release, the rendered cube silhouette and the captured fluid
+silhouette disagree by amounts the surrogate cannot model
+(finite-time gate withdrawal, release-timing jitter, transient
+free-surface effects, and surface tension that the MPM forward
+omits). Late frames have settled into the steady spread regime in
+which the surrogate matches reality cleanly, so weighting late
+residuals more heavily aligns the loss with where the surrogate is
+trustworthy. We treat this schedule as a practical
+implementation choice rather than a methodological contribution.
 
 \paragraph{Per-Sub Bound Tightening.}
 \label{sec:inv-box}
@@ -956,7 +967,7 @@ The per-setup negative log marginal likelihood is
     =
     \frac{1}{8}\sum_{d=1}^{8}
     \left[
-      \frac{w_d^2 r_d(\mathbf{z})^2}{2v_d(\mathbf{z})}
+      \frac{\alpha_d^2\, r_d(\mathbf{z})^2}{2v_d(\mathbf{z})}
       +\frac{1}{2}\log v_d(\mathbf{z})
     \right],
     \qquad
@@ -972,14 +983,31 @@ a per-material tuning knob.
 
 \paragraph{CMA-ES Configuration and Uncertainty Output.}
 \label{sec:inv-cma}
-We optimise Eq.~\eqref{eq:Pprime} with CMA-ES on
-$\mathbf{z}=(n,\log\eta,\log\sigma_Y)$ using population $12$, initial
-step $0.25$, at most $30$ generations, and five deterministic
-restarts. The best restart is reported as the MAP estimate, while the
-standard deviation across restart optima is retained as a
+We optimise Eq.~\eqref{eq:Pprime} with CMA-ES~\cite{hansen2016cma}
+on $\mathbf{z}=(n,\log\eta,\log\sigma_Y)$ using population $\lambda=12$,
+initial step $0.25$, at most $30$ generations, and five deterministic
+restarts. The best restart is reported as the MAP estimate, while
+the standard deviation across restart optima is retained as a
 truth-blind ridge diagnostic. When enabled, a numerical Hessian of
-Eq.~\eqref{eq:obs-loss} at the MAP gives a local Laplace
-95\% interval for $(n,\eta,\sigma_Y)$.
+Eq.~\eqref{eq:obs-loss} at the MAP gives a local Laplace 95\%
+interval for $(n,\eta,\sigma_Y)$.
+
+\paragraph{Batched Per-Generation Evaluation.}
+\label{sec:inv-batch}
+Every CMA-ES generation queries the surrogate at the
+$\lambda=12$ candidate $\mathbf{z}$'s emitted by
+\texttt{ask()}. A naive implementation issues twelve sequential GP
+forward calls, each paying a fixed CUDA launch overhead that
+dominates the per-call cost. Instead, we collect the whole
+generation into a single batched forward call, which exact GPs
+support natively for batched test inputs
+(Eq.~\eqref{eq:gp-predictive} applied to a stacked
+$\mathbf{X}_*$)~\cite{rasmussen2006gaussian}. The Mahalanobis,
+Occam, and box-support terms of Eq.~\eqref{eq:obs-loss} are then
+evaluated per-candidate in vectorised numpy outside the GPU. This
+amortises the launch overhead across the generation and yields an
+empirical $8$--$13\times$ wall-clock speedup on the joint
+two-setup inverse, with no change to the optimisation trajectory.
 
 \paragraph{Joint Two-Setup Inverse.}
 \label{sec:inv-joint}
@@ -1660,232 +1688,6 @@ against ground truth on a representative sample.
     \label{fig:flowcurve-syn}
 \end{figure}
 
-
-\subsection{Ablations}
-\label{sec:ablation}
-
-We ablate the three design choices that distinguish our inverse from
-a vanilla CMA-ES-on-GP: the aggregation scheme, the
-nearest-neighbour warm-start, and the data-honest $\sigma_Y$ prior.
-All rows in Table~\ref{tab:ablation} use identical gate routing,
-identical experts, the same $10$-sample inverse set, and the frozen
-CMA-ES budget ($12\times 25 = 300$ surrogate calls).
-
-\begin{table*}[!htbp]
-\centering
-\small
-\caption{Ablation of inverse-side design choices; medians over
-$10$ test samples. ``Fwd NMSE'' is the residual at the recovered
-parameter; ``dt'' is per-sample wall-clock.}
-\label{tab:ablation}
-\setlength{\tabcolsep}{3.5pt}
-\small
-\begin{tabular}{@{}lccccc@{}}
-\toprule
-Config & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ & $\mathrm{relE}\,\sigma_Y$ & Fwd NMSE & dt\,(s) \\
-\midrule
-Pure NN (no CMA)        & 0.115 & 0.153 & \textbf{0.168} & $3.9{\times}10^{-3}$ & \textbf{0.0} \\
-GRBCM warm              & \textbf{0.076} & 0.198 & 0.366 & $1.5{\times}10^{-5}$ & 21.6 \\
-rBCM warm, no prior     & 0.109 & 0.201 & 0.459 & $\mathbf{9.5{\times}10^{-6}}$ & 5.9 \\
-\textbf{Ours (rBCM warm $+$ prior)} & 0.160 & 0.202 & \textbf{0.298} & $1.4{\times}10^{-5}$ & 12.0 \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-Three findings.
-
-\textbf{rBCM outperforms GRBCM at top-$1$ routing.}
-GRBCM~\cite{liu2018generalized} augments our aggregation with an
-additional geometry-wide baseline expert indexed by $0$ with
-predictive moments $(\mu_0, \sigma_0^{2})$:
-\begin{align}
-\label{eq:grbcm}
-    \sigma_{\mathrm{GRBCM}}^{-2}
-    &= \sigma_0^{-2}
-       + \sum_{k \in \mathcal{R}} \beta_k\,\sigma_k^{-2},
-\nonumber\\
-    \mu_{\mathrm{GRBCM}}
-    &= \sigma_{\mathrm{GRBCM}}^{\,2}\!
-       \left[\sigma_0^{-2}\,\mu_0
-           + \sum_{k \in \mathcal{R}}
-               \beta_k\,\sigma_k^{-2}\,\mu_k\right].
-\end{align}
-Computing $(\mu_0, \sigma_0^2)$ requires a second GP query per
-sample, doubling inference cost ($21.6$\,s vs.\ $12.0$\,s). On our
-peaked gate posterior the baseline blend contributes no independent
-information and slightly worsens forward NMSE. We therefore adopt
-pure rBCM with top-$1$ routing, which in our setting reduces
-Eq.~\eqref{eq:top1} to the single-expert predictive mean with
-calibrated variance.
-
-\textbf{Pure NN is the best $\sigma_Y$ estimator but cannot match the
-flow curve.} The nearest-neighbour alone---returning
-$\boldsymbol{\theta}^{\mathrm{NN}}$ without CMA refinement---recovers
-$\sigma_Y$ with median relative error $0.168$, the best of all
-configurations, because $\boldsymbol{\theta}^{\mathrm{NN}}$ lies on
-the data manifold by construction. However, its forward NMSE
-($3.9\times 10^{-3}$, two to three orders of magnitude worse than
-any CMA-refined variant) shows that pure NN does not reproduce the
-observation and is therefore useful only as an initialiser.
-
-\textbf{The $\sigma_Y$ prior closes the gap that CMA-ES opens.}
-Without the prior, rBCM with warm-start CMA-ES slides along the
-identifiability ridge of \S3.3 to
-$\mathrm{relE}\,\sigma_Y = 0.459$. Anchoring at
-$\sigma_Y^{\mathrm{NN}}$ with $\lambda = 10^{-5}$ recovers
-$\mathrm{relE}\,\sigma_Y = 0.298$---a $35\%$ improvement---at the
-cost of a forward NMSE increase from $9.5\times 10^{-6}$ to
-$1.4\times 10^{-5}$, both far below any perceptually meaningful
-discrepancy. The prior trades a negligible amount of fit for a
-large gain in identifiability.
-
-\paragraph{Gate granularity.}
-We additionally sweep the level-$1$ component count
-$K_{\mathrm{geo}} \in \{1, 4, 12, 24\}$ and the level-$2$ count
-$K_{\phi}^{(g)} \in \{30, 45\}$. $K_{\mathrm{geo}} = 1$ collapses to
-a $\phi$-only single-level gate and loses roughly $2\times$
-aggregate MAE relative to the two-level gate; $K_{\mathrm{geo}} = 24$
-over-fragments the geometry space and starves individual experts of
-training data. The BIC-selected per-geo $K_{\phi}^{(g)}$ (summing to
-$540$) lies within $5\%$ of the best scanned setting.
-
-\paragraph{Optimizer comparison: 6 methods $\times$ 12 materials.}
-We additionally compare three CMA-ES-on-GP optimisers
-(``CMA-ES'', the gradient-free reference; ``Multi-Adam'', a batched
-multi-start Adam over the same routed sub; ``Grid+Adam'', an
-exhaustive grid sweep on the sub bbox followed by Adam refinement)
-and the $\sigma_{Y}$ two-stage prior on/off, on the
-twelve-material real-world set $T_{\mathrm{real}}$.
-Figure~\ref{fig:opt-compare} reports per-material flow-curve
-percent error fc\% and Figure~\ref{fig:sy-prior-abl} isolates the
-prior contribution.
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{Placeholder F-OPT-COMPARE: 6$\times$12
-      heat-map of fc\% with row = optimiser-prior combination
-      (CMA, CMA+prior, MA, MA+prior, GA, GA+prior) and column =
-      twelve real-world materials. Right-side bar: median wall-clock
-      per row.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/inverse/optimizer_heatmap.pdf}
-    \fi
-    \caption{Optimiser comparison on twelve real-world materials.
-    Median fc\% across the panel: CMA-ES $+$ prior 22.9\%,
-    Multi-Adam $+$ prior 37.4\%, Grid$+$Adam $+$ prior 46.0\%.
-    Multi-Adam matches Grid$+$Adam at $\sim\!1/5$ wall-clock cost;
-    CMA-ES $+$ prior remains the production winner.}
-    \Description{Six-by-twelve heat-map of flow-curve percent error
-    across optimiser configurations and materials, with right-side
-    median wall-clock bar.}
-    \label{fig:opt-compare}
-\end{figure}
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{Placeholder F-SY-PRIOR-ABLATION: grouped
-      bar chart, twelve materials on x-axis, four bars per group
-      (CMA no-prior, CMA $+$ prior, Multi-Adam no-prior, Multi-Adam
-      $+$ prior). Y-axis fc\% on log scale. Highlight Lotion
-      $94.6\% \to 22.3\%$ and Sesame $55.2\% \to 11.9\%$ with
-      callout arrows.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/inverse/sy_prior_ablation.pdf}
-    \fi
-    \caption{$\sigma_{Y}$ two-stage prior ablation. The prior closes
-    the identifiability ridge for materials whose single-setup
-    inverse saturates against the parameter boundary (Lotion,
-    Sesame, JTWS, SweetBeanPaste); on materials where stage-1
-    estimates are well-interior, the prior contributes a small but
-    consistent improvement; the saturation guard ensures that
-    boundary-saturated stage-1 estimates do not anchor the joint
-    solution to the wrong end of the ridge.}
-    \Description{Grouped bar chart showing flow-curve percent error
-    for twelve real-world materials under four optimiser-prior
-    combinations, demonstrating that the two-stage sigma_Y prior
-    sharply reduces error on ridge-prone materials.}
-    \label{fig:sy-prior-abl}
-\end{figure}
-
-\paragraph{Diagonal-bias analysis.}
-We additionally test whether the recovered $\theta$ is
-systematically biased toward the dense $(\eta, \sigma_{Y})$ corner
-of the training pool (the ``diagonal-bias hypothesis''). The
-median diagonal-projection
-$d_{\mathrm{diag}} = \Delta\!\log\eta + \Delta\!\log\sigma_{Y}$
-is approximately $-0.04$ across all six optimiser-prior
-combinations (Figure~\ref{fig:diagonal-bias}); the directionality is
-in fact \emph{per-sub} rather than global, set by the routed sub's
-training-input bounding box. This refines the failure mode story:
-when an inverse fails on a corner material, the cause is the
-specific routed sub's empirical $z$-bbox, not a global pull toward
-the dense data region.
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[4.5cm]{Placeholder F-RIDGE-EVIDENCE: 2-panel
-      scatter.
-      (a) $\Delta\!\log\eta$ vs $\Delta\!\log\sigma_{Y}$ across
-      six methods $\times$ twelve materials, coloured by method.
-      Median $\sim 0$ in both axes.
-      (b) Histogram of
-      $d_{\mathrm{diag}} = \Delta\!\log\eta + \Delta\!\log\sigma_{Y}$,
-      median $-0.04$, range $-1.4$ to $+2.1$, showing positive and
-      negative tails of equal mass.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/inverse/diagonal_bias.pdf}
-    \fi
-    \caption{Diagonal-bias falsification. (a)~Per-method
-    $(\Delta\!\log\eta, \Delta\!\log\sigma_{Y})$ scatter; (b)~the
-    diagonal-projection
-    $d_{\mathrm{diag}}$ histogram, median $\approx -0.04$.
-    Outlying ridge-prone materials are split between the two tails
-    rather than being all pulled toward the dense corner.}
-    \Description{Two-panel scatter and histogram showing that
-    parameter-error projection onto the dense diagonal direction
-    is approximately balanced around zero across methods and
-    materials, with no systematic pull.}
-    \label{fig:diagonal-bias}
-\end{figure}
-
-\paragraph{Convergence vs simulation-in-loop baseline.}
-Figure~\ref{fig:converge} reports per-material convergence
-trajectories of our pipeline against Baseline~A
-(Hamamichi MPM-in-loop). On the same hardware, Baseline~A's
-forward evaluation cost is $\sim$2--5 minutes per query, so a
-budget of 360 surrogate queries (CMA-ES popsize $12 \times 30$
-generations) translates to $\sim$24 hours of MPM-in-loop wall-clock
-per material. Our pipeline reaches a comparable forward NMSE in
-$\sim$12\,s.
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder F-CONVERGE: 4-panel line
-      plot.
-      (a)--(c) Per-iteration forward NMSE for Baseline~A, our
-      CMA-ES $+$ prior, our Multi-Adam $+$ prior on a representative
-      material (e.g.\ Lotion); shared log-time x-axis.
-      (d) Pareto plot: final forward NMSE vs total wall-clock; one
-      dot per (material, optimiser).}
-    \else
-      \includegraphics[width=\columnwidth]{figs/inverse/convergence.pdf}
-    \fi
-    \caption{Convergence trajectories vs Baseline~A. On a single
-    consumer GPU, our pipeline reaches Baseline~A's NMSE floor in
-    $\sim\!12$\,s vs $\sim\!24$\,h of MPM-in-loop CMA-ES.
-    Pareto plot in (d) places our methods well above (i.e., to the
-    upper-left of) Baseline~A in the wall-clock-vs-accuracy frontier.}
-    \Description{Four-panel figure showing per-iteration loss
-    convergence for the three optimisers and a Pareto plot of final
-    forward NMSE versus wall-clock; our pipeline dominates the
-    simulation-in-the-loop baseline by three to four orders of
-    magnitude in wall-clock.}
-    \label{fig:converge}
-\end{figure}
 
 
 \subsection{Parameter Freshness for Time-Varying Fluids}
