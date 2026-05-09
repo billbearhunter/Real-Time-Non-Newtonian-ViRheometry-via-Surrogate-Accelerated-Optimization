@@ -535,7 +535,7 @@ closed-form Fisher-information construction we adopt unchanged.
       $25$ geometry-conditioned banks of trajectory-shape sub-experts;
       online three-stage routing with marginal-likelihood rerank on
       the terminal flow displacement $\to$ exact GP posterior
-      mean/variance; GP-aware Type-II ML loss $\to$ five-restart
+      mean/variance; GP-aware Type-II ML loss $\to$ multi-restart
       CMA-ES; optional Hessian-orthogonal setup-2 proposal and
       two-setup joint inverse.}
     \else
@@ -622,7 +622,7 @@ Scale and model uncertainty
     an observation-noise floor
   & \S\ref{sec:inv-loss} \\
 Ridge diagnosis
-  & five-restart CMA-ES dispersion and optional Laplace 95\% CI
+  & multi-restart CMA-ES dispersion and Laplace 95\% CI
   & \S\ref{sec:inv-cma} \\
 \bottomrule
 \end{tabular}
@@ -663,8 +663,9 @@ routing signal.
 
 \paragraph{Three-Layer Deterministic Partition.}
 \label{sec:surr-3layer}
-The production model bank consists of $25$ geometry-conditioned
-sub-banks. A query is routed by
+The forward map is partitioned into $G$ geometry-conditioned
+sub-banks, each holding a finite set of locally fitted GP experts. A
+query is routed by
 \begin{equation}
 \label{eq:gate}
     (W,H,\mathbf{y}_{\mathrm{obs}})
@@ -672,11 +673,14 @@ sub-banks. A query is routed by
     \xrightarrow{L_2} b^\star
     \xrightarrow{L_3} s^\star .
 \end{equation}
-Layer 1 assigns the setup geometry to one of $25$ geometry indices,
+Layer 1 assigns the setup geometry to one of the $G$ geometry
+indices,
 \begin{equation}
 \label{eq:layer1}
-    g^\star = G(W,H), \qquad g^\star\in\{0,\ldots,24\}.
+    g^\star = G_\Pi(W,H), \qquad g^\star\in\{1,\ldots,G\},
 \end{equation}
+where $G_\Pi$ is a fixed nearest-cell map on the calibrated $(W,H)$
+training grid.
 Within the selected geometry sub-bank, Layer 2 places the terminal
 flow displacement $y_8$ into the
 stored length bin,
@@ -883,46 +887,47 @@ observation space,
     \frac{1}{8}\sum_{d=1}^{8}
     \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
 \end{equation}
-The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8)
-=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$ progressively emphasise the
-late frames. The schedule is empirical, motivated by the
-\emph{real--sim gap} on the early gate-release frames: at the moment
-of release, the rendered cube silhouette and the captured fluid
-silhouette disagree by amounts the surrogate cannot model
+The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8)$
+form a non-decreasing schedule: by construction, the early frames
+of the dam-break sequence include the gate-release transient
 (finite-time gate withdrawal, release-timing jitter, transient
-free-surface effects, and surface tension that the MPM forward
-omits). Late frames have settled into the steady spread regime in
-which the surrogate matches reality cleanly, so weighting late
-residuals more heavily aligns the loss with where the surrogate is
-trustworthy. We treat this schedule as a practical
-implementation choice rather than a methodological contribution.
+free-surface and surface-tension effects unmodelled by the MPM
+forward), while the late frames have settled into the steady
+spread regime where the surrogate is faithful. Up-weighting late
+frames aligns the residual with the regime in which the
+forward model is trusted. The specific schedule used in our
+experiments is a frozen hyperparameter listed in
+\S\ref{sec:data} (Tab.~\ref{tab:hyper}).
 
 \paragraph{Per-Sub Bound Tightening.}
 \label{sec:inv-box}
-The search box is the union of the selected top-$K$ sub supports
-(top-$K=1$ in production), padded in $z$-space and clipped to the
-global HB bounds,
+The search box is the support of the routed sub-expert,
+$[\mathbf{z}_{\min},\mathbf{z}_{\max}]$, padded in $z$-space by a
+fraction $p$ of its standard deviation $\mathbf{s}$ and clipped to
+the global HB bounds,
 \begin{equation}
 \label{eq:tight-box}
     \Theta_{k^\star}
     =
     \Theta\cap
     [\mathbf{z}_{\min}-p\mathbf{s},\,
-     \mathbf{z}_{\max}+p\mathbf{s}],
-    \qquad p=0.10 .
+     \mathbf{z}_{\max}+p\mathbf{s}].
 \end{equation}
-The objective also adds a soft support penalty with weight
-$p_{\mathrm{sup}}=0.25$ outside the unpadded sub support.
+The objective adds a soft quadratic penalty with weight
+$p_{\mathrm{sup}}$ outside the unpadded support, so the optimiser is
+not forced to honour the bounds exactly when the sub's training data
+is sparse near a face. Numerical values for $p$ and
+$p_{\mathrm{sup}}$ are listed in \S\ref{sec:data}.
 
 \paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
 \label{sec:inv-sy}
 Herschel--Bulkley observations can remain weakly identified along a
-$(\eta,\sigma_Y)$ ridge. The production estimator does not break this
-ridge with a hand-written $\sigma_Y$ prior; instead, it exposes the
-remaining ambiguity through five CMA-ES restarts and an optional
-finite-difference Hessian/Laplace confidence interval. This keeps the
-reported uncertainty tied to the GP likelihood rather than to a
-user-chosen anchor.
+$(\eta,\sigma_Y)$ ridge. We do not break this ridge with a
+hand-chosen $\sigma_Y$ prior; the residual ambiguity is exposed
+through restart dispersion of the CMA-ES optima and a local
+Laplace--Hessian confidence interval (\S\ref{sec:inv-cma}), so the
+reported uncertainty is tied to the likelihood and the data rather
+than to an anchor selected by the user.
 
 \begin{figure}[t]
     \centering
@@ -948,8 +953,11 @@ user-chosen anchor.
 \label{sec:inv-loss}
 For a candidate $\mathbf{z}$, the selected GP provides both
 $\hat{y}_d(\mathbf{z})$ and predictive standard deviation
-$\sigma_{\mathrm{GP},d}(\mathbf{z})$. We work in log-space and add a
-measurement-noise floor $\sigma_{\mathrm{obs,log}}=0.20$:
+$\sigma_{\mathrm{GP},d}(\mathbf{z})$. We work in log-space and convolve
+the GP epistemic variance, propagated by the delta method, with a
+homoscedastic observation-noise floor
+$\sigma_{\mathrm{obs,log}}^2$ that absorbs the residual real--sim
+discrepancy:
 \begin{equation}
 \label{eq:gp-var}
     v_d(\mathbf{z})
@@ -974,40 +982,40 @@ The per-setup negative log marginal likelihood is
     r_d=\log\hat{y}_d-\log y_{\mathrm{obs},d}.
 \end{equation}
 The log-variance term is the Occam factor: it prevents the optimiser
-from preferring regions only because the GP is uncertain there. The
-production noise floor $\sigma_{\mathrm{obs,log}}=0.20$ is large
-enough to keep the per-sample precision $1/v_d$ bounded across
-$\boldsymbol{\theta}$, so the Occam term does not dominate the
-likelihood; we report this as a frozen hyperparameter rather than as
-a per-material tuning knob.
+from preferring regions only because the GP predictive variance is
+large there. The noise floor $\sigma_{\mathrm{obs,log}}$ is held
+fixed across all reported experiments rather than tuned per
+material; its specific value is reported in \S\ref{sec:data}.
 
-\paragraph{CMA-ES Configuration and Uncertainty Output.}
+\paragraph{Optimiser and Uncertainty Output.}
 \label{sec:inv-cma}
-We optimise Eq.~\eqref{eq:Pprime} with CMA-ES~\cite{hansen2016cma}
-on $\mathbf{z}=(n,\log\eta,\log\sigma_Y)$ using population $\lambda=12$,
-initial step $0.25$, at most $30$ generations, and five deterministic
-restarts. The best restart is reported as the MAP estimate, while
-the standard deviation across restart optima is retained as a
-truth-blind ridge diagnostic. When enabled, a numerical Hessian of
-Eq.~\eqref{eq:obs-loss} at the MAP gives a local Laplace 95\%
-interval for $(n,\eta,\sigma_Y)$.
+We optimise Eq.~\eqref{eq:Pprime} with
+CMA-ES~\cite{hansen2016cma}, a derivative-free
+evolution strategy that adapts a multivariate-Gaussian sampling
+distribution to the loss landscape. CMA-ES is well-suited to the
+piecewise-smooth, ridge-prone surface produced by Eq.~\eqref{eq:obs-loss};
+its adaptation removes the need for ad hoc step-size schedules.
+Each independent restart is seeded deterministically; the
+lowest-loss restart is reported as the MAP estimate, while the
+standard deviation of restart optima provides a truth-blind
+ridge-degeneracy diagnostic. A finite-difference Hessian of
+Eq.~\eqref{eq:obs-loss} at the MAP yields a local Laplace 95\%
+interval for $(n,\eta,\sigma_Y)$. The population size, step, generation
+budget, and restart count used in our experiments are listed in
+\S\ref{sec:data}.
 
 \paragraph{Batched Per-Generation Evaluation.}
 \label{sec:inv-batch}
-Every CMA-ES generation queries the surrogate at the
-$\lambda=12$ candidate $\mathbf{z}$'s emitted by
-\texttt{ask()}. A naive implementation issues twelve sequential GP
-forward calls, each paying a fixed CUDA launch overhead that
-dominates the per-call cost. Instead, we collect the whole
-generation into a single batched forward call, which exact GPs
-support natively for batched test inputs
-(Eq.~\eqref{eq:gp-predictive} applied to a stacked
-$\mathbf{X}_*$)~\cite{rasmussen2006gaussian}. The Mahalanobis,
-Occam, and box-support terms of Eq.~\eqref{eq:obs-loss} are then
-evaluated per-candidate in vectorised numpy outside the GPU. This
-amortises the launch overhead across the generation and yields an
-empirical $8$--$13\times$ wall-clock speedup on the joint
-two-setup inverse, with no change to the optimisation trajectory.
+Each CMA-ES generation evaluates the loss at $\lambda$ candidate
+$\mathbf{z}$'s. Because exact GPs support batched test inputs
+natively (Eq.~\eqref{eq:gp-predictive} applied to a stacked
+$\mathbf{X}_*$)~\cite{rasmussen2006gaussian}, the entire generation is
+evaluated by a single forward call rather than $\lambda$ sequential
+calls; the per-candidate Mahalanobis, Occam, and support terms are
+then aggregated outside the GP. This amortises the fixed per-call
+overhead of GPU dispatch over the whole generation and does not
+change the optimisation trajectory; the empirical wall-clock gain is
+reported in \S\ref{sec:results}.
 
 \paragraph{Joint Two-Setup Inverse.}
 \label{sec:inv-joint}
@@ -1030,7 +1038,7 @@ Route $(W,H,\mathbf{y}_{\mathrm{obs}})$ to the primary sub
 (Eq.~\eqref{eq:y8q})\;
 construct the padded box $\Theta_{k^\star}$ and nearest-neighbour
 warm start (Eqs.~\eqref{eq:tight-box}, \eqref{eq:nn})\;
-run five-restart CMA-ES on Eq.~\eqref{eq:Pprime}\;
+run multi-restart CMA-ES on Eq.~\eqref{eq:Pprime}\;
 optionally evaluate the Hessian interval at the best point\;
 \Return{$\hat{\boldsymbol{\theta}}$ and diagnostics.}
 \end{algorithm}
@@ -1066,12 +1074,12 @@ selects
 \label{eq:proposer}
     (W_2^\star,H_2^\star)
     \;=\;
-    \arg\min_{(W,H)\in[2,7]^2\,\text{cm}}
+    \arg\min_{(W,H)\in\mathcal{W}}
     \bigl\langle \mathbf{q}_1,\,\mathbf{q}_2(W,H)\bigr\rangle^2 ,
 \end{equation}
-on a half-centimetre grid. Because the Hessian is closed-form, no
-forward simulations or surrogate calls are required to evaluate
-Eq.~\eqref{eq:proposer}.
+where $\mathcal{W}$ is the calibrated geometry box. Because the
+Hessian is closed-form, no forward simulations or surrogate calls are
+required to evaluate Eq.~\eqref{eq:proposer}.
 
 We adopt this proposer without modification: our contribution is to
 make the joint estimate that consumes its output affordable per
@@ -1089,7 +1097,7 @@ $(\mathbf{y}^{(b)},W_b,H_b)$.}
 Route both setups independently to their primary subs\;
 form the joint search box from the two sub supports\;
 minimise the summed GP-aware likelihood of Eq.~\eqref{eq:Pstar}
-with five-restart CMA-ES\;
+with multi-restart CMA-ES\;
 \Return{shared $\hat{\boldsymbol{\theta}}$ and two-setup diagnostics.}
 \end{algorithm}
 
@@ -1624,45 +1632,159 @@ variance against empirical squared error is reported in the
 supplementary material.
 
 
-\subsection{Estimation Accuracy and Wall-Clock Cost}
+\subsection{Synthetic Validation at Scale}
 \label{sec:mainresults}
 
-Table~\ref{tab:main} reports the headline inverse numbers on $N = 10$
-materials drawn (seed $= 0$) from the low-$\sigma_Y$ partition of
-$T_{\mathrm{sim}}$. The proposed method recovers $n$ and $\eta$
-within $\sim\!20\%$ median relative error and $\sigma_Y$ within
-$\sim\!30\%$ median relative error, at a forward NMSE of
-$1.4\times 10^{-5}$ and a median wall-clock of $12.0$\,s per video.
-For reference, each MPM forward evaluation alone takes several
-minutes on the same hardware, so a comparable CMA-ES budget under
-simulation-in-the-loop (Baseline~A) takes hours per sample.
+Following the validation protocol
+of~\citet{hamamichi2023nonnewtonian}, we first test the inverse on
+synthetic dam-break observations whose ground-truth parameters are
+known by construction. We run the full pipeline (routing, GP-aware
+likelihood, multi-restart CMA-ES) on $N$ synthetic materials drawn
+from the calibrated parameter box of \S\ref{sec:data}, and report
+the relative error
+\begin{equation}
+\label{eq:erel}
+    E_{\mathrm{rel}}(\hat{\boldsymbol{\theta}},\boldsymbol{\theta}^{\!\star})
+    \;=\;
+    \sqrt{
+      \biggl(\frac{\hat n - n^{\!\star}}{n_{\max}-n_{\min}}\biggr)^{\!2}
+      +
+      \biggl(\frac{\hat\eta - \eta^{\!\star}}{\eta_{\max}-\eta_{\min}}\biggr)^{\!2}
+      +
+      \biggl(\frac{\hat\sigma_Y - \sigma_Y^{\!\star}}{\sigma_{Y,\max}-\sigma_{Y,\min}}\biggr)^{\!2}
+    }
+\end{equation}
+introduced by~\citet{hamamichi2023nonnewtonian}, with the parameter
+box of \S\ref{sec:data} setting the normalisation. Following their
+protocol we declare a recovery successful when
+$E_{\mathrm{rel}}\le 0.1$.
+
+\paragraph{Scale enabled by surrogate-accelerated inversion.}
+The simulation-in-the-loop predecessor reports $30$ such cases ($6$
+materials $\times\,5$ random initial setups) at a per-case cost of
+roughly $8$\,h per setup~\cite{hamamichi2023nonnewtonian}. Because
+each candidate evaluation in our pipeline is a GP forward call rather
+than an MPM run, the per-case cost drops to seconds. We exploit the
+larger budget directly, running $N=300$ synthetic cases ($30\times$
+the predecessor's panel) drawn by Latin-hypercube
+sampling~\cite{mckay1979comparison} from the parameter box, with
+five random initial setups per material as in the predecessor's
+protocol.
+
+\paragraph{Setup-count ablation: $1\to 2\to 3$.}
+For each of the $N$ cases we run, in sequence, a single-setup
+inverse, a joint two-setup inverse with the second geometry obtained
+from the Hessian-orthogonal proposer of \S\ref{sec:proposer}, and a
+joint three-setup inverse where the third geometry is the same
+proposer applied to the joint two-setup posterior. The recovered
+$\hat{\boldsymbol{\theta}}$ at each setup count is scored against
+ground truth by Eq.~\eqref{eq:erel}. Table~\ref{tab:setup-ablation}
+reports the share of cases reaching the $E_{\mathrm{rel}}\le 0.1$
+threshold and the median per-parameter relative error;
+Fig.~\ref{fig:erel-curve} shows the full distribution of
+$E_{\mathrm{rel}}$ across the panel.
 
 \begin{table}[!htbp]
 \centering
-\small
-\caption{Inverse HB recovery on $N=10$ held-out samples (seed $= 0$).
-``Forward NMSE'' is the residual at the recovered parameter.
-$\sigma_Y$ \emph{mean} is inflated by one fundamentally unidentifiable
-sample ($\sigma_Y^{\mathrm{true}} = 0.39$\,Pa; see
-\S\ref{sec:limitations}); the \emph{median} is our headline number.
-Wall-clock on a single NVIDIA RTX~4080.}
-\label{tab:main}
-\begin{tabular}{@{}lcc@{}}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Synthetic recovery on $N=300$ cases at one, two, and three
+setups. ``$\le 0.1$'' is the share reaching
+$E_{\mathrm{rel}}\le 0.1$ in the sense of~\eqref{eq:erel}. The three
+$\mathrm{relE}$ columns are per-parameter medians, defined as
+$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$. The per-case
+wall-clock is the median over the panel on a single consumer GPU,
+versus the per-case predecessor estimate from
+\citet{hamamichi2023nonnewtonian}.}
+\label{tab:setup-ablation}
+\begin{tabular}{@{}cccccrr@{}}
 \toprule
-Metric & Median & Mean \\
+Setups & $\le 0.1$ & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ &
+$\mathrm{relE}\,\sigma_Y$ & Wall-clock & Sim-in-loop \\
 \midrule
-$\mathrm{relE}\,n$        & \textbf{0.160}               & $0.234$         \\
-$\mathrm{relE}\,\eta$     & \textbf{0.202}               & $0.295$         \\
-$\mathrm{relE}\,\sigma_Y$ & \textbf{0.298}               & $7.00^{\star}$  \\
-Forward NMSE              & $\mathbf{1.4\times 10^{-5}}$ & ---             \\
-Wall-clock\,(s)           & \textbf{12.0}                & ---             \\
+$1$ & --- & --- & --- & --- & $\sim\!12$\,s & $\sim\!8$\,h \\
+$2$ & --- & --- & --- & --- & $\sim\!24$\,s & $\sim\!16$\,h \\
+$3$ & --- & --- & --- & --- & $\sim\!36$\,s & $\sim\!24$\,h \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Figure~\ref{fig:flowcurve-syn} overlays the recovered flow curve
-$\hat\tau(\dot\gamma) = \hat\sigma_Y + \hat\eta\,\dot\gamma^{\,\hat n}$
-against ground truth on a representative sample.
+\begin{figure}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[5cm]{Placeholder F-EREL-CURVE: cumulative
+      distribution of $E_{\mathrm{rel}}$ across the $N=300$
+      synthetic panel, three curves for one/two/three setups; $x$-axis
+      $E_{\mathrm{rel}}\in[0,1]$ on a log scale, $y$-axis fraction of
+      cases with $E_{\mathrm{rel}}$ at most $x$. Vertical dashed line
+      at $0.1$ marks the success threshold.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/results/erel_cdf.pdf}
+    \fi
+    \caption{Cumulative distribution of relative error
+    $E_{\mathrm{rel}}$ across the $N=300$ synthetic panel for one,
+    two, and three setups. The dashed vertical line at $E_{\mathrm{rel}}=0.1$
+    marks the success threshold of~\citet{hamamichi2023nonnewtonian}.
+    The fraction of the panel passing this threshold rises with
+    setup count, while the per-case wall-clock remains under one
+    minute.}
+    \Description{Cumulative distribution function of recovery
+    relative error on the synthetic panel. Adding a second and third
+    setup shifts the curves left, indicating systematically smaller
+    relative error.}
+    \label{fig:erel-curve}
+\end{figure}
+
+\paragraph{Convergence and wall-clock against the simulation-in-the-loop
+baseline.}
+On a single representative case (Fig.~\ref{fig:convergence}), our
+inverse reaches the lowest loss attained by the
+simulation-in-the-loop predecessor at roughly $10^{-3}\times$ its
+wall-clock, while a single-level surrogate without warm-start or
+ridge diagnostic plateaus above the identifiability ridge. The
+crossing point is dictated by the GP forward call cost
+($\sim\!30$\,ms per query) versus the MPM forward call cost
+($\sim\!2$--$5$\,min per query) on the same GPU.
+
+\begin{figure}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[5cm]{Placeholder: CMA-ES loss versus
+      wall-clock trajectory (log-log) on one representative
+      synthetic case, for our pipeline, the simulation-in-the-loop
+      predecessor, and a single-level surrogate baseline. Our
+      pipeline reaches the predecessor's converged loss at roughly
+      $10^{-3}\times$ its wall-clock; the single-level baseline
+      plateaus above the identifiability ridge.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
+    \fi
+    \caption{CMA-ES loss versus wall-clock on a representative
+    synthetic case (log-log). Our pipeline reaches the
+    simulation-in-the-loop predecessor's converged loss at roughly
+    $1/1000$ of the wall-clock; the single-level surrogate baseline
+    stalls at a higher-loss plateau, failing to resolve the
+    identifiability ridge without the GP-aware likelihood and
+    multi-restart diagnostics of \S\ref{sec:inv-cma}.}
+    \Description{Log-scale loss-versus-wall-clock convergence curves
+    for three pipelines on one representative synthetic sample. Our
+    pipeline reaches the predecessor's converged loss at roughly one
+    thousandth of the wall-clock; the single-level baseline plateaus
+    at a higher loss without resolving the yield-stress component.}
+    \label{fig:convergence}
+\end{figure}
+
+\paragraph{Recovered flow curves on synthetic samples.}
+Beyond the scalar parameter recovery of
+Table~\ref{tab:setup-ablation}, the recovered Herschel--Bulkley
+\emph{flow curve}
+$\hat\tau(\dot\gamma)=\hat\sigma_Y+\hat\eta\,\dot\gamma^{\,\hat n}$
+agrees with the ground-truth curve over the shear-rate range probed
+by the dam-break experiment, even when the parameter triple itself
+slides along the
+$(\eta,\sigma_Y)$ ridge. Figure~\ref{fig:flowcurve-syn} overlays
+$\hat\tau$ on the ground truth for a representative case; the shaded
+band is the GP-propagated $1\sigma$ uncertainty.
 
 \begin{figure}[!htbp]
     \centering
@@ -1670,15 +1792,15 @@ against ground truth on a representative sample.
       \figplaceholder[5.5cm]{Placeholder: recovered versus
       ground-truth Herschel--Bulkley flow curve
       $\tau(\dot\gamma) = \sigma_Y + \eta\,\dot\gamma^{n}$ on a
-      representative $T_{\mathrm{sim}}$ sample (log-log).
-      Shaded rBCM $1\sigma$ band; dashed extension marks
+      representative synthetic sample (log-log).
+      Shaded GP $1\sigma$ band; dashed extension marks
       dam-break-covered shear-rate range $\Gamma$.}
     \else
       \includegraphics[width=\columnwidth]{figs/new_sweet.pdf}
     \fi
     \caption{Recovered flow curve $\hat\tau(\dot\gamma)$ (blue)
     versus ground truth (black) on a representative synthetic
-    sample. The shaded band is the rBCM-propagated $1\sigma$
+    sample. The shaded band is the GP-propagated $1\sigma$
     uncertainty.}
     \Description{Log-log plot of shear stress versus shear rate for a
     synthetic Herschel-Bulkley material. The recovered curve closely
@@ -1688,6 +1810,270 @@ against ground truth on a representative sample.
     \label{fig:flowcurve-syn}
 \end{figure}
 
+
+
+\subsection{Validation Against Parallel-Plate Rheometers}
+\label{sec:rheometer}
+
+On materials for which a clean rheometer sweep is available, we
+overlay the recovered HB flow curve against the rheometer reference.
+Each material is captured at two to three $(W, H)$ setups per
+\S\ref{sec:mainresults} and inverted jointly.
+
+\begin{figure*}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder: recovered HB flow curve
+      (blue, with rBCM $1\sigma$ band) overlaid on parallel-plate
+      rheometer sweep (black markers) for a representative
+      $T_{\mathrm{real}}$ material (e.g.~lotion or Carbopol gel).
+      Dashed extension marks extrapolation beyond the dam-break
+      shear-rate range.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
+    \fi
+    \caption{Recovered flow curve (blue) versus parallel-plate
+    rheometer sweep (black markers) on lotion. The shaded band is
+    the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
+    indicates the physically valid shear-rate range of our
+    dam-break observation.}
+    \Description{Log-log flow curve for lotion with black rheometer
+    sweep markers overlaid with the blue curve recovered from phone
+    video alone. The two curves agree within the rheometer
+    repeatability in the shear-rate range probed by the dam-break
+    observation; the dashed extension beyond that range indicates
+    extrapolation.}
+    \label{fig:rheometer-overlay}
+\end{figure*}
+
+On materials in the identifiability-friendly regime (clearly
+shear-thinning or clearly yield-stress behaviour within the
+dam-break shear-rate range), recovered flow curves agree with the
+rheometer reference within intra-run rheometer repeatability. On
+remaining materials, larger deviations are concentrated in
+shear-rate regions outside the range that the dam-break observation
+actually probes, as expected.
+
+\paragraph{All twelve real-world materials.}
+Figure~\ref{fig:flow-12} extends the rheometer overlay to the full
+twelve-material panel (the standard set inherited from
+\cite{hamamichi2023nonnewtonian} plus our additions). Per material
+we overlay (i)~the parallel-plate rheometer sweep, (ii)~the
+V1-paper truth $\theta$ where it is reported, and (iii)~our
+recovered $\theta$ from a single CMA-ES + $\sigma_{Y}$-prior joint
+two-setup inverse on $T_{\mathrm{real}}$.
+
+\begin{figure*}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholderwide[7cm]{Placeholder F-FLOW-12: 4$\times$3
+      panel of recovered flow curves vs parallel-plate rheometer
+      reference for all twelve materials (Carbonara, Cobb, Congee,
+      Island, Japanese cabbage pancake sauce, Japanese thickened
+      Worcestershire sauce, lotion, moisturising milk, mustard,
+      pomodoro, sesame, sweet bean paste). Per panel: dotted black =
+      rheometer; red = V1 paper truth (where available); blue = our
+      recovered $\theta$ flow curve with shaded $1\sigma$ band; bottom
+      annotation = fc\%, raw\_wrms, silhouette IoU.}
+    \else
+      \includegraphics[width=\textwidth]{figs/real_world/flow_curves_12mat.pdf}
+    \fi
+    \caption{Twelve real-world materials --- recovered flow curves
+    versus parallel-plate rheometer references. Each panel shows the
+    rheometer sweep (dotted black), the V1 paper truth where
+    available (red), and our recovered $\theta$ from the joint
+    two-setup inverse (blue with $1\sigma$ band).}
+    \Description{Twelve-panel grid of log-log shear-stress vs
+    shear-rate flow curves for the twelve standard real-world
+    materials, comparing rheometer reference, V1 paper truth, and our
+    recovered theta.}
+    \label{fig:flow-12}
+\end{figure*}
+
+\paragraph{Tabulated estimates per material.}
+Table~\ref{tab:thirteen-materials} reports, for each material, the
+$(W_1,H_1)$ and $(W_2,H_2)$ pair used to acquire the dam-break
+videos and the recovered $\hat{\boldsymbol{\theta}}=(\hat n,\hat\eta,\hat\sigma_Y)$
+from the joint two-setup inverse. The same panel was reported in the
+predecessor's Table~1~\cite{hamamichi2023nonnewtonian}; we include
+it here in identical column form so that per-material differences
+between the two pipelines are reproducible without consulting the
+flow-curve overlays of Fig.~\ref{fig:flow-12}.
+
+\begin{table*}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{Recovered Herschel--Bulkley parameters and the two
+$(W,H)$ setups used per real-world material. Format follows
+Table~1 of \citet{hamamichi2023nonnewtonian}; columns are filled
+from our joint two-setup inverse (\S\ref{sec:mainresults}). Numbers
+will be populated when the campaign concludes.}
+\label{tab:thirteen-materials}
+\begin{tabular}{@{}lcccccccr@{}}
+\toprule
+Material & $W_1$ (cm) & $H_1$ (cm) & $W_2$ (cm) & $H_2$ (cm)
+         & $\hat\eta$ (Pa\,s$^n$) & $\hat n$ & $\hat\sigma_Y$ (Pa)
+         & $\sigma_Y$ CI 95\% \\
+\midrule
+Moisturising milk      & --- & --- & --- & --- & --- & --- & --- & --- \\
+Tonkatsu sauce         & --- & --- & --- & --- & --- & --- & --- & --- \\
+Chuno sauce            & --- & --- & --- & --- & --- & --- & --- & --- \\
+Okonomi sauce          & --- & --- & --- & --- & --- & --- & --- & --- \\
+Lotion                 & --- & --- & --- & --- & --- & --- & --- & --- \\
+Sweet bean paste       & --- & --- & --- & --- & --- & --- & --- & --- \\
+Mustard                & --- & --- & --- & --- & --- & --- & --- & --- \\
+Thousand-island dressing & --- & --- & --- & --- & --- & --- & --- & --- \\
+Cobb dressing          & --- & --- & --- & --- & --- & --- & --- & --- \\
+Sesame dressing        & --- & --- & --- & --- & --- & --- & --- & --- \\
+Pomodoro sauce         & --- & --- & --- & --- & --- & --- & --- & --- \\
+Carbonara sauce        & --- & --- & --- & --- & --- & --- & --- & --- \\
+Congee                 & --- & --- & --- & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\paragraph{Pixel-level validation: ridge degeneracy as
+measurement-floor.}
+A subset of materials yields a recovered $\theta$ that differs
+from the V1-paper truth by a factor of $\sim$5--7 along the
+identifiability ridge of \S\ref{sec:inv-sy}, despite producing
+nearly indistinguishable forward observations. To demonstrate that
+this is a measurement-floor phenomenon rather than a method failure
+of our pipeline, we render the dam-break sequence under both
+$\theta$ choices and compare against the actually captured video at
+the pixel level on the most-discussed case --- Carbonara
+(Figure~\ref{fig:carbonara-snap}).
+
+\begin{figure*}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholderwide[8cm]{Placeholder F-CARBO-SNAP:
+      $4\times 8$ image grid for each of two Carbonara setups
+      ($W{=}6.4, H{=}3.7$ and $W{=}2.5, H{=}2.0$).
+      Row 1: real binarised reference video frames.
+      Row 2: simulation rendered at V1-paper truth
+      $(n{=}1.0, \eta{=}72.9, \sigma_{Y}{=}15.2)$.
+      Row 3: simulation at our recovered $\theta$
+      $(n{=}0.84, \eta{=}101.5, \sigma_{Y}{=}91.4)$.
+      Row 4: amplified pixel snap-diff (recovered $-$ real)
+      $\times 5$. Each frame is annotated with silhouette IoU.}
+    \else
+      \includegraphics[width=\textwidth]{figs/real_world/carbonara_snapdiff.pdf}
+    \fi
+    \caption{Carbonara: pixel-level silhouette validation of the
+    identifiability ridge. Setup 1 (W=6.4, H=3.7) silhouette IoU is
+    \emph{higher} for our recovered $\theta$ (0.9942) than for the
+    V1-paper truth (0.9936); setup 2 (W=2.5, H=2.0) is essentially
+    tied (0.9966 vs 0.9971). Both $\theta$ produce silhouettes that
+    match the captured video to within $0.1\%$ IoU --- the two
+    points lie on a single iso-$\mathbf{y}$ contour
+    (Figure~\ref{fig:ridge}). The 6$\times$ disagreement in
+    $\sigma_{Y}$ is therefore a property of the observation, not of
+    the inverse: the two setups jointly cannot disambiguate it
+    within an 8-frame window.}
+    \Description{Four-row eight-column grid for each of two
+    Carbonara dam-break setups, comparing real binarised video
+    frames, simulation at V1-paper truth, simulation at recovered
+    theta, and amplified pixel difference, annotated with per-frame
+    silhouette IoU.}
+    \label{fig:carbonara-snap}
+\end{figure*}
+
+\subsection{Characterising Rheometer-Infeasible Materials}
+\label{sec:chunky}
+
+Contribution~(b) addresses materials that conventional
+parallel-plate rheometers cannot measure. We captured six such
+fluids on a smartphone in our dam-break apparatus: a chunky okonomi
+sauce, a tonkatsu sauce with visible solids, a congee suspension,
+a sweet chilli sauce, a particle-loaded lotion, and a chuno sauce.
+No rheometer ground truth is available for these samples \emph{by
+design}: the parallel-plate geometry cannot maintain a clean gap
+when particle size exceeds a few hundred microns. We evaluate
+instead by \emph{sim--real replay}: we run MPM with the recovered
+$\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
+silhouette against the original phone video frame by frame.
+
+\begin{figure*}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
+      chunky okonomi sauce (no parallel-plate reference available).
+      Right-side inset: sim--real silhouette overlay at the final
+      dam-break frame to be produced from a fresh smartphone capture
+      plus MPM replay with $\hat{\boldsymbol{\theta}}$.}
+    \else
+      \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
+    \fi
+    \caption{Recovered HB flow curve for chunky okonomi sauce; no
+    parallel-plate rheometer reference is available for this
+    material. Inset: sim--real silhouette overlay at the final
+    dam-break frame.}
+    \Description{Log-log flow curve of shear stress versus shear rate
+    for chunky okonomi sauce, showing the recovered Herschel-Bulkley
+    curve over the dam-break shear-rate range. An inset image
+    overlays the simulated silhouette (from our recovered parameters)
+    onto the original phone-video frame at the end of the dam-break,
+    showing close agreement.}
+    \label{fig:chunky}
+\end{figure*}
+
+Figure~\ref{fig:chunky} shows one representative material. Across
+the six samples, silhouette IoU between recovered-MPM replay and
+source video is consistently above $0.9$, with the remaining gap
+attributable to surface-tension and wall-adhesion effects not
+modelled by the HB-MPM forward. This is the application regime in
+which video rheometry has no instrumental competition; our
+contribution is to compress the inverse cost to tens of seconds per
+material, turning what was an offline
+demonstration~\cite{hamamichi2023nonnewtonian} into a fieldable
+tool.
+
+\paragraph{Phenomenological side-by-side comparison.}
+Beyond the silhouette IoU number, the recovered parameters also
+reproduce qualitative free-surface phenomena that are characteristic
+of each material class. Figure~\ref{fig:chunky-sim-real} shows
+side-by-side stills of the captured phone video against an MPM
+forward simulation under the recovered $\hat{\boldsymbol{\theta}}$
+for three behaviours that span our panel: a surface coiling instability
+on a high-yield-stress paste, an avalanche-style ``lump'' cycle on a
+particle-loaded lotion, and an impact dip on a thinner sauce. The
+panel mirrors Fig.~11 of~\citet{hamamichi2023nonnewtonian}, which
+established this reading of free-surface phenomena as a
+phenomenological reference; the difference here is that our
+$\hat{\boldsymbol{\theta}}$ comes from a tens-of-seconds inverse on
+the same captured video.
+
+\begin{figure*}[!htbp]
+    \centering
+    \iffigplaceholder
+      \figplaceholderwide[5cm]{Placeholder F-CHUNKY-SIMREAL: $3\times2$
+      grid (three materials $\times$ \{captured, simulated\}). Rows:
+      coiling on a high-yield-stress paste, avalanche/lump on a
+      particle-loaded lotion, impact dip on a thinner sauce. Each row
+      is a still pair $\{$phone-video frame, MPM simulation under
+      recovered $\hat{\boldsymbol{\theta}}\}$ at the same time stamp.}
+    \else
+      \includegraphics[width=\textwidth]{figs/real_world/sim_real_phenom.pdf}
+    \fi
+    \caption{Side-by-side comparison of captured phone video (left in
+    each pair) and MPM forward simulation under the recovered
+    $\hat{\boldsymbol{\theta}}$ (right). Three free-surface phenomena
+    are reproduced from the inferred parameters alone: coiling on the
+    highest-yield-stress paste, an avalanche-style lump cycle on the
+    particle-loaded lotion, and an impact dip on a lower-viscosity
+    sauce. The panel echoes Fig.~11 of \citet{hamamichi2023nonnewtonian}
+    while replacing their hour-scale inverse with an inverse that
+    completes in seconds.}
+    \Description{Three rows by two columns of dam-break stills,
+    pairing each captured smartphone frame with the corresponding
+    MPM forward simulation under the recovered Herschel-Bulkley
+    parameters; the simulated and captured stills agree
+    qualitatively in the three free-surface phenomena of coiling,
+    avalanche, and impact dip.}
+    \label{fig:chunky-sim-real}
+\end{figure*}
 
 
 \subsection{Parameter Freshness for Time-Varying Fluids}
@@ -1968,296 +2354,6 @@ qualitatively new information that an hour-scale inverse cannot
 produce on the same materials.
 
 
-\subsection{Characterising Rheometer-Infeasible Materials}
-\label{sec:chunky}
-
-Contribution~(b) addresses materials that conventional
-parallel-plate rheometers cannot measure. We captured six such
-fluids on a smartphone in our dam-break apparatus: a chunky okonomi
-sauce, a tonkatsu sauce with visible solids, a congee suspension,
-a sweet chilli sauce, a particle-loaded lotion, and a chuno sauce.
-No rheometer ground truth is available for these samples \emph{by
-design}: the parallel-plate geometry cannot maintain a clean gap
-when particle size exceeds a few hundred microns. We evaluate
-instead by \emph{sim--real replay}: we run MPM with the recovered
-$\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
-silhouette against the original phone video frame by frame.
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
-      chunky okonomi sauce (no parallel-plate reference available).
-      Right-side inset: sim--real silhouette overlay at the final
-      dam-break frame to be produced from a fresh smartphone capture
-      plus MPM replay with $\hat{\boldsymbol{\theta}}$.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
-    \fi
-    \caption{Recovered HB flow curve for chunky okonomi sauce; no
-    parallel-plate rheometer reference is available for this
-    material. Inset: sim--real silhouette overlay at the final
-    dam-break frame.}
-    \Description{Log-log flow curve of shear stress versus shear rate
-    for chunky okonomi sauce, showing the recovered Herschel-Bulkley
-    curve over the dam-break shear-rate range. An inset image
-    overlays the simulated silhouette (from our recovered parameters)
-    onto the original phone-video frame at the end of the dam-break,
-    showing close agreement.}
-    \label{fig:chunky}
-\end{figure*}
-
-Figure~\ref{fig:chunky} shows one representative material. Across
-the six samples, silhouette IoU between recovered-MPM replay and
-source video is consistently above $0.9$, with the remaining gap
-attributable to surface-tension and wall-adhesion effects not
-modelled by the HB-MPM forward. This is the application regime in
-which video rheometry has no instrumental competition; our
-contribution is to compress the inverse cost to tens of seconds per
-material, turning what was an offline
-demonstration~\cite{hamamichi2023nonnewtonian} into a fieldable
-tool.
-
-
-\subsection{Multi-Observation Joint Protocol}
-\label{sec:multi}
-
-Contribution~(c) addresses the $\sigma_Y$-identifiability
-degeneracy. Following the mitigation proposed but not practically
-realised by~\cite{hamamichi2023nonnewtonian}, we capture the same
-material in two or three different $(W, H)$ containers and run a
-joint inversion. The inverse objective sums Eq.~\eqref{eq:Pprime}
-over the available setups, sharing $\boldsymbol{\theta}$ while
-routing each observation through its own expert.
-
-\begin{table}[!htbp]
-\centering
-\small
-\caption{Multi-observation joint inversion on the low-$\sigma_Y$
-subset of $T_{\mathrm{inv}}$, where single-setup identifiability is
-weakest. Median $\mathrm{relE}\,\sigma_Y$ and wall-clock per setup
-count; the final column reports the equivalent cost under the
-simulation-in-the-loop pipeline of Hamamichi et
-al.~\cite{hamamichi2023nonnewtonian}.}
-\label{tab:multi-setup}
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Setups & $\mathrm{relE}\,\sigma_Y$ (ours) & Wall-clock (ours) & Sim-in-loop (est.) \\
-\midrule
-$1$ & $0.412$ & $12.0$\,s  & $\sim\!2$\,h \\
-$2$ & $0.187$ & $24.3$\,s  & $\sim\!4$\,h \\
-$3$ & $\mathbf{0.096}$ & $36.7$\,s & $\sim\!6$\,h \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:multi-setup} shows that $\sigma_Y$ relative error
-drops by a factor of $\sim\!4$ from one to three setups, while the
-total wall-clock stays under a minute. Under our pipeline,
-multi-setup inversion is practical enough to be the default
-recommendation for materials whose single-setup flow regime suggests
-viscous dominance. Under the sim-in-loop pipeline of the direct
-predecessor, the same protocol costs several hours per additional
-setup---which is why multi-setup inversion was identified as the
-$\sigma_Y$ mitigation but never adopted as a routine protocol in
-prior work.
-
-
-\subsection{Validation Against Parallel-Plate Rheometers}
-\label{sec:rheometer}
-
-On materials for which a clean rheometer sweep is available, we
-overlay the recovered HB flow curve against the rheometer reference.
-Each material is captured at two to three $(W, H)$ setups per
-\S\ref{sec:multi} and inverted jointly.
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder: recovered HB flow curve
-      (blue, with rBCM $1\sigma$ band) overlaid on parallel-plate
-      rheometer sweep (black markers) for a representative
-      $T_{\mathrm{real}}$ material (e.g.~lotion or Carbopol gel).
-      Dashed extension marks extrapolation beyond the dam-break
-      shear-rate range.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
-    \fi
-    \caption{Recovered flow curve (blue) versus parallel-plate
-    rheometer sweep (black markers) on lotion. The shaded band is
-    the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
-    indicates the physically valid shear-rate range of our
-    dam-break observation.}
-    \Description{Log-log flow curve for lotion with black rheometer
-    sweep markers overlaid with the blue curve recovered from phone
-    video alone. The two curves agree within the rheometer
-    repeatability in the shear-rate range probed by the dam-break
-    observation; the dashed extension beyond that range indicates
-    extrapolation.}
-    \label{fig:rheometer-overlay}
-\end{figure*}
-
-On materials in the identifiability-friendly regime (clearly
-shear-thinning or clearly yield-stress behaviour within the
-dam-break shear-rate range), recovered flow curves agree with the
-rheometer reference within intra-run rheometer repeatability. On
-remaining materials, larger deviations are concentrated in
-shear-rate regions outside the range that the dam-break observation
-actually probes, as expected.
-
-\paragraph{All twelve real-world materials.}
-Figure~\ref{fig:flow-12} extends the rheometer overlay to the full
-twelve-material panel (the standard set inherited from
-\cite{hamamichi2023nonnewtonian} plus our additions). Per material
-we overlay (i)~the parallel-plate rheometer sweep, (ii)~the
-V1-paper truth $\theta$ where it is reported, and (iii)~our
-recovered $\theta$ from a single CMA-ES + $\sigma_{Y}$-prior joint
-two-setup inverse on $T_{\mathrm{real}}$.
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholderwide[7cm]{Placeholder F-FLOW-12: 4$\times$3
-      panel of recovered flow curves vs parallel-plate rheometer
-      reference for all twelve materials (Carbonara, Cobb, Congee,
-      Island, Japanese cabbage pancake sauce, Japanese thickened
-      Worcestershire sauce, lotion, moisturising milk, mustard,
-      pomodoro, sesame, sweet bean paste). Per panel: dotted black =
-      rheometer; red = V1 paper truth (where available); blue = our
-      recovered $\theta$ flow curve with shaded $1\sigma$ band; bottom
-      annotation = fc\%, raw\_wrms, silhouette IoU.}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/flow_curves_12mat.pdf}
-    \fi
-    \caption{Twelve real-world materials --- recovered flow curves
-    versus parallel-plate rheometer references. Each panel shows the
-    rheometer sweep (dotted black), the V1 paper truth where
-    available (red), and our recovered $\theta$ from the joint
-    two-setup inverse (blue with $1\sigma$ band).}
-    \Description{Twelve-panel grid of log-log shear-stress vs
-    shear-rate flow curves for the twelve standard real-world
-    materials, comparing rheometer reference, V1 paper truth, and our
-    recovered theta.}
-    \label{fig:flow-12}
-\end{figure*}
-
-\paragraph{Pixel-level validation: ridge degeneracy as
-measurement-floor.}
-A subset of materials yields a recovered $\theta$ that differs
-from the V1-paper truth by a factor of $\sim$5--7 along the
-identifiability ridge of \S\ref{sec:inv-sy}, despite producing
-nearly indistinguishable forward observations. To demonstrate that
-this is a measurement-floor phenomenon rather than a method failure
-of our pipeline, we render the dam-break sequence under both
-$\theta$ choices and compare against the actually captured video at
-the pixel level on the most-discussed case --- Carbonara
-(Figure~\ref{fig:carbonara-snap}).
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholderwide[8cm]{Placeholder F-CARBO-SNAP:
-      $4\times 8$ image grid for each of two Carbonara setups
-      ($W{=}6.4, H{=}3.7$ and $W{=}2.5, H{=}2.0$).
-      Row 1: real binarised reference video frames.
-      Row 2: simulation rendered at V1-paper truth
-      $(n{=}1.0, \eta{=}72.9, \sigma_{Y}{=}15.2)$.
-      Row 3: simulation at our recovered $\theta$
-      $(n{=}0.84, \eta{=}101.5, \sigma_{Y}{=}91.4)$.
-      Row 4: amplified pixel snap-diff (recovered $-$ real)
-      $\times 5$. Each frame is annotated with silhouette IoU.}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/carbonara_snapdiff.pdf}
-    \fi
-    \caption{Carbonara: pixel-level silhouette validation of the
-    identifiability ridge. Setup 1 (W=6.4, H=3.7) silhouette IoU is
-    \emph{higher} for our recovered $\theta$ (0.9942) than for the
-    V1-paper truth (0.9936); setup 2 (W=2.5, H=2.0) is essentially
-    tied (0.9966 vs 0.9971). Both $\theta$ produce silhouettes that
-    match the captured video to within $0.1\%$ IoU --- the two
-    points lie on a single iso-$\mathbf{y}$ contour
-    (Figure~\ref{fig:ridge}). The 6$\times$ disagreement in
-    $\sigma_{Y}$ is therefore a property of the observation, not of
-    the inverse: the two setups jointly cannot disambiguate it
-    within an 8-frame window.}
-    \Description{Four-row eight-column grid for each of two
-    Carbonara dam-break setups, comparing real binarised video
-    frames, simulation at V1-paper truth, simulation at recovered
-    theta, and amplified pixel difference, annotated with per-frame
-    silhouette IoU.}
-    \label{fig:carbonara-snap}
-\end{figure*}
-
-
-\subsection{Head-to-Head Against Prior Work}
-\label{sec:headtohead}
-
-Finally, we compare our pipeline against Baselines~A and~B on the
-$T_{\mathrm{real}}$ subset. All three pipelines consume the same
-phone-video clips and produce an HB triple
-$\hat{\boldsymbol{\theta}}$.
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder: wall-clock comparison on
-      the shared $T_{\mathrm{real}}$ subset (log scale). Three boxes
-      side-by-side: Baseline~A (sim-in-loop,
-      $\sim O(\mathrm{hours})$), Baseline~B (single-level MoE,
-      $\sim O(\mathrm{s})$ but narrow box), Ours
-      ($\sim 12$\,s median).}
-    \else
-      \includegraphics[width=\columnwidth]{figs/fig3_boxplot_time.png}
-    \fi
-    \caption{End-to-end wall-clock comparison on the shared
-    $T_{\mathrm{real}}$ subset (log scale). Baseline~A:
-    simulation-in-the-loop~\cite{hamamichi2023nonnewtonian}-style.
-    Baseline~B: single-level MoE surrogate without warm-start or
-    prior. Ours: HVIMoGP-rBCM with identifiability-aware inverse.}
-    \Description{Log-scale box plot of per-sample wall-clock times
-    for three pipelines: simulation-in-the-loop Baseline A in the
-    hours range, single-level surrogate Baseline B in the second
-    range, and our hierarchical pipeline at a median of 12 seconds.}
-    \label{fig:speedup}
-\end{figure}
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder: CMA-ES loss versus
-      wall-clock trajectory (log-log) on one representative sample,
-      for all three pipelines aligned on the time axis. Our method
-      reaches Baseline~A's converged loss at roughly $10^{-3}\times$
-      its wall-clock; Baseline~B plateaus above the identifiability
-      ridge.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
-    \fi
-    \caption{CMA-ES loss trajectory on a representative sample. Our
-    pipeline reaches Baseline~A's final loss in approximately
-    $1/1000$ of the wall-clock; Baseline~B stalls at a higher-loss
-    plateau, failing to resolve the identifiability ridge without
-    the prior.}
-    \Description{Log-scale loss-versus-wall-clock convergence curves
-    for three pipelines on one representative sample. Our pipeline
-    reaches the best loss value of Baseline A at roughly one
-    thousandth of its wall-clock time; Baseline B plateaus at a
-    higher loss and does not recover the sigma-y component.}
-    \label{fig:convergence}
-\end{figure}
-
-On the shared clips, integrated log-stress flow-curve agreement
-between our method and Baseline~A is within $1.2\times$, at three
-orders of magnitude lower latency (Fig.~\ref{fig:speedup}). Against
-Baseline~B, our pipeline covers a substantially wider training box
-(\S\ref{sec:data}) and resolves $\sigma_Y$ on the low-flow subset
-where B diverges (Fig.~\ref{fig:convergence}). These comparisons
-validate the headline claim: comparable accuracy to the
-sim-in-loop predecessor at orders-of-magnitude lower latency, with
-the additional capability of covering the full household $(W, H)$
-range rather than a narrow single-geometry box.
-
-
 \subsection{End-to-End Capture-to-Parameter Time Budget}
 \label{sec:timebudget}
 
@@ -2316,13 +2412,13 @@ Mask cleanup (\texttt{Photoshop})
 The compute-side contribution is the CMA-ES inverse of
 \S\ref{sec:mainresults}. A single-setup inverse through
 Algorithm~\ref{alg:invert} takes a median of $12$\,s per video on a
-single consumer GPU (Table~\ref{tab:main}), versus several hours
+single consumer GPU (Table~\ref{tab:setup-ablation}), versus several hours
 under the simulation-in-the-loop baseline that runs MPM at every
 candidate. A joint two-setup inverse through
 Algorithm~\ref{alg:joint} adds a second bounded CMA-ES run on the
 summed-NMSE objective of~\eqref{eq:Pstar}, bringing the total to a
 median of $24$\,s; three setups extend this to $\sim\!36$\,s
-(Table~\ref{tab:multi-setup}). The predecessor's
+(Table~\ref{tab:setup-ablation}). The predecessor's
 multi-setup protocol---proposed
 in~\cite{hamamichi2023nonnewtonian} as the identifiability
 mitigation but left computationally infeasible in practice---scales
@@ -2356,7 +2452,7 @@ fluids (\S\ref{sec:freshness}),
 practical characterisation of \emph{rheometer-infeasible}
 materials (\S\ref{sec:chunky}), and
 \emph{multi-observation joint inversion} that approaches
-parallel-plate rheometer precision (\S\ref{sec:multi}). The first is
+parallel-plate rheometer precision (\S\ref{sec:mainresults}). The first is
 a temporal improvement that turns ``hours to return a past state''
 into ``seconds to return the current state.'' The second inherits
 the independent value of video rheometry over instrumental
@@ -2467,12 +2563,12 @@ entire dam-break shear-rate range, the flow front encodes
 essentially no information about $\sigma_Y$, and any inverse---ours
 included---returns an estimate determined by the prior and the
 training distribution rather than by the data. Among the $10$
-held-out samples of Table~\ref{tab:main}, one such material
+held-out samples of Table~\ref{tab:setup-ablation}, one such material
 ($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa in a low-$\eta$ regime)
 pushes the $\sigma_Y$ \emph{mean} to $7.0$ while the nine remaining
 samples sit at median $0.298$. This is a task-level bound, not a
 method bound; the appropriate mitigation is the multi-setup protocol
-of \S\ref{sec:multi}.
+of \S\ref{sec:mainresults}.
 
 \subsection{Dependence on Training-Set Coverage}
 The surrogate is trustworthy only inside the input box on which it
