@@ -2050,27 +2050,36 @@ Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
     \label{fig:flow-real}
 \end{figure*}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_chuno_setup1.png}\\[2pt]
-    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_okonomi_setup1.png}
-    \caption{Frame-by-frame silhouette diagnostic on Chuno (top) and
-    Okonomiyaki (bottom) at setup-$1$.  Top three rows of each
-    panel: captured video, MPM forward at the recovered
-    $\hat{\boldsymbol{\theta}}$, MPM forward at the rheometer-truth
+    \includegraphics[width=\textwidth]{figs/real_world/snapdiff_okonomi_setup2.png}
+    \caption{Frame-by-frame silhouette diagnostic on Okonomiyaki at
+    setup-$2$ ($W=7.0$\,cm, $H=7.0$\,cm), the largest dam-break
+    geometry on the panel.  Top three rows: captured video, MPM
+    forward at the recovered $\hat{\boldsymbol{\theta}}$, MPM
+    forward at the rheometer-fitted
     $\boldsymbol{\theta}^{\!\star}$.  Bottom three rows: pixel
     differences (amplified $\times 5$): real$-$MPM$(\hat\theta)$,
-    real$-$MPM$(\theta^{\!\star})$, and MPM$(\hat\theta)$$-
-    $MPM$(\theta^{\!\star})$.  The bottom row is consistently
-    smaller than the upper two, indicating that the residual
-    real$-$MPM gap dominates over our parameter-recovery error.
-    Setup-$2$ snapdiffs are similar and are reported in the
-    supplemental material.}
-    \Description{Two stacked silhouette diagnostic panels per
-    material, with three rows of forward simulations and three
-    rows of pixel differences over eight frames.}
+    real$-$MPM$(\theta^{\!\star})$, and MPM$(\hat\theta)\,-\,$%
+    MPM$(\theta^{\!\star})$.  The bottom row is consistently
+    smaller than the upper two, even though
+    $\hat{\boldsymbol{\theta}}=(0.78, 21.4, 98.0)$ and
+    $\boldsymbol{\theta}^{\!\star}=(0.50, 67.0, 87.2)$ differ
+    substantially in $n$ and $\eta$: the two triples sit on the
+    $(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy} and predict
+    visually identical dam-break trajectories inside the captured
+    window, so the residual real$-$MPM gap is the dominant source
+    of disagreement, not our parameter-recovery error.  Setup-$1$
+    and the Chuno snapdiffs are reported in the supplemental
+    material.}
+    \Description{One silhouette diagnostic panel for Okonomiyaki
+    setup-2: three rows of forward simulations (real, recovered
+    theta, rheometer-truth theta) followed by three rows of pixel
+    differences across eight frames, showing that the
+    MPM-versus-MPM difference is smaller than the real-versus-MPM
+    difference.}
     \label{fig:snapdiff}
-\end{figure}
+\end{figure*}
 
 As reported by the predecessor on its own real-fluid panel,
 agreement at the parameter-triple level is not the relevant bar
@@ -2083,13 +2092,13 @@ in Fig.~\ref{fig:flow-real}: on both materials the joint
 two-setup curve tracks the parallel-plate reference inside the
 dam-break $\dot\gamma$ window, while the single-setup curve sits
 slightly off on Chuno (the predicted ridge displacement) and the
-joint update closes that gap.  The MPM-vs-MPM row of
-Fig.~\ref{fig:snapdiff} (third row of each block) makes the same
-point in pixel space: the silhouette difference between MPM at
-$\hat{\boldsymbol{\theta}}$ and MPM at the rheometer-fitted
-$\boldsymbol{\theta}^{\!\star}$ is visibly smaller than the
-real$-$MPM gap above, so any residual triple disagreement does
-not change the dam-break prediction inside the captured window.
+joint update closes that gap.  The MPM-vs-MPM bottom row of
+Fig.~\ref{fig:snapdiff} makes the same point in pixel space: the
+silhouette difference between MPM at $\hat{\boldsymbol{\theta}}$
+and MPM at the rheometer-fitted $\boldsymbol{\theta}^{\!\star}$
+is visibly smaller than the real$-$MPM gap above, so any residual
+triple disagreement does not change the dam-break prediction
+inside the captured window.
 Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.

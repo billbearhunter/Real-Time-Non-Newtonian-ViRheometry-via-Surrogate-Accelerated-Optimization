@@ -1097,16 +1097,15 @@ Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
     \label{fig:flow-real}
 \end{figure*}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_chuno_setup1.png}\\[2pt]
-    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_okonomi_setup1.png}
-    \caption{setup-$1$ 上 Chuno(上)与 Okonomiyaki(下)的逐帧剪影诊断。每个 panel 上三行:实拍视频、在恢复 $\hat{\boldsymbol{\theta}}$ 下的 MPM 前向、在流变仪真值 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 前向。下三行:像素差(放大 $\times 5$):real$-$MPM$(\hat\theta)$、real$-$MPM$(\theta^{\!\star})$、MPM$(\hat\theta)$$-$MPM$(\theta^{\!\star})$。最后一行始终小于上面两行,说明残余 real$-$MPM 差距支配于参数恢复误差。setup-$2$ 的剪影差类似,放在补充材料。}
-    \Description{两种材料的两叠剪影诊断 panel,每个 panel 三行前向仿真、三行像素差,跨八帧。}
+    \includegraphics[width=\textwidth]{figs/real_world/snapdiff_okonomi_setup2.png}
+    \caption{Okonomiyaki 在 setup-$2$($W=7.0$\,cm,$H=7.0$\,cm,面板上最大的溃坝几何)的逐帧剪影诊断。上三行:实拍视频、在恢复 $\hat{\boldsymbol{\theta}}$ 下的 MPM 前向、在流变仪拟合 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 前向。下三行:像素差(放大 $\times 5$):real$-$MPM$(\hat\theta)$、real$-$MPM$(\theta^{\!\star})$、MPM$(\hat\theta)\,-\,$MPM$(\theta^{\!\star})$。即使 $\hat{\boldsymbol{\theta}}=(0.78, 21.4, 98.0)$ 与 $\boldsymbol{\theta}^{\!\star}=(0.50, 67.0, 87.2)$ 在 $n$ 与 $\eta$ 上差距明显,最后一行依然显著小于上面两行:两组三元组都落在~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 上,在采集窗口内预测出视觉上相同的溃坝轨迹,因此残余 real$-$MPM 差距是分歧的主要来源,而不是参数恢复误差。setup-$1$ 与 Chuno 的剪影差放在补充材料。}
+    \Description{Okonomiyaki setup-2 的单个剪影诊断面板:三行前向仿真(实拍、恢复 theta、流变仪 truth)、三行像素差,跨八帧。}
     \label{fig:snapdiff}
-\end{figure}
+\end{figure*}
 
-如前作在自家真实流体面板上指出的:在视频流变里,参数三元组层面的吻合不是合适的判定标准——溃坝观测落在~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 上,多个三元组在溃坝 $\dot\gamma$ 窗口内会预测出几乎相同的流曲线。因此遵循~\citet{hamamichi2023nonnewtonian},我们从图~\ref{fig:flow-real} 的流曲线叠加读出恢复质量:两种材料上,联合两 setup 曲线在溃坝 $\dot\gamma$ 窗口内紧贴平板流变仪参考;Chuno 上单 setup 曲线略有偏离(预测中的 ridge 位移),联合更新把这一差距闭合。图~\ref{fig:snapdiff} 的 MPM-vs-MPM 行(每个 block 的第三行)在像素级表达同一观察:在 $\hat{\boldsymbol{\theta}}$ 下与在流变仪拟合 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 剪影差,明显小于上面的 real$-$MPM 差距,即任何残余三元组分歧都不改变溃坝在采集窗口内的预测。沿 ridge 的逐参数不确定由局部 Laplace--Hessian $95\%$ 区间(\S\ref{sec:inv-cma})报告,而非由手选先验掩盖。
+如前作在自家真实流体面板上指出的:在视频流变里,参数三元组层面的吻合不是合适的判定标准——溃坝观测落在~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 上,多个三元组在溃坝 $\dot\gamma$ 窗口内会预测出几乎相同的流曲线。因此遵循~\citet{hamamichi2023nonnewtonian},我们从图~\ref{fig:flow-real} 的流曲线叠加读出恢复质量:两种材料上,联合两 setup 曲线在溃坝 $\dot\gamma$ 窗口内紧贴平板流变仪参考;Chuno 上单 setup 曲线略有偏离(预测中的 ridge 位移),联合更新把这一差距闭合。图~\ref{fig:snapdiff} 最下面一行 (MPM-vs-MPM) 在像素级表达同一观察:在 $\hat{\boldsymbol{\theta}}$ 下与在流变仪拟合 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 剪影差,明显小于上面的 real$-$MPM 差距,即任何残余三元组分歧都不改变溃坝在采集窗口内的预测。沿 ridge 的逐参数不确定由局部 Laplace--Hessian $95\%$ 区间(\S\ref{sec:inv-cma})报告,而非由手选先验掩盖。
 
 ### 7.5 Characterising Rheometer-Infeasible Materials
 \label{sec:chunky}
