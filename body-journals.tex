@@ -1850,9 +1850,11 @@ trajectory distance under the \texttt{sim\_precision} profile),
 optimises each candidate pair in its own tight sub-expert box, and
 accepts the joint update only when it does not violate the first
 observation's truth-blind replay consistency.  The full $30$-case
-panel completed in $13.1$\,min on one consumer GPU; under the
-predecessor's per-case budget the same panel would take roughly
-$240$\,h, a $\sim\!10^{3}\times$ wall-clock contraction.
+panel completed in $13.1$\,min on one consumer GPU; extrapolating
+from the predecessor's reported $\sim\!8$\,h per single-setup
+inverse~\cite{hamamichi2023nonnewtonian}, the same $30$-case
+panel would take of order $240$\,h sim-in-loop, a
+$\sim\!10^{3}\times$ wall-clock contraction.
 Fig.~\ref{fig:flow-error-cdf} reports the cumulative distributions
 of parameter and forward replay error across the panel.
 
@@ -1874,8 +1876,9 @@ ranking) with per-pair tight-box joint optimisation and a
 truth-blind first-observation consistency guard, so the joint
 update preserves rather than regresses the single-setup result.
 The full panel, including second-setup MLS-MPM observation
-synthesis, took $13.1$\,min, versus an estimated $240$\,h budget
-under the predecessor's sim-in-loop wall-clock.}
+synthesis, took $13.1$\,min, versus an estimated $\sim\!240$\,h
+extrapolated from the predecessor's per-inverse
+wall-clock~\cite{hamamichi2023nonnewtonian}.}
 \label{tab:setup-ablation}
 \begin{tabular}{@{}cccccrr@{}}
 \toprule
