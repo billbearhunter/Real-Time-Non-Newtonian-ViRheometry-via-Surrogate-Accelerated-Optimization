@@ -1981,6 +1981,8 @@ Moisturising milk  & $(4.5, 3.5)$ & $(4.5, 2.0)$
                    & $0.85$ & $23.3$  & $167.6$ & $7$\,s \\
 Lotion             & $(6.1, 2.8)$ & $(7.0, 6.5)$
                    & $0.37$ & $163.1$ & $2.6$  & $5$\,s \\
+Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
+                   & $0.44$ & $219.0$ & $253.7$ & $7$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2023,20 +2025,28 @@ Lotion             & $(6.1, 2.8)$ & $(7.0, 6.5)$
     Hamamichi rheometer-reference panel, in the layout
     of~\citet{hamamichi2023nonnewtonian} Fig.~$13$.  Dotted black:
     parallel-plate rheometer sweep on the same batch.  Red:
-    single-setup recovery.  Blue: joint two-setup recovery.  Four
-    materials are reported here; the remaining two panels follow
-    once the matching captures and rheometer sweeps are paired.
-    On Chuno, Okonomiyaki, and Lotion the joint curve overlaps the
+    single-setup recovery.  Blue: joint two-setup recovery.  Five
+    materials are reported here; the remaining panel follows once
+    the matching capture and rheometer sweep are paired.  On
+    Chuno, Okonomiyaki, and Lotion the joint curve overlaps the
     parallel-plate reference inside the dam-break shear-rate
     window; on Chuno the single-setup curve is biased toward
     higher $\sigma_Y$ (the predicted ridge displacement), and the
-    joint update closes that gap.  Moisturising milk illustrates
-    the synthetic-mode joint regression discussed in
-    \S\ref{sec:mainresults}: at $(W_2=4.5, H_2=2.0)$ the setup-2
-    sub picks up high-$\dot\gamma$ evidence that pulls the
-    recovered $n$ toward the Newtonian limit, producing a joint
-    curve that disagrees with the rheometer at high $\dot\gamma$
-    even though the single-setup curve was already close.}
+    joint update closes that gap.  Sweet bean paste shows the
+    same mechanism in the opposite direction: single setup
+    over-estimates $\sigma_Y$ at $38$\,Pa, joint pulls it to
+    $25$\,Pa within $10\%$ of the rheometer reference, while $n$
+    and $\eta$ compensate along the ridge so the visible
+    log--log flow curve barely moves -- a clean data instance of
+    the $\sigma_Y$/$\eta$ ridge of \S\ref{sec:inv-sy} expressed at
+    the parameter level rather than the curve level.  Moisturising
+    milk illustrates the synthetic-mode joint regression discussed
+    in \S\ref{sec:mainresults}: at $(W_2=4.5, H_2=2.0)$ the
+    setup-2 sub picks up high-$\dot\gamma$ evidence that pulls
+    the recovered $n$ toward the Newtonian limit, producing a
+    joint curve that disagrees with the rheometer at high
+    $\dot\gamma$ even though the single-setup curve was already
+    close.}
     \Description{Two-by-three grid of log-log flow-curve overlays.
     Each panel shows a rotational-rheometer sweep alongside the
     single-setup and joint-setup flow curves recovered by our

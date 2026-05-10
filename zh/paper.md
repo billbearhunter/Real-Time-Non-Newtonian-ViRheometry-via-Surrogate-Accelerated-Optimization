@@ -1042,6 +1042,8 @@ Okonomiyaki        & $(2.2, 2.5)$ & $(7.0, 7.0)$
                    & $0.85$ & $23.3$  & $167.6$ & $7$\,s \\
 化妆水             & $(6.1, 2.8)$ & $(7.0, 6.5)$
                    & $0.37$ & $163.1$ & $2.6$  & $5$\,s \\
+甜面酱             & $(4.8, 4.1)$ & $(2.5, 2.5)$
+                   & $0.44$ & $219.0$ & $253.7$ & $7$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1080,7 +1082,7 @@ Okonomiyaki        & $(2.2, 2.5)$ & $(7.0, 7.0)$
         \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_mat6_single_vs_joint.png}{(f) 第六种 Hamamichi 材料(待定):流变仪 + 单 setup + 联合曲线;待采集。}\\
         {\footnotesize (f) [第六种材料]}
     \end{minipage}
-    \caption{Hamamichi 流变仪参考面板上恢复的 HB 流曲线,布局遵循~\citet{hamamichi2023nonnewtonian} 的 Fig.~$13$。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。这里报告四种材料,其余两个 panel 在配对的采集与流变仪扫描完成后填入。Chuno、Okonomiyaki、化妆水(Lotion)上联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 位移),联合更新把这一差距闭合。保湿乳是\S\ref{sec:mainresults} 讨论的合成模式 joint 退步的失败模式样例:在 $(W_2=4.5, H_2=2.0)$ 处 setup-2 sub 选到的高-$\dot\gamma$ 证据把恢复的 $n$ 拉向 Newtonian 极限,虽然单 setup 已经接近,joint 曲线在高 $\dot\gamma$ 处反而偏离了流变仪。}
+    \caption{Hamamichi 流变仪参考面板上恢复的 HB 流曲线,布局遵循~\citet{hamamichi2023nonnewtonian} 的 Fig.~$13$。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。这里报告五种材料,剩余一个 panel 在配对的采集与流变仪扫描完成后填入。Chuno、Okonomiyaki、化妆水(Lotion)上联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 位移),联合更新把这一差距闭合。甜面酱(Sweet bean paste)展示同一机制反向作用:单 setup 把 $\sigma_Y$ 估高到 $38$\,Pa,joint 把它拉到 $25$\,Pa 与流变仪参考的 $23$\,Pa 之差 $10\%$ 内,而 $n$ 与 $\eta$ 沿 ridge 互补,使可见的 log--log 流曲线几乎不动 —— 这是\S\ref{sec:inv-sy} 的 $\sigma_Y$/$\eta$ ridge 在参数层(而非曲线层)的清晰真实数据样例。保湿乳(Moisturising milk)是\S\ref{sec:mainresults} 讨论的合成模式 joint 退步的失败模式样例:在 $(W_2=4.5, H_2=2.0)$ 处 setup-2 sub 选到的高-$\dot\gamma$ 证据把恢复的 $n$ 拉向 Newtonian 极限,虽然单 setup 已经接近,joint 曲线在高 $\dot\gamma$ 处反而偏离了流变仪。}
     \Description{二行三列 log-log 流曲线叠加网格;每个 panel 对应一种 Hamamichi 参考材料的流变仪扫描、单 setup 与联合 setup 恢复。}
     \label{fig:flow-real}
 \end{figure*}
