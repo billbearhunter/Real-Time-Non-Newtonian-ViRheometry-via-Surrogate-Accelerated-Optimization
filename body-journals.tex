@@ -1868,7 +1868,7 @@ error and forward replay error are correlated but not identical:
 sliding along the HB ridge can move $\eta$ and $\sigma_Y$ while leaving
 the dam-break trajectory nearly unchanged.  We therefore also report
 flow-curve overlays and the actual $\dot\gamma$ ranges visited by
-representative replay cases in Figs.~\ref{fig:flowcurve-syn} and
+diagnostic replay categories in Figs.~\ref{fig:flowcurve-syn} and
 \ref{fig:gamma-replay}.
 
 \begin{figure}[!htbp]
@@ -1893,19 +1893,21 @@ can agree with the ground-truth curve over the shear-rate range
 probed by the dam-break experiment, even when the parameter triple
 itself slides along the $(\eta,\sigma_Y)$ ridge.
 Figure~\ref{fig:flowcurve-syn} overlays $\hat\tau$ on the ground
-truth for representative panel cases selected from the replay
+truth for diagnostic panel categories selected from the replay
 diagnostic.
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
     \caption{Recovered flow curves $\hat\tau(\dot\gamma)$ (blue)
-    versus ground truth (black) on representative synthetic replay
-    cases.  The green band marks the conventional HB-fit
+    versus ground truth (black) on five diagnostic synthetic replay
+    categories: accurate recovery, large replay error,
+    ridge-equivalent parameters, joint rescue, and joint regression.
+    The green band marks the conventional HB-fit
     $1$--$100\,\mathrm{s}^{-1}$ range, while the surrounding grey band
     covers the wider rheometer-style shear-rate window.}
     \Description{Log-log Herschel-Bulkley flow-curve overlays for
-    representative synthetic cases selected from the replay diagnostic.}
+    diagnostic synthetic categories selected from the replay diagnostic.}
     \label{fig:flowcurve-syn}
 \end{figure}
 
@@ -1913,14 +1915,15 @@ diagnostic.
     \centering
     \includegraphics[width=\columnwidth]{figs/results/gamma_representatives.png}
     \caption{Particle-level shear-rate coverage during MLS-MPM replay
-    of representative synthetic cases.  Vertical bars show the
+    of the same five diagnostic categories as Fig.~\ref{fig:flowcurve-syn}.
+    Vertical bars show the
     $5$--$95$ percentile range of $\dot\gamma$ over particles and
     frames; dots show the median.  Most replay trajectories spend
     substantial mass inside the HB-fit window, explaining why flow
     curves remain meaningful even when the parameter triple moves
     along an identifiability ridge.}
-    \Description{Shear-rate percentile ranges for representative
-    MLS-MPM replay cases, with rheometer and HB-fit windows shaded.}
+    \Description{Shear-rate percentile ranges for five diagnostic
+    MLS-MPM replay categories, with rheometer and HB-fit windows shaded.}
     \label{fig:gamma-replay}
 \end{figure}
 
