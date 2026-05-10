@@ -196,11 +196,7 @@ $$
 
 \begin{figure*}[t]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[6cm]{生产管线占位:标定后的视频 $\to$ 八个流前沿距离 $\mathbf{y}_{\mathrm{obs}}$;离线 MPM 语料 $\to$ $25$ 个几何条件的轨迹形状子专家 bank;在线三阶段路由,带 source-aware 观测证据重排 $\to$ 精确 GP 后验均值 / 方差;GP-aware Type-II ML 损失 $\to$ 多重启 CMA-ES;可选 Hessian-正交 setup-2 提议与两 setup 联合反演。}
-    \else
-      \includegraphics[width=\textwidth]{figs/method_overview.pdf}
-    \fi
+    \includegraphics[width=\textwidth]{figs/method_overview.pdf}
     \caption{随附代码实现的生产管线。用户提供一个观测到的流前沿向量 $\mathbf{y}_{\mathrm{obs}}$ 与 setup 几何 $(W,H)$。一组冻结的局部精确 GP 专家先把观测通过几何与 y-shape 分区路由,然后在一个有界 CMA-ES 反演内部计算一个 GP-aware 似然。两 setup 材料情形下,两次观测共享一个 $\boldsymbol{\theta}$ 的同时各自保留被路由专家。}
     \Description{生产反演管线的方框图:观测提取、分层路由到一个局部 GP 专家、GP-aware 似然、CMA-ES 反演,以及可选的两 setup 联合恢复。}
     \label{fig:overview}
@@ -370,18 +366,6 @@ $$
 $$
 其中 $\{Y_{s,i,\cdot}\}_i$ 是分配给子专家 $s$ 的轨迹,$\alpha_d$ 是反演损失使用的 frame weights(\S\ref{sec:inv-nn};表~\ref{tab:hyper})。两个 profile 都返回单一主子专家 $s_{\mathrm{prod}}\in\{s_{\mathrm{real}},s_{\mathrm{sim}}\}$,反演直接使用这个 top-1 专家,不在候选之间做集成聚合。
 
-\begin{figure*}[t]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{占位 F-PARTITION:生产轨迹形状 bank 的 $25$ 个几何条件子 bank、长度 bin、PCA / K-means 形状 cluster、以及逐子专家的规模 / 支撑统计。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/method/partition_3layer.pdf}
-    \fi
-    \caption{生产路由 bank。模型按几何、终端位移、归一化轨迹形状切分;最后由一次观测证据重排选出反演所用的主子专家。该重排包含真实视频 robust profile(Eq.~\eqref{eq:y8q}) 和 simulator-matched precision profile(Eq.~\eqref{eq:simprecision})。}
-    \Description{三层路由的可视化:几何、长度、形状、以及最终观测证据重排。}
-    \label{fig:partition}
-\end{figure*}
-
 \paragraph{为何使用确定性路由。}
 \label{sec:surr-deterministic}
 反演时材料参数未知,但 $(W,H,\mathbf{y}_{\mathrm{obs}})$ 是被观测到的。在可观测量上做路由避开了一个会要求未知 $\boldsymbol{\theta}$ 的循环 gate,并通过检查所选子专家的训练 box 使越界情形可被诊断。
@@ -515,18 +499,6 @@ $$
 \paragraph{无显式 $\sigma_Y$ 先验下的 Ridge 诊断。}
 \label{sec:inv-sy}
 Herschel--Bulkley 观测可能在一个 $(\eta,\sigma_Y)$ ridge 上仍然弱可识别。我们不使用人工选择的 $\sigma_Y$ 先验来打破这条 ridge;残余的不确定度通过 CMA-ES 最优解的多重启散度,以及一个局部 Laplace--Hessian 置信区间(\S\ref{sec:inv-cma})来暴露,因此报告的不确定度被绑定在似然与数据上,而不是绑定在用户挑选的锚定上。
-
-\begin{figure}[t]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{占位 F-RIDGE:在 $(\log\eta,\log\sigma_Y)$ 上的预测 $y_8$ 等高线,展示 HB ridge 以及如何用两个 setup 的似然或 Hessian 诊断揭示弱可识别方向。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/method/ridge_identifiability.pdf}
-    \fi
-    \caption{HB ridge 诊断。单 setup 流前沿观测可能沿一个耦合的 $(\log\eta,\log\sigma_Y)$ 方向近似不变。我们用联合 setup 似然、重启散度与局部 Hessian 区间来报告这种不确定度,而不是强加一个显式的 $\sigma_Y$ 先验。}
-    \Description{HB 识别性 ridge 的等高线图,以及通过联合似然与不确定度估计做诊断的图示。}
-    \label{fig:ridge}
-\end{figure}
 
 \paragraph{GP-aware Type-II ML 损失。}
 \label{sec:inv-loss}
@@ -922,11 +894,7 @@ $R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{占位:代理预测 $\hat{\mathbf{y}}$ 与 MPM 真值 $\mathbf{y}$ 在 $42{,}583$ 个 held-out MPM rows 上的 parity plot,每个 flow-front frame 一个 panel。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
     \caption{$N=42{,}583$ 个 held-out MPM rows 上的 surrogate parity,每个 flow-front frame $d=1\!\dots\!8$ 一个 panel。每行由其 training-time sub-expert assignment(oracle routing) forward;点是 $8{,}000$ 行随机 subsample。per-frame $R^2$ 与 MAE 在全部 $42{,}583$ 行上计算。点云在三个数量级的 flow-front distance 上贴近 identity line。}
     \Description{八个散点图,展示 42583 个 held-out samples 上 surrogate-predicted flow-front displacement 与 MPM ground truth 的关系;每个 frame 中点云都沿 identity line 紧密分布。}
     \label{fig:parity}
@@ -934,11 +902,7 @@ $R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{占位:$1{,}484$ 个子专家的逐 sub $R^{2}$ 分布,按 $25$ 个几何子 bank 分组。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
     \caption{具有 $\ge 5$ 条 held-out test rows 的 $1{,}484$ 个子专家上的 per-sub-expert $R^2$ 分布,按 $25$ 个几何子 bank 分组。Median $R^2 = 0.998$(红虚线),$p_5 = 0.965$(灰点线),upper-tail subs 到达 $R^2 \approx 1.000$。最低 outliers 来自 $g\in\{1,2,5\}$ 中最近 infilled cells,其训练集尚未 densify 到 production interior 水平;inverse-time top-$1$ rerank 除非 query 明确贴近边界,否则会避开它们。}
     \Description{1484 个按 25 个几何子 bank 分组的子专家 R-squared 箱线图;分布集中在 0.99 以上,少数 outliers 来自 recently-infilled cells。}
     \label{fig:expert-r2}
@@ -1015,11 +979,7 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{占位 F-REPLAY:$N=30$ 合成面板上参数误差与 MLS-MPM replay error 的累积分布。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
     \caption{与 Hamamichi 对齐的 $N=30$ 合成面板上的参数恢复与 MLS-MPM replay error。参数阈值 $E_{\mathrm{rel}}=0.1$ 沿用~\citet{hamamichi2023nonnewtonian}。把恢复的 $\hat{\boldsymbol{\theta}}$ 重新送入 MLS-MPM 后,median flow-front WRMS 为 $0.060$,median absolute flow-front error 为 $0.091$\,cm,median terminal-front error 为 $0.132$\,cm,说明许多接近参数阈值边界的估计仍然能作为 dam-break forward prediction 保持准确。}
     \Description{合成验证面板上参数相对误差、MPM replay flow-front error、terminal flow-front error 的累积分布。}
     \label{fig:flow-error-cdf}
@@ -1036,31 +996,12 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
     \label{fig:replay-scatter}
 \end{figure}
 
-\paragraph{相对模拟在环基线的收敛与墙上时钟。}
-在单个代表性案例上(图~\ref{fig:convergence}),我们的反演在大约 $10^{-3}\times$ 模拟在环前作的墙上时钟下达到其最低损失,而一个不带温启动或 ridge 诊断的单层代理在可识别性 ridge 之上停顿。临界点由 GP 前向调用代价($\sim\!30$\,ms 每查询)与 MPM 前向调用代价($\sim\!2$--$5$\,min 每查询)在同一 GPU 上的对比决定。
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{占位:在一个代表性合成案例上,我们的管线、模拟在环前作、单层代理基线三者的 CMA-ES 损失对墙上时钟轨迹(log-log)。我们的管线在大约 $10^{-3}\times$ 前作墙上时钟下达到其收敛损失;单层基线在可识别性 ridge 之上停顿。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
-    \fi
-    \caption{一个代表性合成案例上 CMA-ES 损失对墙上时钟(log-log)。我们的管线在大约 $1/1000$ 墙上时钟下达到模拟在环前作的收敛损失;单层代理基线停在更高损失平台,在没有~\S\ref{sec:inv-cma} 的 GP-aware 似然与多重启诊断时无法解决可识别性 ridge。}
-    \Description{三个管线在一个代表性合成样本上的对数尺度损失-时间收敛曲线。我们的管线在大约千分之一墙上时钟下达到前作的收敛损失;单层基线在更高损失上停顿,无法恢复屈服应力分量。}
-    \label{fig:convergence}
-\end{figure}
-
 \paragraph{合成样本上恢复的流曲线。}
 除了表~\ref{tab:setup-ablation} 的标量参数恢复之外,恢复出来的 Herschel--Bulkley \emph{flow curve} $\hat\tau(\dot\gamma)=\hat\sigma_Y+\hat\eta\,\dot\gamma^{\,\hat n}$ 可以在溃坝实验探测到的剪切率范围内与真值曲线一致,即使参数三元组本身沿 $(\eta,\sigma_Y)$ ridge 滑动也是如此。图~\ref{fig:flowcurve-syn} 在 replay diagnostic 选出的代表性面板案例上把 $\hat\tau$ 叠加在真值上。
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{占位:代表性 synthetic replay cases 上恢复 vs 真值的 Herschel--Bulkley flow curves。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
     \caption{代表性 synthetic replay cases 上恢复的 flow curves $\hat\tau(\dot\gamma)$(蓝)与真值(黑)。绿色带标记常规 HB-fit 的 $1$--$100\,\mathrm{s}^{-1}$ 范围,外侧灰色带覆盖更宽的 rheometer-style shear-rate window。}
     \Description{从 replay diagnostic 中选出的代表性合成案例上的 log-log Herschel-Bulkley flow-curve overlays。}
     \label{fig:flowcurve-syn}
@@ -1151,7 +1092,7 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
     \else
       \includegraphics[width=\textwidth]{figs/real_world/carbonara_snapdiff.pdf}
     \fi
-    \caption{Carbonara:可识别性 ridge 的像素级剪影验证。Setup 1(W=6.4, H=3.7)上,我们恢复的 $\theta$ 的剪影 IoU(0.9942)\emph{高于} V1 论文真值(0.9936);setup 2(W=2.5, H=2.0)实际上打平(0.9966 vs 0.9971)。两个 $\theta$ 都把采集视频匹配到 $0.1\%$ IoU 以内——两个点位于一条等-$\mathbf{y}$ 等高线上(图~\ref{fig:ridge})。$\sigma_{Y}$ 上 $6\times$ 的不一致因此是观测的属性而不是反演的缺陷:这两个 setup 在一个 $8$ 帧窗口内联合也无法消歧。}
+    \caption{Carbonara:可识别性 ridge 的像素级剪影验证。Setup 1(W=6.4, H=3.7)上,我们恢复的 $\theta$ 的剪影 IoU(0.9942)\emph{高于} V1 论文真值(0.9936);setup 2(W=2.5, H=2.0)实际上打平(0.9966 vs 0.9971)。两个 $\theta$ 都把采集视频匹配到 $0.1\%$ IoU 以内——两个点位于~\S\ref{sec:inv-sy} 描述的同一个等-$\mathbf{y}$ ambiguity 上。$\sigma_{Y}$ 上 $6\times$ 的不一致因此是观测的属性而不是反演的缺陷:这两个 setup 在一个 $8$ 帧窗口内联合也无法消歧。}
     \Description{两个 Carbonara 溃坝 setup 各自的四行八列网格,对比真实二值化视频帧、V1 论文真值仿真、恢复 theta 仿真与放大的像素差异,每帧标注剪影 IoU。}
     \label{fig:carbonara-snap}
 \end{figure*}
@@ -1368,11 +1309,11 @@ Mask 清理(\texttt{Photoshop})
 
 ### 8.2 A Reusable Surrogate as a Community Asset
 
-把一次性离线训练阶段与秒级在线推理阶段分离,产生了一个对模拟在环管线在结构上不可用的可复用产物。我们冻结的 $540$ 专家 checkpoint 训练一次,基于 $295{,}419$ 次覆盖 $\eta$ 与 $\sigma_Y$ $5.5$--$5.6$ 个数量级、且覆盖 $[2, 7]\,\mathrm{cm}$ 全家用容器范围的 MPM 仿真。后续用户——以及视频流变学的后续研究——可以查询同一个 checkpoint 而不必再付一次 MPM 训练代价。这一摊销性正是把我们的方法从一次性反演变成一台可复用测量仪器的关键;模拟在环管线不具备这一性质,因为它们没有可摊销的代理。我们随论文一并发布 checkpoint、训练语料和反演代码。
+把一次性离线训练阶段与秒级在线推理阶段分离,产生了一个对模拟在环管线在结构上不可用的可复用产物。我们冻结的 MoGP checkpoint 训练一次,基于 $295{,}419$ 次覆盖 $\eta$ 与 $\sigma_Y$ $5.5$--$5.6$ 个数量级、且覆盖 $[2, 7]\,\mathrm{cm}$ 全家用容器范围的 MPM 仿真。后续用户——以及视频流变学的后续研究——可以查询同一个 checkpoint 而不必再付一次 MPM 训练代价。这一摊销性正是把我们的方法从一次性反演变成一台可复用测量仪器的关键;模拟在环管线不具备这一性质,因为它们没有可摊销的代理。我们随论文一并发布 checkpoint、训练语料和反演代码。
 
-### 8.3 Why Regime-Aware Surrogate and Data-Honest Prior Must Go Together
+### 8.3 Why Regime-Aware Surrogate and Identifiability-Aware Inverse Must Go Together
 
-本文核心的一个 takeaway 是:代理与反演修改单独都不够。一个单一的全局 GP,即使它足够准确,在常规 CMA-ES 下仍然会留下 $\sigma_Y$ 可识别性 ridge 不被打破:优化器会滑到 $\sigma_Y \to 0$ 同时膨胀 $\eta$ 来匹配观测。反过来,~\S\ref{sec:inverse} 的可识别性感知反演要求一个准确代理在每段视频内被求值 $300$ 次;在一个粗糙代理上跑同一个反演会把代理偏置作为新的误差源重新引入。分层 MoGP-rBCM 代理与基于训练数据锚定的先验必须耦合;这种耦合就是技术核心。
+本文核心的一个 takeaway 是:代理与反演修改单独都不够。一个单一的全局 GP,即使它足够准确,在常规 CMA-ES 下仍然会留下 $\sigma_Y$ 可识别性 ridge 不被打破:优化器会滑到 $\sigma_Y \to 0$ 同时膨胀 $\eta$ 来匹配观测。反过来,~\S\ref{sec:inverse} 的可识别性感知反演要求一个准确代理在每段视频内被求值 $300$ 次;在一个粗糙代理上跑同一个反演会把代理偏置作为新的误差源重新引入。分层 MoGP-rBCM 代理必须与 GP-aware 反演耦合 —— 后者把 CMA-ES 限制在被路由专家的训练支撑内,并通过多重启 dispersion 与局部 Laplace--Hessian 区间读出残余 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 打破。这种耦合就是技术核心。
 
 ### 8.4 Relation to Differentiable MPM
 
@@ -1381,7 +1322,7 @@ Mask 清理(\texttt{Photoshop})
 
 ### 8.5 Conclusion
 
-我们提出了一个面向非牛顿视频流变的代理加速框架,把 Herschel--Bulkley 反演从模拟在环前作~\cite{hamamichi2023nonnewtonian} 的每 setup 大约八小时压缩到一台消费级 GPU 上每段视频中位 $12$\,s。该方法基于两个耦合分量:一个 regime 感知的分层 GP 专家混合代理(HVIMoGP-rBCM),含 $540$ 个由两层贝叶斯高斯混合 gate 在容器几何与观测签名上路由的专门化专家;以及一个可识别性感知反演,从被路由专家的最近训练邻居热启动 CMA-ES,并用一个 data-honest 软先验锚定 $\sigma_Y$ 轴——对屈服应力 / 稠度相似性退化的一个互补缓解,~\cite{hamamichi2023nonnewtonian} 处理这条退化用的是基于 Hessian 的相似性分析、一个 Poiseuille 流代理、主动 setup 选择、与迭代多 setup CMA-ES。我们的路径用训练数据先验与联合(而不是顺序)多 setup 反演替换 Hessian 机器,两者都因代理而变得切实可行。
+我们提出了一个面向非牛顿视频流变的代理加速框架,把 Herschel--Bulkley 反演从模拟在环前作~\cite{hamamichi2023nonnewtonian} 的每 setup 大约八小时压缩到一台消费级 GPU 上每段视频中位 $12$\,s。该方法基于两个耦合分量:一个 regime 感知的分层 GP 专家混合代理(HVIMoGP-rBCM),其局部训练的 exact-GP 专家由一个 deterministic 的三阶段 gate(容器几何 → 终端流距离 → 归一化轨迹形状,加最终观测证据重排)路由;以及一个可识别性感知的 GP-aware 反演,从被路由专家的最近训练邻居热启动 CMA-ES,并通过多重启 dispersion 与局部 Laplace--Hessian 95\% 置信区间报告残余的屈服应力 / 稠度 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 强行打破。\citet{hamamichi2023nonnewtonian} 处理同一条 ridge 用的是基于 Hessian 的相似性分析、一个 Poiseuille 流代理、主动 setup 选择、与迭代多 setup CMA-ES;我们的路径用代理摊销的诊断与一个 replay-consistency-guarded 的两 setup 联合反演(在保留单 setup 恢复的前提下)替换 Hessian 机器,两者都因代理而变得切实可行。
 
 除了运行时降幅之外,秒级反演解锁了模拟在环流变学不可达的三种能力:时变流体的新鲜参数估计、传统流变仪无法测量的材料的实用表征、以及一种仅靠手机视频就能接近平板流变仪精度的多观测联合协议。我们把训练好的代理、$295{,}419$ 行 MPM 训练语料与反演代码作为可复用社区产物释出,后续视频流变学研究可以在其上构建,而不必重复支付仿真训练代价。
 

@@ -2336,9 +2336,9 @@ as a separate accuracy claim.
 The separation of a one-time offline training phase from a
 seconds-scale online inference phase produces a reusable artefact
 that is structurally unavailable to simulation-in-the-loop pipelines.
-Our frozen $540$-expert checkpoint was trained once on
-$295{,}419$ MPM simulations covering $5.5$--$5.6$ orders of magnitude
-in $\eta$ and $\sigma_Y$ and the full $[2, 7]\,\mathrm{cm}$ range of
+Our frozen MoGP checkpoint was trained once on $295{,}419$ MPM
+simulations covering $5.5$--$5.6$ orders of magnitude in $\eta$
+and $\sigma_Y$ and the full $[2, 7]\,\mathrm{cm}$ range of
 household containers. Subsequent users---and subsequent research on
 video rheometry---can query the same checkpoint without paying the
 MPM training cost again. This amortisation property is what turns
@@ -2347,8 +2347,8 @@ instrument; it is not available to sim-in-loop pipelines because
 they have no surrogate to amortise. We release the checkpoint, the
 training corpus, and the inverse code alongside this paper.
 
-\subsection{Why Regime-Aware Surrogate and Data-Honest Prior Must Go
-Together}
+\subsection{Why Regime-Aware Surrogate and Identifiability-Aware
+Inverse Must Go Together}
 
 A takeaway at the core of this work is that neither the surrogate
 nor the inverse modifications is sufficient alone. A single global
@@ -2360,8 +2360,11 @@ of \S\ref{sec:inverse} requires an accurate surrogate to be evaluated
 $300$ times per video within seconds; running the same inverse
 against a coarse surrogate would reintroduce surrogate bias as a new
 source of error. The hierarchical MoGP-rBCM surrogate and the
-training-data-anchored prior must be coupled; this coupling is the
-technical core.
+GP-aware inverse---which keeps CMA-ES inside the routed expert's
+training support and reads the residual ridge through restart
+dispersion and the local Laplace--Hessian interval rather than
+through a hand-chosen $\sigma_Y$ prior---must be coupled; this
+coupling is the technical core.
 
 \subsection{Relation to Differentiable MPM}
 
@@ -2387,18 +2390,22 @@ around eight hours per setup in simulation-in-the-loop prior
 work~\cite{hamamichi2023nonnewtonian} to a median of $12$\,s per
 video on a single consumer GPU. The method rests on two coupled
 components: a regime-aware hierarchical Mixture-of-GP surrogate
-(HVIMoGP-rBCM) with $540$ specialised experts routed by a two-level
-Bayesian Gaussian mixture gate over container geometry and
-observation signatures, and an identifiability-aware inverse that
-warm-starts CMA-ES from the routed expert's nearest training
-neighbour and anchors the $\sigma_Y$ axis with a data-honest soft
-prior---a complementary mitigation for the
-yield-stress/consistency similarity degeneracy that~\cite{hamamichi2023nonnewtonian}
-treated through Hessian-based similarity analysis, a
-Poiseuille-flow proxy, active setup selection, and iterative
-multi-setup CMA-ES. Our path trades the Hessian machinery for
-training-data priors and joint (rather than sequential) multi-setup
-inversion, both made practical by the surrogate.
+(HVIMoGP-rBCM) whose locally-trained exact-GP experts are routed
+by a deterministic three-stage gate over container geometry,
+terminal flow displacement, and normalised trajectory shape, with
+a final observation-evidence rerank; and an identifiability-aware
+GP-aware inverse that warm-starts CMA-ES from the routed expert's
+nearest training neighbour and reports the residual
+yield-stress/consistency ridge through multi-restart dispersion and
+a local Laplace--Hessian $95\%$ confidence interval, rather than
+breaking the ridge with a hand-chosen $\sigma_Y$ prior.
+\citet{hamamichi2023nonnewtonian} mitigates the same ridge with
+Hessian-based similarity analysis, a Poiseuille-flow proxy, active
+setup selection, and iterative multi-setup CMA-ES; our path
+swaps that Hessian machinery for surrogate-amortised diagnosis and
+a replay-consistency-guarded two-setup joint inversion that
+preserves the single-setup recovery---both made practical by the
+surrogate.
 
 Beyond runtime reduction, the seconds-scale inverse makes two
 capabilities practical in the present paper: fresh parameter
