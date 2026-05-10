@@ -1042,22 +1042,60 @@ Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
-    \begin{minipage}{0.49\columnwidth}
+    % Row 1
+    \begin{minipage}[t]{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figs/real_world/y8q_chuno_single_vs_joint.png}\\
-        {\footnotesize (a) Chuno}
+        {\footnotesize (a) Chuno(中浓酱)}
     \end{minipage}\hfill
-    \begin{minipage}{0.49\columnwidth}
+    \begin{minipage}[t]{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figs/real_world/y8q_okonomi_single_vs_joint.png}\\
-        {\footnotesize (b) Okonomiyaki}
+        {\footnotesize (b) Okonomiyaki(御好烧酱)}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(c) 保湿乳:流变仪 + 单 setup + 联合曲线;待采集。}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_lotion_single_vs_joint.png}\\
+          {\footnotesize (c) 保湿乳}
+        \fi
+    \end{minipage}\\[6pt]
+    % Row 2
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(d) 猪排酱(Tonkatsu):流变仪 + 单 setup + 联合曲线;待采集。}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_tonkatsu_single_vs_joint.png}\\
+          {\footnotesize (d) 猪排酱}
+        \fi
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(e) 甜面酱:流变仪 + 单 setup + 联合曲线;待采集。}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_sweetbean_single_vs_joint.png}\\
+          {\footnotesize (e) 甜面酱}
+        \fi
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(f) 第六种 Hamamichi 材料(待定):流变仪 + 单 setup + 联合曲线;待采集。}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_mat6_single_vs_joint.png}\\
+          {\footnotesize (f) [第六种材料]}
+        \fi
     \end{minipage}
-    \caption{两种 Hamamichi 流变仪参考材料上恢复的 HB 流曲线。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。两种材料上,联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 行为),联合曲线把这一差距闭合。}
-    \Description{Chuno 与 Okonomiyaki 的两个 log-log 流曲线叠加,显示流变仪参考、单 setup 恢复与联合 setup 恢复。}
+    \caption{Hamamichi 流变仪参考面板上恢复的 HB 流曲线,布局遵循~\citet{hamamichi2023nonnewtonian} 的 Fig.~$13$。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。这里报告两种材料,其余四个 panel 在配对的采集与流变仪扫描完成后填入。两种已报告材料上,联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 位移),联合更新把这一差距闭合。}
+    \Description{二行三列 log-log 流曲线叠加网格;每个 panel 对应一种 Hamamichi 参考材料的流变仪扫描、单 setup 与联合 setup 恢复。}
     \label{fig:flow-real}
-\end{figure}
+\end{figure*}
 
 \begin{figure}[!htbp]
     \centering

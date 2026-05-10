@@ -1981,31 +1981,74 @@ Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
-    \begin{minipage}{0.49\columnwidth}
+    % Row 1: 3 panels
+    \begin{minipage}[t]{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figs/real_world/y8q_chuno_single_vs_joint.png}\\
-        {\footnotesize (a) Chuno}
+        {\footnotesize (a) Chuno (Japanese thickened sauce)}
     \end{minipage}\hfill
-    \begin{minipage}{0.49\columnwidth}
+    \begin{minipage}[t]{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{figs/real_world/y8q_okonomi_single_vs_joint.png}\\
-        {\footnotesize (b) Okonomiyaki}
+        {\footnotesize (b) Okonomiyaki (cabbage pancake sauce)}
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(c) Moisturising milk: rheometer + single + joint flow curves; pending capture.}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_lotion_single_vs_joint.png}\\
+          {\footnotesize (c) Moisturising milk}
+        \fi
+    \end{minipage}\\[6pt]
+    % Row 2: 3 panels
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(d) Japanese pork-cutlet sauce: rheometer + single + joint flow curves; pending capture.}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_tonkatsu_single_vs_joint.png}\\
+          {\footnotesize (d) Japanese pork-cutlet sauce}
+        \fi
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(e) Sweet bean paste: rheometer + single + joint flow curves; pending capture.}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_sweetbean_single_vs_joint.png}\\
+          {\footnotesize (e) Sweet bean paste}
+        \fi
+    \end{minipage}\hfill
+    \begin{minipage}[t]{0.32\textwidth}
+        \centering
+        \iffigplaceholder
+          \figplaceholder[3.6cm]{(f) Sixth Hamamichi material (TBD): rheometer + single + joint flow curves; pending capture.}
+        \else
+          \includegraphics[width=\linewidth]{figs/real_world/y8q_mat6_single_vs_joint.png}\\
+          {\footnotesize (f) [sixth material]}
+        \fi
     \end{minipage}
-    \caption{Recovered Herschel--Bulkley flow curves on the two
-    Hamamichi rheometer-reference materials.  Dotted black: parallel-plate
-    rheometer sweep on the same batch.  Red: single-setup recovery.
-    Blue: joint two-setup recovery.  On both materials the joint
-    curve overlaps the rheometer reference inside the dam-break
-    shear-rate window; on Chuno the single-setup curve is biased
-    toward higher $\sigma_Y$ (the predicted regression), and the
-    joint curve closes that gap.}
-    \Description{Two log-log flow-curve overlays for Chuno and
-    Okonomiyaki, showing rheometer reference, single-setup
-    recovery, and joint-setup recovery.}
+    \caption{Recovered Herschel--Bulkley flow curves on the
+    Hamamichi rheometer-reference panel, in the layout
+    of~\citet{hamamichi2023nonnewtonian} Fig.~$13$.  Dotted black:
+    parallel-plate rheometer sweep on the same batch.  Red:
+    single-setup recovery.  Blue: joint two-setup recovery.  Two
+    materials are reported here; the remaining four panels follow
+    once the matching captures and rheometer sweeps are paired.
+    On both reported materials the joint curve overlaps the
+    rheometer reference inside the dam-break shear-rate window;
+    on Chuno the single-setup curve is biased toward higher
+    $\sigma_Y$ (the predicted ridge displacement), and the joint
+    update closes that gap.}
+    \Description{Two-by-three grid of log-log flow-curve overlays.
+    Each panel shows a rotational-rheometer sweep alongside the
+    single-setup and joint-setup flow curves recovered by our
+    inverse for one Hamamichi reference material.}
     \label{fig:flow-real}
-\end{figure}
+\end{figure*}
 
 \begin{figure}[!htbp]
     \centering
