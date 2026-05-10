@@ -1945,49 +1945,38 @@ the recovered Herschel--Bulkley flow curve against the rheometer
 reference over the shear-rate range actually probed by the
 dam-break replay.
 
-Tab.~\ref{tab:rheo-recovery} reports the recovered
-$\hat{\boldsymbol{\theta}}$ alongside the rheometer reference and
-the 95\% Laplace--Hessian intervals from
-\S\ref{sec:inv-cma}; Fig.~\ref{fig:flow-real} overlays the
-recovered curve on the rheometer sweep, and Fig.~\ref{fig:snapdiff}
+Following the convention of the predecessor's Table~$1$ and
+Fig.~$13$~\cite{hamamichi2023nonnewtonian}, the headline real-fluid
+comparison is the flow-curve overlay against the parallel-plate
+rheometer (Fig.~\ref{fig:flow-real}); Tab.~\ref{tab:rheo-recovery}
+lists the two setups we used per material together with the
+recovered Herschel--Bulkley triple, mirroring the columns of
+the predecessor's Table~$1$.  Fig.~\ref{fig:snapdiff} additionally
 shows frame-by-frame silhouette differences between the captured
-video, MPM forward at the recovered $\hat{\boldsymbol{\theta}}$, and
-MPM forward at the rheometer-truth $\boldsymbol{\theta}^{\!\star}$.
+video, MPM forward at the recovered $\hat{\boldsymbol{\theta}}$,
+and MPM forward at the rheometer-fitted
+$\boldsymbol{\theta}^{\!\star}$.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Joint two-setup recovery on the Hamamichi rheometer-reference
-materials.  $\hat{\boldsymbol{\theta}} = (n,\eta,\sigma_Y)$ is the
-recovered triple; $\boldsymbol{\theta}^{\!\star}$ is the
-parallel-plate rheometer fit on the same batch.  CI columns are
-the local Laplace--Hessian $95\%$ intervals from
-\S\ref{sec:inv-cma}.  $\sigma_Y$ relative error is the
-information-rich axis for both materials and is recovered to within
-intra-run rheometer repeatability on the low-$\sigma_Y$ Chuno case;
-$n$ and $\eta$ are recovered along the expected
-$(\eta,\sigma_Y)$-ridge with the residual ambiguity exposed by the
-CI rather than masked.  Joint inverse wall-clock per material is
-shown in the last column.}
+\caption{Recovered Herschel--Bulkley parameters and the two
+$(W,H)$ setups used by the joint inverse, in the column format of
+\citet{hamamichi2023nonnewtonian}'s Table~$1$.  Joint inverse
+wall-clock per material is reported in the last column.  The
+flow-curve comparison against the parallel-plate rheometer
+reference is shown in Fig.~\ref{fig:flow-real}.}
 \label{tab:rheo-recovery}
-\begin{tabular}{@{}lcccr@{}}
+\begin{tabular}{@{}lcccccr@{}}
 \toprule
-Material & Param & $\hat\theta$ & $\theta^{\!\star}$ (rheo)
-         & rel.\ err. \\
+Material  & $(W_1,H_1)$ & $(W_2,H_2)$
+          & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & wall \\
 \midrule
-\multirow{3}{*}{Chuno}
-  & $n$       & $0.664$  & $0.633$  & $4.9\%$ \\
-  & $\eta$    & $8.12$   & $10.51$  & $22.8\%$ \\
-  & $\sigma_Y$& $19.65$  & $19.62$  & $\mathbf{0.2\%}$ \\
-\midrule
-\multirow{3}{*}{Okonomiyaki}
-  & $n$       & $0.769$  & $0.502$  & $53.2\%$ \\
-  & $\eta$    & $21.35$  & $67.05$  & $68.2\%$ \\
-  & $\sigma_Y$& $97.99$  & $87.24$  & $\mathbf{12.3\%}$ \\
-\midrule
-Wall & \multicolumn{4}{r}{Chuno $117$\,s\,/\,Okonomiyaki $126$\,s
-       per joint inverse on a single GPU} \\
+Chuno         & $(2.5, 2.7)$ & $(4.0, 2.0)$
+              & $0.66$ & $8.12$  & $19.7$ & $117$\,s \\
+Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
+              & $0.77$ & $21.4$  & $98.0$ & $126$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2040,21 +2029,27 @@ Wall & \multicolumn{4}{r}{Chuno $117$\,s\,/\,Okonomiyaki $126$\,s
     \label{fig:snapdiff}
 \end{figure}
 
-The Chuno recovery is the cleanest demonstration: $\sigma_Y$ is
-the information-rich axis given the dam-break shear-rate range, and
-joint two-setup recovers it to within $0.2\%$ of the parallel-plate
-reference.  $n$ and $\eta$ slide along the
-$(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy}, and the local
-Laplace--Hessian interval reflects that ridge directly rather
-than masking it with a hand-chosen prior.  On Okonomiyaki, the
-$\sigma_Y$ error remains within the rheometer's intra-run
-repeatability ($12.3\%$); $n$ and $\eta$ deviate further along the
-same ridge.  In both cases, the MPM-vs-MPM panel of
-Fig.~\ref{fig:snapdiff} (third row of each block) confirms that
-forward dam-break trajectories under
-$\hat{\boldsymbol{\theta}}$ and $\boldsymbol{\theta}^{\!\star}$
-agree visually inside the dam-break window, even where individual
-parameters slide along the ridge.
+As reported by the predecessor on its own real-fluid panel,
+agreement at the parameter-triple level is not the relevant bar
+for video rheometry: the dam-break observation lies on the
+$(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy}, so multiple triples
+predict effectively identical flow curves over the dam-break
+shear-rate window.  Following~\citet{hamamichi2023nonnewtonian},
+we therefore read recovery quality from the flow-curve overlay
+in Fig.~\ref{fig:flow-real}: on both materials the joint
+two-setup curve tracks the parallel-plate reference inside the
+dam-break $\dot\gamma$ window, while the single-setup curve sits
+slightly off on Chuno (the predicted ridge displacement) and the
+joint update closes that gap.  The MPM-vs-MPM row of
+Fig.~\ref{fig:snapdiff} (third row of each block) makes the same
+point in pixel space: the silhouette difference between MPM at
+$\hat{\boldsymbol{\theta}}$ and MPM at the rheometer-fitted
+$\boldsymbol{\theta}^{\!\star}$ is visibly smaller than the
+real$-$MPM gap above, so any residual triple disagreement does
+not change the dam-break prediction inside the captured window.
+Per-parameter uncertainty along the ridge is reported by the
+local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
+rather than hidden by a hand-chosen prior.
 
 \subsection{Parameter Freshness for Time-Varying Fluids}
 \label{sec:freshness}

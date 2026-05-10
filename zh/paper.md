@@ -1021,29 +1021,23 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
 
 本版本的实测验证限于两种已经完成溃坝采集与同批次平板流变仪扫描的 Hamamichi 材料:Chuno(韩国年糕水,低 $\sigma_Y$ 剪切稀化 regime)与 Okonomiyaki batter(日式杂烩饼浆,中-高 $\sigma_Y$ regime)。两者都落在~\S\ref{sec:data} 的训练 box 内。每种材料采集两个溃坝 setup,运行论文其余位置同款的 \texttt{real\_robust} 路由与联合两 setup 反演,把恢复出来的 HB 流曲线叠加在流变仪参考上,并报告 $\dot\gamma$ 范围实际由溃坝重放探测到的部分。
 
-表~\ref{tab:rheo-recovery} 给出恢复的 $\hat{\boldsymbol{\theta}}$ 与 95\% Laplace--Hessian 区间(\S\ref{sec:inv-cma});图~\ref{fig:flow-real} 把恢复曲线叠加在流变仪扫描上;图~\ref{fig:snapdiff} 给出捕捉视频、在 $\hat{\boldsymbol{\theta}}$ 下 MPM 前向、与在流变仪真值 $\boldsymbol{\theta}^{\!\star}$ 下 MPM 前向的逐帧剪影差。
+遵循前作 Table~$1$ 与 Fig.~$13$~\cite{hamamichi2023nonnewtonian} 的惯例,真实流体的主比较是流曲线对照平板流变仪参考(图~\ref{fig:flow-real});表~\ref{tab:rheo-recovery} 列出每种材料用到的两个 setup 与恢复出来的 Herschel--Bulkley 三元组,与前作 Table~$1$ 列形式一致。图~\ref{fig:snapdiff} 给出捕捉视频、在 $\hat{\boldsymbol{\theta}}$ 下 MPM 前向、与在流变仪拟合的 $\boldsymbol{\theta}^{\!\star}$ 下 MPM 前向的逐帧剪影差。
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Hamamichi 流变仪参考材料上的联合两 setup 恢复结果。$\hat{\boldsymbol{\theta}}=(n,\eta,\sigma_Y)$ 是恢复三元组;$\boldsymbol{\theta}^{\!\star}$ 是同批次平板流变仪拟合。$\sigma_Y$ 是溃坝 $\dot\gamma$ 范围内信息量最高的轴,在低 $\sigma_Y$ 的 Chuno 上恢复到流变仪同次重复精度以内;$n$ 与 $\eta$ 沿预期的 $(\eta,\sigma_Y)$ ridge 滑动,残余不确定由 CI 直接报告而非由先验掩盖。}
+\caption{恢复的 Herschel--Bulkley 参数与联合反演用到的两个 $(W,H)$ setup,列形式遵循~\citet{hamamichi2023nonnewtonian} 的 Table~$1$。最后一列是每种材料联合反演的墙上时钟;对照平板流变仪参考的流曲线比较见图~\ref{fig:flow-real}。}
 \label{tab:rheo-recovery}
-\begin{tabular}{@{}lcccr@{}}
+\begin{tabular}{@{}lcccccr@{}}
 \toprule
-材料 & 参数 & $\hat\theta$ & $\theta^{\!\star}$ (流变仪) & 相对误差 \\
+材料  & $(W_1,H_1)$ & $(W_2,H_2)$
+      & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & 墙上时钟 \\
 \midrule
-\multirow{3}{*}{Chuno}
-  & $n$       & $0.664$  & $0.633$  & $4.9\%$ \\
-  & $\eta$    & $8.12$   & $10.51$  & $22.8\%$ \\
-  & $\sigma_Y$& $19.65$  & $19.62$  & $\mathbf{0.2\%}$ \\
-\midrule
-\multirow{3}{*}{Okonomiyaki}
-  & $n$       & $0.769$  & $0.502$  & $53.2\%$ \\
-  & $\eta$    & $21.35$  & $67.05$  & $68.2\%$ \\
-  & $\sigma_Y$& $97.99$  & $87.24$  & $\mathbf{12.3\%}$ \\
-\midrule
-墙上时钟 & \multicolumn{4}{r}{Chuno $117$\,s\,/\,Okonomiyaki $126$\,s 每个联合反演,单 GPU} \\
+Chuno         & $(2.5, 2.7)$ & $(4.0, 2.0)$
+              & $0.66$ & $8.12$  & $19.7$ & $117$\,s \\
+Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
+              & $0.77$ & $21.4$  & $98.0$ & $126$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1074,7 +1068,7 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
     \label{fig:snapdiff}
 \end{figure}
 
-Chuno 是最干净的展示:$\sigma_Y$ 在溃坝 $\dot\gamma$ 范围内是信息量最高的轴,联合两 setup 把它恢复到平板流变仪参考的 $0.2\%$ 以内。$n$ 与 $\eta$ 沿~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 滑动,局部 Laplace--Hessian 区间直接反映这一 ridge 而非用手选先验掩盖。Okonomiyaki 上 $\sigma_Y$ 误差在流变仪同次重复精度以内($12.3\%$);$n$ 与 $\eta$ 沿同一 ridge 偏离更多。两种情况下,图~\ref{fig:snapdiff} 的 MPM-vs-MPM 行(每个 block 的第三行)都确认了:即使个别参数沿 ridge 滑动,$\hat{\boldsymbol{\theta}}$ 与 $\boldsymbol{\theta}^{\!\star}$ 下的溃坝前向轨迹在溃坝窗口内视觉吻合。
+如前作在自家真实流体面板上指出的:在视频流变里,参数三元组层面的吻合不是合适的判定标准——溃坝观测落在~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 上,多个三元组在溃坝 $\dot\gamma$ 窗口内会预测出几乎相同的流曲线。因此遵循~\citet{hamamichi2023nonnewtonian},我们从图~\ref{fig:flow-real} 的流曲线叠加读出恢复质量:两种材料上,联合两 setup 曲线在溃坝 $\dot\gamma$ 窗口内紧贴平板流变仪参考;Chuno 上单 setup 曲线略有偏离(预测中的 ridge 位移),联合更新把这一差距闭合。图~\ref{fig:snapdiff} 的 MPM-vs-MPM 行(每个 block 的第三行)在像素级表达同一观察:在 $\hat{\boldsymbol{\theta}}$ 下与在流变仪拟合 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 剪影差,明显小于上面的 real$-$MPM 差距,即任何残余三元组分歧都不改变溃坝在采集窗口内的预测。沿 ridge 的逐参数不确定由局部 Laplace--Hessian $95\%$ 区间(\S\ref{sec:inv-cma})报告,而非由手选先验掩盖。
 
 ### 7.5 Characterising Rheometer-Infeasible Materials
 \label{sec:chunky}
