@@ -1965,11 +1965,30 @@ real-data joint inverses of \S\ref{sec:mainresults} and
 \S\ref{sec:rheometer}, which use \texttt{real\_robust} routing,
 do not exhibit this regression because the terminal-displacement
 rerank concentrates on a single conservative scalar that aligns
-the two legs' $\sigma_Y$ regimes.  Resolving the synthetic-mode
-joint regression -- e.g.\ via setup-2 routing anchored on the
-single-setup posterior $\hat{\boldsymbol{\theta}}_1$ rather than
-on $\mathbf{y}_{\mathrm{obs}}^{(2)}$, or per-leg
-likelihood weighting -- is left for future work.
+the two legs' $\sigma_Y$ regimes.
+
+To probe whether the synthetic-mode regression is a routing
+artefact we ran three controlled ablations on the same
+$N=294$ panel: $(i)$~mixing routing
+profiles (\texttt{sim\_precision} on setup-1 and
+\texttt{real\_robust} on setup-2), $(ii)$~constraining the
+Hessian-orthogonal proposer to $H\!\ge\!3$\,cm to avoid the
+shallow-box geometries that dominated the regressing cases,
+and $(iii)$~a setup-2 \emph{joint-consistency} rerank that
+picks the candidate sub-expert closest in z-space to
+$\hat{\boldsymbol{\theta}}_1$.  None recovered the
+single-setup pass rate; all stayed within $-3$ to $-5$ percentage
+points of the baseline.  The $z$-anchored rerank rescues
+$18/71$ baseline-regressed cases as designed, but breaks
+$20/41$ baseline preserved-pass cases when the chosen
+parameter-consistent sub no longer fits
+$\mathbf{y}_{\mathrm{obs}}^{(2)}$ tightly.  This pattern --
+mechanism-level rescue that is not yet net positive at panel
+scale -- suggests the synthetic-mode joint regression is
+not a single-knob routing fix but a structural coupling between
+local-GP basins and the additive joint likelihood, and is left
+for future work alongside Bayesian posterior fusion and
+per-leg likelihood weighting.
 
 \paragraph{Convergence and wall-clock against the simulation-in-the-loop
 baseline.}
