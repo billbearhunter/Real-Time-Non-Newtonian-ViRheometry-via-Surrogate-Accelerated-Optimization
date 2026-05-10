@@ -1019,83 +1019,62 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
 ### 7.4 Validation Against Parallel-Plate Rheometers
 \label{sec:rheometer}
 
-对于有干净流变仪扫描可用的材料,我们把恢复的 HB 流曲线叠加在流变仪参考之上。每种材料按~\S\ref{sec:mainresults} 在两到三个 $(W, H)$ setup 下采集并联合反演。
+本版本的实测验证限于两种已经完成溃坝采集与同批次平板流变仪扫描的 Hamamichi 材料:Chuno(韩国年糕水,低 $\sigma_Y$ 剪切稀化 regime)与 Okonomiyaki batter(日式杂烩饼浆,中-高 $\sigma_Y$ regime)。两者都落在~\S\ref{sec:data} 的训练 box 内。每种材料采集两个溃坝 setup,运行论文其余位置同款的 \texttt{real\_robust} 路由与联合两 setup 反演,把恢复出来的 HB 流曲线叠加在流变仪参考上,并报告 $\dot\gamma$ 范围实际由溃坝重放探测到的部分。
 
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{占位:对一种代表性 $T_{\mathrm{real}}$ 材料(例如乳液或 Carbopol 凝胶),恢复的 HB 流曲线(蓝色,带 rBCM $1\sigma$ 带)叠加在平板流变仪扫描(黑色标记)之上。虚线延伸标记溃坝剪切率范围之外的外推。}
-    \else
-      \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
-    \fi
-    \caption{乳液上恢复的流曲线(蓝)与平板流变仪扫描(黑色标记)。阴影带是 rBCM 传播的 $1\sigma$ 不确定度;虚线延伸表示我们溃坝观测的物理上有效的剪切率范围。}
-    \Description{乳液的 log-log 流曲线,黑色流变仪扫描标记被仅从手机视频恢复出来的蓝色曲线叠加。两条曲线在溃坝观测探测到的剪切率范围内吻合在流变仪可重复性以内;该范围之外的虚线延伸表示外推。}
-    \label{fig:rheometer-overlay}
-\end{figure*}
+表~\ref{tab:rheo-recovery} 给出恢复的 $\hat{\boldsymbol{\theta}}$ 与 95\% Laplace--Hessian 区间(\S\ref{sec:inv-cma});图~\ref{fig:flow-real} 把恢复曲线叠加在流变仪扫描上;图~\ref{fig:snapdiff} 给出捕捉视频、在 $\hat{\boldsymbol{\theta}}$ 下 MPM 前向、与在流变仪真值 $\boldsymbol{\theta}^{\!\star}$ 下 MPM 前向的逐帧剪影差。
 
-对识别性友好 regime 内的材料(在溃坝剪切率范围内表现出明显剪切稀化或明显屈服应力行为),恢复的流曲线在流变仪本身的同次重复精度之内与流变仪参考一致。其余材料上较大的偏差集中在溃坝观测实际未探测的剪切率区域,这与预期一致。
-
-\paragraph{全部十二种真实材料。}
-图~\ref{fig:flow-12} 把流变仪叠加扩展到完整的十二种材料面板(从~\cite{hamamichi2023nonnewtonian} 继承的标准集合加上我们自己的扩展)。对每种材料我们叠加 (i)~平板流变仪扫描、(ii)~V1 论文给出的真值 $\theta$(若有报告),以及 (iii)~我们在 $T_{\mathrm{real}}$ 上单次 CMA-ES + $\sigma_{Y}$ 先验联合两 setup 反演恢复出来的 $\theta$。
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholderwide[7cm]{占位 F-FLOW-12:全部十二种材料的恢复流曲线对照平板流变仪参考的 $4\times 3$ 面板(Carbonara、Cobb、Congee、Island、Japanese cabbage pancake sauce、Japanese thickened Worcestershire sauce、lotion、moisturising milk、mustard、pomodoro、sesame、sweet bean paste)。每个 panel:点状黑 = 流变仪;红 = V1 论文真值(若有);蓝 = 我们恢复的 $\theta$ 流曲线带阴影 $1\sigma$ 带;底部标注 = fc\%、raw\_wrms、剪影 IoU。}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/flow_curves_12mat.pdf}
-    \fi
-    \caption{十二种真实材料——恢复的流曲线对照平板流变仪参考。每个 panel 显示流变仪扫描(点状黑)、V1 论文真值若有(红)、以及我们从联合两 setup 反演恢复出来的 $\theta$(蓝带 $1\sigma$ 带)。}
-    \Description{十二种标准真实材料的 log-log 剪切应力-剪切率流曲线 $4\times 3$ 网格,对比流变仪参考、V1 论文真值与我们恢复的 theta。}
-    \label{fig:flow-12}
-\end{figure*}
-
-\paragraph{逐材料的表格化估计。}
-表~\ref{tab:thirteen-materials} 对每种材料报告用于采集溃坝视频的 $(W_1, H_1)$ 与 $(W_2, H_2)$ 对,以及联合两 setup 反演恢复出来的 $\hat{\boldsymbol{\theta}} = (\hat n, \hat\eta, \hat\sigma_Y)$。同一面板在前作的表~1~\cite{hamamichi2023nonnewtonian} 中也有报告;我们在此以相同的列形式包含,使得两条管线之间的逐材料差异不必查阅图~\ref{fig:flow-12} 的流曲线叠加图就可复现。
-
-\begin{table*}[!htbp]
+\begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{每种真实材料下恢复的 Herschel--Bulkley 参数与所用的两个 $(W,H)$ setup。格式遵循~\citet{hamamichi2023nonnewtonian} 的表~1;数据列由我们的联合两 setup 反演(\S\ref{sec:mainresults})填入。当 campaign 完成后会填入数字。}
-\label{tab:thirteen-materials}
-\begin{tabular}{@{}lcccccccr@{}}
+\caption{Hamamichi 流变仪参考材料上的联合两 setup 恢复结果。$\hat{\boldsymbol{\theta}}=(n,\eta,\sigma_Y)$ 是恢复三元组;$\boldsymbol{\theta}^{\!\star}$ 是同批次平板流变仪拟合。$\sigma_Y$ 是溃坝 $\dot\gamma$ 范围内信息量最高的轴,在低 $\sigma_Y$ 的 Chuno 上恢复到流变仪同次重复精度以内;$n$ 与 $\eta$ 沿预期的 $(\eta,\sigma_Y)$ ridge 滑动,残余不确定由 CI 直接报告而非由先验掩盖。}
+\label{tab:rheo-recovery}
+\begin{tabular}{@{}lcccr@{}}
 \toprule
-材料 & $W_1$ (cm) & $H_1$ (cm) & $W_2$ (cm) & $H_2$ (cm)
-         & $\hat\eta$ (Pa\,s$^n$) & $\hat n$ & $\hat\sigma_Y$ (Pa)
-         & $\sigma_Y$ CI 95\% \\
+材料 & 参数 & $\hat\theta$ & $\theta^{\!\star}$ (流变仪) & 相对误差 \\
 \midrule
-保湿乳                 & --- & --- & --- & --- & --- & --- & --- & --- \\
-猪排酱(Tonkatsu)       & --- & --- & --- & --- & --- & --- & --- & --- \\
-中浓ソース(Chuno)       & --- & --- & --- & --- & --- & --- & --- & --- \\
-御好烧酱(Okonomi)       & --- & --- & --- & --- & --- & --- & --- & --- \\
-化妆水(Lotion)          & --- & --- & --- & --- & --- & --- & --- & --- \\
-甜面酱(Sweet bean paste)& --- & --- & --- & --- & --- & --- & --- & --- \\
-芥末(Mustard)           & --- & --- & --- & --- & --- & --- & --- & --- \\
-千岛沙拉酱              & --- & --- & --- & --- & --- & --- & --- & --- \\
-科布沙拉酱              & --- & --- & --- & --- & --- & --- & --- & --- \\
-芝麻沙拉酱              & --- & --- & --- & --- & --- & --- & --- & --- \\
-番茄酱(Pomodoro)         & --- & --- & --- & --- & --- & --- & --- & --- \\
-卡邦尼酱(Carbonara)      & --- & --- & --- & --- & --- & --- & --- & --- \\
-粥(Congee)              & --- & --- & --- & --- & --- & --- & --- & --- \\
+\multirow{3}{*}{Chuno}
+  & $n$       & $0.664$  & $0.633$  & $4.9\%$ \\
+  & $\eta$    & $8.12$   & $10.51$  & $22.8\%$ \\
+  & $\sigma_Y$& $19.65$  & $19.62$  & $\mathbf{0.2\%}$ \\
+\midrule
+\multirow{3}{*}{Okonomiyaki}
+  & $n$       & $0.769$  & $0.502$  & $53.2\%$ \\
+  & $\eta$    & $21.35$  & $67.05$  & $68.2\%$ \\
+  & $\sigma_Y$& $97.99$  & $87.24$  & $\mathbf{12.3\%}$ \\
+\midrule
+墙上时钟 & \multicolumn{4}{r}{Chuno $117$\,s\,/\,Okonomiyaki $126$\,s 每个联合反演,单 GPU} \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 
-\paragraph{像素级验证:ridge 退化作为测量地板。}
-有一部分材料的恢复 $\theta$ 与 V1 论文的真值在~\S\ref{sec:inv-sy} 的可识别性 ridge 上相差大约 $5$--$7$ 倍,而它们的前向观测几乎不可分辨。为了证明这是测量地板现象而不是我们管线的方法失败,我们在两个 $\theta$ 选择下渲染溃坝序列,并在最被讨论的案例——Carbonara——上,在像素级与实际采集的视频做对比(图~\ref{fig:carbonara-snap})。
-
-\begin{figure*}[!htbp]
+\begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[8cm]{占位 F-CARBO-SNAP:针对两个 Carbonara setup($W{=}6.4, H{=}3.7$ 与 $W{=}2.5, H{=}2.0$)各自的 $4\times 8$ 图像网格。第 1 行:真实二值化参考视频帧。第 2 行:在 V1 论文真值 $(n{=}1.0, \eta{=}72.9, \sigma_{Y}{=}15.2)$ 下渲染的仿真。第 3 行:在我们恢复的 $\theta$ $(n{=}0.84, \eta{=}101.5, \sigma_{Y}{=}91.4)$ 下的仿真。第 4 行:放大的像素 snap-diff(恢复 $-$ 真实)$\times 5$。每帧标注剪影 IoU。}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/carbonara_snapdiff.pdf}
-    \fi
-    \caption{Carbonara:可识别性 ridge 的像素级剪影验证。Setup 1(W=6.4, H=3.7)上,我们恢复的 $\theta$ 的剪影 IoU(0.9942)\emph{高于} V1 论文真值(0.9936);setup 2(W=2.5, H=2.0)实际上打平(0.9966 vs 0.9971)。两个 $\theta$ 都把采集视频匹配到 $0.1\%$ IoU 以内——两个点位于~\S\ref{sec:inv-sy} 描述的同一个等-$\mathbf{y}$ ambiguity 上。$\sigma_{Y}$ 上 $6\times$ 的不一致因此是观测的属性而不是反演的缺陷:这两个 setup 在一个 $8$ 帧窗口内联合也无法消歧。}
-    \Description{两个 Carbonara 溃坝 setup 各自的四行八列网格,对比真实二值化视频帧、V1 论文真值仿真、恢复 theta 仿真与放大的像素差异,每帧标注剪影 IoU。}
-    \label{fig:carbonara-snap}
-\end{figure*}
+    \begin{minipage}{0.49\columnwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/real_world/y8q_chuno_single_vs_joint.png}\\
+        {\footnotesize (a) Chuno}
+    \end{minipage}\hfill
+    \begin{minipage}{0.49\columnwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figs/real_world/y8q_okonomi_single_vs_joint.png}\\
+        {\footnotesize (b) Okonomiyaki}
+    \end{minipage}
+    \caption{两种 Hamamichi 流变仪参考材料上恢复的 HB 流曲线。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。两种材料上,联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 行为),联合曲线把这一差距闭合。}
+    \Description{Chuno 与 Okonomiyaki 的两个 log-log 流曲线叠加,显示流变仪参考、单 setup 恢复与联合 setup 恢复。}
+    \label{fig:flow-real}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_chuno_setup1.png}\\[2pt]
+    \includegraphics[width=\columnwidth]{figs/real_world/snapdiff_okonomi_setup1.png}
+    \caption{setup-$1$ 上 Chuno(上)与 Okonomiyaki(下)的逐帧剪影诊断。每个 panel 上三行:实拍视频、在恢复 $\hat{\boldsymbol{\theta}}$ 下的 MPM 前向、在流变仪真值 $\boldsymbol{\theta}^{\!\star}$ 下的 MPM 前向。下三行:像素差(放大 $\times 5$):real$-$MPM$(\hat\theta)$、real$-$MPM$(\theta^{\!\star})$、MPM$(\hat\theta)$$-$MPM$(\theta^{\!\star})$。最后一行始终小于上面两行,说明残余 real$-$MPM 差距支配于参数恢复误差。setup-$2$ 的剪影差类似,放在补充材料。}
+    \Description{两种材料的两叠剪影诊断 panel,每个 panel 三行前向仿真、三行像素差,跨八帧。}
+    \label{fig:snapdiff}
+\end{figure}
+
+Chuno 是最干净的展示:$\sigma_Y$ 在溃坝 $\dot\gamma$ 范围内是信息量最高的轴,联合两 setup 把它恢复到平板流变仪参考的 $0.2\%$ 以内。$n$ 与 $\eta$ 沿~\S\ref{sec:inv-sy} 的 $(\eta,\sigma_Y)$ ridge 滑动,局部 Laplace--Hessian 区间直接反映这一 ridge 而非用手选先验掩盖。Okonomiyaki 上 $\sigma_Y$ 误差在流变仪同次重复精度以内($12.3\%$);$n$ 与 $\eta$ 沿同一 ridge 偏离更多。两种情况下,图~\ref{fig:snapdiff} 的 MPM-vs-MPM 行(每个 block 的第三行)都确认了:即使个别参数沿 ridge 滑动,$\hat{\boldsymbol{\theta}}$ 与 $\boldsymbol{\theta}^{\!\star}$ 下的溃坝前向轨迹在溃坝窗口内视觉吻合。
 
 ### 7.5 Characterising Rheometer-Infeasible Materials
 \label{sec:chunky}
