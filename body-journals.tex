@@ -526,9 +526,12 @@ propose the next physical experiment through the analytical
 Hessian-orthogonal rule of \citet{hamamichi2023nonnewtonian}, whose
 closed-form Fisher-information construction we adopt unchanged.
 
-\begin{figure*}[t]
+\begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\textwidth]{figs/method_overview.pdf}
+    \widefigureorplaceholder[5cm]{\textwidth}{figs/method_overview.pdf}{Placeholder METHOD OVERVIEW:
+    production inverse pipeline with observation extraction,
+    hierarchical routing to a local GP expert, GP-aware likelihood,
+    CMA-ES inverse, and optional two-setup joint recovery.}
     \caption{Production pipeline implemented by the accompanying code.
     The user supplies an observed flow-front vector
     $\mathbf{y}_{\mathrm{obs}}$ and setup geometry $(W,H)$. A frozen
@@ -1490,10 +1493,10 @@ against four questions: (1) how faithfully does the surrogate
 approximate the MPM forward model, (2) how accurately does the full
 inverse recover $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$ on
 held-out samples, (3) what wall-clock reduction does the surrogate
-deliver relative to simulation-in-the-loop inversion, and (4) do the
-three contributions of \S1---freshness, rheometer-infeasible
-materials, and multi-observation precision---hold under experimental
-validation?
+deliver relative to simulation-in-the-loop inversion, and (4) does
+the fast inverse remain consistent with independent rheometer
+measurements on the Hamamichi materials for which such references are
+available?
 
 \paragraph{Datasets.}
 We use three evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
@@ -1502,10 +1505,11 @@ corpus, sampled stratified over
 $(n, \log\eta, \log\sigma_Y, W, H)$. \emph{$T_{\mathrm{inv}}$} is a
 synthetic benchmark of $30$ materials drawn from within the training
 box, each rendered via MPM at three container sizes (total $90$
-clips). \emph{$T_{\mathrm{real}}$} consists of six to eight standard
-non-Newtonian fluids (honey, ketchup, mayonnaise, shampoo, Carbopol
-gel, and a lotion sample) captured on a smartphone in our dam-break
-apparatus and accompanied by parallel-plate rheometer sweeps.
+clips). \emph{$T_{\mathrm{real}}$} is restricted in this version to
+the six Hamamichi materials for which parallel-plate rheometer sweeps
+are available; rheometer-infeasible particulate demonstrations are
+left to the time-varying-material study of \S\ref{sec:freshness}
+rather than treated as a separate validation axis.
 
 \paragraph{Baselines.}
 \emph{Baseline A} is the simulation-in-the-loop pipeline
@@ -1925,34 +1929,33 @@ diagnostic.
 \subsection{Validation Against Parallel-Plate Rheometers}
 \label{sec:rheometer}
 
-On materials for which a clean rheometer sweep is available, we
-overlay the recovered HB flow curve against the rheometer reference.
-Each material is captured at two to three $(W, H)$ setups per
-\S\ref{sec:mainresults} and inverted jointly.
+The real-fluid validation in this version is deliberately restricted
+to the subset of the Hamamichi material panel for which clean
+parallel-plate rheometer sweeps are available. This keeps the real
+comparison tied to an independent physical reference rather than to
+parameter values inferred by another video inverse. For each of the
+six reference materials we capture two dam-break setups, run the same
+\texttt{real\_robust} routing and joint inverse used elsewhere in the
+paper, and overlay the recovered Herschel--Bulkley flow curve against
+the rheometer sweep over the shear-rate range actually probed by the
+dam-break replay.
 
 \begin{figure*}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder: recovered HB flow curve
+    \figureorplaceholder[6cm]{\columnwidth}{figs/new_lotion.pdf}{Placeholder: recovered HB flow curve
       (blue, with rBCM $1\sigma$ band) overlaid on parallel-plate
       rheometer sweep (black markers) for a representative
-      $T_{\mathrm{real}}$ material (e.g.~lotion or Carbopol gel).
+      Hamamichi rheometer-reference material.
       Dashed extension marks extrapolation beyond the dam-break
       shear-rate range.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/new_lotion.pdf}
-    \fi
     \caption{Recovered flow curve (blue) versus parallel-plate
-    rheometer sweep (black markers) on lotion. The shaded band is
-    the rBCM-propagated $1\sigma$ uncertainty; the dashed extension
-    indicates the physically valid shear-rate range of our
-    dam-break observation.}
-    \Description{Log-log flow curve for lotion with black rheometer
-    sweep markers overlaid with the blue curve recovered from phone
-    video alone. The two curves agree within the rheometer
-    repeatability in the shear-rate range probed by the dam-break
-    observation; the dashed extension beyond that range indicates
-    extrapolation.}
+    rheometer sweep (black markers) on a representative Hamamichi
+    reference material. The shaded band is the GP-propagated
+    $1\sigma$ uncertainty; the dashed extension indicates shear-rate
+    regions not directly constrained by the dam-break observation.}
+    \Description{Log-log flow curve for one Hamamichi reference
+    material with black rheometer sweep markers overlaid with the
+    blue curve recovered from phone video alone.}
     \label{fig:rheometer-overlay}
 \end{figure*}
 
@@ -1964,227 +1967,41 @@ remaining materials, larger deviations are concentrated in
 shear-rate regions outside the range that the dam-break observation
 actually probes, as expected.
 
-\paragraph{All twelve real-world materials.}
-Figure~\ref{fig:flow-12} extends the rheometer overlay to the full
-twelve-material panel (the standard set inherited from
-\cite{hamamichi2023nonnewtonian} plus our additions). Per material
-we overlay (i)~the parallel-plate rheometer sweep, (ii)~the
-V1-paper truth $\theta$ where it is reported, and (iii)~our
-recovered $\theta$ from a single CMA-ES + $\sigma_{Y}$-prior joint
-two-setup inverse on $T_{\mathrm{real}}$.
+\paragraph{Six-material rheometer panel.}
+Figure~\ref{fig:flow-6} extends the overlay to the six Hamamichi
+materials with rheometer sweeps. Per material we overlay (i)~the
+parallel-plate rheometer sweep, (ii)~the predecessor's reported flow
+curve where available, and (iii)~our recovered
+$\hat{\boldsymbol{\theta}}$ from the joint two-setup inverse.
 
 \begin{figure*}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[7cm]{Placeholder F-FLOW-12: 4$\times$3
+    \widefigureorplaceholder[6.5cm]{\textwidth}{figs/real_world/flow_curves_hamamichi6.pdf}{Placeholder F-FLOW-6: 2$\times$3
       panel of recovered flow curves vs parallel-plate rheometer
-      reference for all twelve materials (Carbonara, Cobb, Congee,
-      Island, Japanese cabbage pancake sauce, Japanese thickened
-      Worcestershire sauce, lotion, moisturising milk, mustard,
-      pomodoro, sesame, sweet bean paste). Per panel: dotted black =
-      rheometer; red = V1 paper truth (where available); blue = our
-      recovered $\theta$ flow curve with shaded $1\sigma$ band; bottom
-      annotation = fc\%, raw\_wrms, silhouette IoU.}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/flow_curves_12mat.pdf}
-    \fi
-    \caption{Twelve real-world materials --- recovered flow curves
-    versus parallel-plate rheometer references. Each panel shows the
-    rheometer sweep (dotted black), the V1 paper truth where
-    available (red), and our recovered $\theta$ from the joint
-    two-setup inverse (blue with $1\sigma$ band).}
-    \Description{Twelve-panel grid of log-log shear-stress vs
-    shear-rate flow curves for the twelve standard real-world
-    materials, comparing rheometer reference, V1 paper truth, and our
-    recovered theta.}
-    \label{fig:flow-12}
+      reference for the six Hamamichi materials with rheometer
+      sweeps. Per panel: dotted black = rheometer; red =
+      predecessor flow curve where available; blue = our recovered
+      $\theta$ flow curve with shaded $1\sigma$ band; bottom
+      annotation = flow-curve error over the dam-break shear-rate
+      window.}
+    \caption{Six Hamamichi rheometer-reference materials: recovered
+    flow curves versus parallel-plate rheometer sweeps. Each panel
+    shows the rheometer sweep (dotted black), the predecessor's
+    reported curve where available (red), and our recovered
+    $\hat{\boldsymbol{\theta}}$ from the joint two-setup inverse
+    (blue with $1\sigma$ band).}
+    \Description{Six-panel grid of log-log shear-stress versus
+    shear-rate flow curves for the Hamamichi materials with
+    parallel-plate rheometer sweeps.}
+    \label{fig:flow-6}
 \end{figure*}
 
-\paragraph{Tabulated estimates per material.}
-Table~\ref{tab:thirteen-materials} reports, for each material, the
-$(W_1,H_1)$ and $(W_2,H_2)$ pair used to acquire the dam-break
-videos and the recovered $\hat{\boldsymbol{\theta}}=(\hat n,\hat\eta,\hat\sigma_Y)$
-from the joint two-setup inverse. The same panel was reported in the
-predecessor's Table~1~\cite{hamamichi2023nonnewtonian}; we include
-it here in identical column form so that per-material differences
-between the two pipelines are reproducible without consulting the
-flow-curve overlays of Fig.~\ref{fig:flow-12}.
-
-\begin{table*}[!htbp]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\caption{Recovered Herschel--Bulkley parameters and the two
-$(W,H)$ setups used per real-world material. Format follows
-Table~1 of \citet{hamamichi2023nonnewtonian}; columns are filled
-from our joint two-setup inverse (\S\ref{sec:mainresults}). Numbers
-will be populated when the campaign concludes.}
-\label{tab:thirteen-materials}
-\begin{tabular}{@{}lcccccccr@{}}
-\toprule
-Material & $W_1$ (cm) & $H_1$ (cm) & $W_2$ (cm) & $H_2$ (cm)
-         & $\hat\eta$ (Pa\,s$^n$) & $\hat n$ & $\hat\sigma_Y$ (Pa)
-         & $\sigma_Y$ CI 95\% \\
-\midrule
-Moisturising milk      & --- & --- & --- & --- & --- & --- & --- & --- \\
-Tonkatsu sauce         & --- & --- & --- & --- & --- & --- & --- & --- \\
-Chuno sauce            & --- & --- & --- & --- & --- & --- & --- & --- \\
-Okonomi sauce          & --- & --- & --- & --- & --- & --- & --- & --- \\
-Lotion                 & --- & --- & --- & --- & --- & --- & --- & --- \\
-Sweet bean paste       & --- & --- & --- & --- & --- & --- & --- & --- \\
-Mustard                & --- & --- & --- & --- & --- & --- & --- & --- \\
-Thousand-island dressing & --- & --- & --- & --- & --- & --- & --- & --- \\
-Cobb dressing          & --- & --- & --- & --- & --- & --- & --- & --- \\
-Sesame dressing        & --- & --- & --- & --- & --- & --- & --- & --- \\
-Pomodoro sauce         & --- & --- & --- & --- & --- & --- & --- & --- \\
-Carbonara sauce        & --- & --- & --- & --- & --- & --- & --- & --- \\
-Congee                 & --- & --- & --- & --- & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{table*}
-
-\paragraph{Pixel-level validation: ridge degeneracy as
-measurement-floor.}
-A subset of materials yields a recovered $\theta$ that differs
-from the V1-paper truth by a factor of $\sim$5--7 along the
-identifiability ridge of \S\ref{sec:inv-sy}, despite producing
-nearly indistinguishable forward observations. To demonstrate that
-this is a measurement-floor phenomenon rather than a method failure
-of our pipeline, we render the dam-break sequence under both
-$\theta$ choices and compare against the actually captured video at
-the pixel level on the most-discussed case --- Carbonara
-(Figure~\ref{fig:carbonara-snap}).
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholderwide[8cm]{Placeholder F-CARBO-SNAP:
-      $4\times 8$ image grid for each of two Carbonara setups
-      ($W{=}6.4, H{=}3.7$ and $W{=}2.5, H{=}2.0$).
-      Row 1: real binarised reference video frames.
-      Row 2: simulation rendered at V1-paper truth
-      $(n{=}1.0, \eta{=}72.9, \sigma_{Y}{=}15.2)$.
-      Row 3: simulation at our recovered $\theta$
-      $(n{=}0.84, \eta{=}101.5, \sigma_{Y}{=}91.4)$.
-      Row 4: amplified pixel snap-diff (recovered $-$ real)
-      $\times 5$. Each frame is annotated with silhouette IoU.}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/carbonara_snapdiff.pdf}
-    \fi
-    \caption{Carbonara: pixel-level silhouette validation of the
-    identifiability ridge. Setup 1 (W=6.4, H=3.7) silhouette IoU is
-    \emph{higher} for our recovered $\theta$ (0.9942) than for the
-    V1-paper truth (0.9936); setup 2 (W=2.5, H=2.0) is essentially
-    tied (0.9966 vs 0.9971). Both $\theta$ produce silhouettes that
-    match the captured video to within $0.1\%$ IoU --- the two
-    points lie on the same iso-$\mathbf{y}$ ambiguity described in
-    \S\ref{sec:inv-sy}. The 6$\times$ disagreement in
-    $\sigma_{Y}$ is therefore a property of the observation, not of
-    the inverse: the two setups jointly cannot disambiguate it
-    within an 8-frame window.}
-    \Description{Four-row eight-column grid for each of two
-    Carbonara dam-break setups, comparing real binarised video
-    frames, simulation at V1-paper truth, simulation at recovered
-    theta, and amplified pixel difference, annotated with per-frame
-    silhouette IoU.}
-    \label{fig:carbonara-snap}
-\end{figure*}
-
-\subsection{Characterising Rheometer-Infeasible Materials}
-\label{sec:chunky}
-
-Contribution~(b) addresses materials that conventional
-parallel-plate rheometers cannot measure. We captured six such
-fluids on a smartphone in our dam-break apparatus: a chunky okonomi
-sauce, a tonkatsu sauce with visible solids, a congee suspension,
-a sweet chilli sauce, a particle-loaded lotion, and a chuno sauce.
-No rheometer ground truth is available for these samples \emph{by
-design}: the parallel-plate geometry cannot maintain a clean gap
-when particle size exceeds a few hundred microns. We evaluate
-instead by \emph{sim--real replay}: we run MPM with the recovered
-$\hat{\boldsymbol{\theta}}$ and compare the simulated dam-break
-silhouette against the original phone video frame by frame.
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder: recovered HB flow curve for
-      chunky okonomi sauce (no parallel-plate reference available).
-      Right-side inset: sim--real silhouette overlay at the final
-      dam-break frame to be produced from a fresh smartphone capture
-      plus MPM replay with $\hat{\boldsymbol{\theta}}$.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/new_okonomi.pdf}
-    \fi
-    \caption{Recovered HB flow curve for chunky okonomi sauce; no
-    parallel-plate rheometer reference is available for this
-    material. Inset: sim--real silhouette overlay at the final
-    dam-break frame.}
-    \Description{Log-log flow curve of shear stress versus shear rate
-    for chunky okonomi sauce, showing the recovered Herschel-Bulkley
-    curve over the dam-break shear-rate range. An inset image
-    overlays the simulated silhouette (from our recovered parameters)
-    onto the original phone-video frame at the end of the dam-break,
-    showing close agreement.}
-    \label{fig:chunky}
-\end{figure*}
-
-Figure~\ref{fig:chunky} shows one representative material. Across
-the six samples, silhouette IoU between recovered-MPM replay and
-source video is consistently above $0.9$, with the remaining gap
-attributable to surface-tension and wall-adhesion effects not
-modelled by the HB-MPM forward. This is the application regime in
-which video rheometry has no instrumental competition; our
-contribution is to compress the inverse cost to tens of seconds per
-material, turning what was an offline
-demonstration~\cite{hamamichi2023nonnewtonian} into a fieldable
-tool.
-
-\paragraph{Phenomenological side-by-side comparison.}
-Beyond the silhouette IoU number, the recovered parameters also
-reproduce qualitative free-surface phenomena that are characteristic
-of each material class. Figure~\ref{fig:chunky-sim-real} shows
-side-by-side stills of the captured phone video against an MPM
-forward simulation under the recovered $\hat{\boldsymbol{\theta}}$
-for three behaviours that span our panel: a surface coiling instability
-on a high-yield-stress paste, an avalanche-style ``lump'' cycle on a
-particle-loaded lotion, and an impact dip on a thinner sauce. The
-panel mirrors Fig.~11 of~\citet{hamamichi2023nonnewtonian}, which
-established this reading of free-surface phenomena as a
-phenomenological reference; the difference here is that our
-$\hat{\boldsymbol{\theta}}$ comes from a tens-of-seconds inverse on
-the same captured video.
-
-\begin{figure*}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholderwide[5cm]{Placeholder F-CHUNKY-SIMREAL: $3\times2$
-      grid (three materials $\times$ \{captured, simulated\}). Rows:
-      coiling on a high-yield-stress paste, avalanche/lump on a
-      particle-loaded lotion, impact dip on a thinner sauce. Each row
-      is a still pair $\{$phone-video frame, MPM simulation under
-      recovered $\hat{\boldsymbol{\theta}}\}$ at the same time stamp.}
-    \else
-      \includegraphics[width=\textwidth]{figs/real_world/sim_real_phenom.pdf}
-    \fi
-    \caption{Side-by-side comparison of captured phone video (left in
-    each pair) and MPM forward simulation under the recovered
-    $\hat{\boldsymbol{\theta}}$ (right). Three free-surface phenomena
-    are reproduced from the inferred parameters alone: coiling on the
-    highest-yield-stress paste, an avalanche-style lump cycle on the
-    particle-loaded lotion, and an impact dip on a lower-viscosity
-    sauce. The panel echoes Fig.~11 of \citet{hamamichi2023nonnewtonian}
-    while replacing their hour-scale inverse with an inverse that
-    completes in seconds.}
-    \Description{Three rows by two columns of dam-break stills,
-    pairing each captured smartphone frame with the corresponding
-    MPM forward simulation under the recovered Herschel-Bulkley
-    parameters; the simulated and captured stills agree
-    qualitatively in the three free-surface phenomena of coiling,
-    avalanche, and impact dip.}
-    \label{fig:chunky-sim-real}
-\end{figure*}
-
+The final camera-ready version will report the recovered
+$(W_1,H_1)$, $(W_2,H_2)$, and
+$\hat{\boldsymbol{\theta}}$ values alongside this panel once the
+six-material rheometer-reference campaign is complete. Until those
+measurements are frozen, we keep the paper figure-driven rather than
+showing an empty parameter table.
 
 \subsection{Parameter Freshness for Time-Varying Fluids}
 \label{sec:freshness}
@@ -2213,6 +2030,11 @@ network-formation rate differs from pure starch
 asymptotic yield stress in each material spans the surrogate's
 training box, $\sigma_Y\in[10,100]$\,Pa, by the analytical
 $\sigma_{Y,\infty}\propto c^{\alpha}$ scaling.
+This panel also provides the paper's particulate visual examples:
+rolled oats and pancake mix contain visible grains or composite
+solids, but we treat them as part of the time-varying freshness
+study rather than as a separate rheometer-infeasible validation
+claim.
 
 \begin{table}[!htbp]
 \centering
@@ -2310,8 +2132,7 @@ deliver.
 
 \begin{figure*}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[6cm]{Placeholder F-FRESH-TRAJ: $3\times3$
+    \widefigureorplaceholder[6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ: $3\times3$
       panel of $\sigma_Y(t)$ trajectories. Rows: oats / potato
       starch / pancake mix. Columns: low / mid / high concentration
       from Tab.~\ref{tab:fresh-mats}. Each panel shows the six
@@ -2321,9 +2142,6 @@ deliver.
       from~\cite{hamamichi2023nonnewtonian} for the same
       $\mathbf{y}_{\mathrm{obs}}$ at $t=60$\,min, and a horizontal
       dashed line at the rheometer plateau at $t=24$\,h.}
-    \else
-      \includegraphics[width=\textwidth]{figs/freshness/sigmaY_kinetics_panel.pdf}
-    \fi
     \caption{Recovered yield-stress kinetics for the $3{\times}3$
     starch panel. For each material$\times$concentration cell, our
     pipeline returns six time-resolved estimates $\hat{\sigma}_Y
@@ -2347,15 +2165,11 @@ deliver.
 
 \begin{figure*}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[4.5cm]{Placeholder F-FRESH-DEMOS:
+    \widefigureorplaceholder[4.5cm]{\textwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
       $3\times 3$ image grid. Rows: the three starch sources at the
       mid concentration of Tab.~\ref{tab:fresh-mats}. Columns:
       $t \in \{15, 60, 240\}$\,min. Each cell is a representative
       still from the calibrated dam-break video.}
-    \else
-      \includegraphics[width=\textwidth]{figs/freshness/material_demos.pdf}
-    \fi
     \caption{Visual evidence of starch-network setting. Three
     materials (rows, mid concentration) at three time points
     (columns) after preparation; each cell is a still frame of the
@@ -2368,40 +2182,6 @@ deliver.
     builds up.}
     \label{fig:fresh-demos}
 \end{figure*}
-
-\begin{table*}[!htbp]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\caption{Recovered kinetic parameters and validation anchors per
-material$\times$concentration cell. $T_k$ and
-$\sigma_{Y,\infty}$ are from the weighted Avrami-1 fit
-(Eq.~\ref{eq:avrami}); the SIL column reports the
-simulation-in-the-loop estimate of~\cite{hamamichi2023nonnewtonian}
-on the $t=60$\,min capture (anchor~A); the rheo column reports the
-parallel-plate measurement at $t=24$\,h (anchor~B). Numbers will be
-populated when the full panel campaign concludes.}
-\label{tab:fresh-drift}
-\begin{tabular}{@{}llcccccc@{}}
-\toprule
-Material      & conc. (\% w/w) & $T_k$ (min)
-              & $\sigma_{Y,\infty}$ (Pa)
-              & $\hat{n}_{\infty}$
-              & $\hat{\eta}_{\infty}$ (Pa\,s$^n$)
-              & $\sigma_Y$ vs SIL & $\sigma_{Y,\infty}$ vs rheo \\
-\midrule
-Rolled oats   & $5$  & --- & --- & --- & --- & --- & --- \\
-Rolled oats   & $7$  & --- & --- & --- & --- & --- & --- \\
-Rolled oats   & $9$  & --- & --- & --- & --- & --- & --- \\
-Potato starch & $3$  & --- & --- & --- & --- & --- & --- \\
-Potato starch & $5$  & --- & --- & --- & --- & --- & --- \\
-Potato starch & $7$  & --- & --- & --- & --- & --- & --- \\
-Pancake mix   & $40$ & --- & --- & --- & --- & --- & --- \\
-Pancake mix   & $55$ & --- & --- & --- & --- & --- & --- \\
-Pancake mix   & $70$ & --- & --- & --- & --- & --- & --- \\
-\bottomrule
-\end{tabular}
-\end{table*}
 
 \begin{table}[!htbp]
 \centering
@@ -2554,22 +2334,20 @@ rather than nominal.
 \subsection{What the Acceleration Unlocks}
 
 The immediate effect of our pipeline is a three-orders-of-magnitude
-reduction in per-video inverse cost. The more important effect is
-that three capabilities previously out of reach under
-simulation-in-the-loop become routine:
-\emph{freshness} for time-varying
-fluids (\S\ref{sec:freshness}),
-practical characterisation of \emph{rheometer-infeasible}
-materials (\S\ref{sec:chunky}), and
-\emph{multi-observation joint inversion} that approaches
-parallel-plate rheometer precision (\S\ref{sec:mainresults}). The first is
-a temporal improvement that turns ``hours to return a past state''
-into ``seconds to return the current state.'' The second inherits
-the independent value of video rheometry over instrumental
-rheometry~\cite{hamamichi2023nonnewtonian} and brings it to
-fieldable speed. The third makes usable a $\sigma_Y$-mitigation path
-that the predecessor work identified but left computationally out of
-reach.
+reduction in per-video inverse cost. In this version we focus the
+real-fluid story on two experimentally anchored payoffs:
+\emph{freshness} for time-varying fluids
+(\S\ref{sec:freshness}) and fast
+\emph{rheometer-referenced validation} on the Hamamichi materials
+for which parallel-plate sweeps are available (\S\ref{sec:rheometer}).
+The first is a temporal improvement that turns ``hours to return a
+past state'' into ``seconds to return the current state.'' The
+second checks that replacing MPM-in-the-loop by a routed GP surrogate
+does not detach the recovered flow curves from independent
+instrumental rheology. Rheometer-infeasible particulate materials
+remain an important motivation for video rheometry, but here they
+appear only as visual examples inside the freshness panel rather than
+as a separate accuracy claim.
 
 \subsection{A Reusable Surrogate as a Community Asset}
 
@@ -2640,16 +2418,16 @@ multi-setup CMA-ES. Our path trades the Hessian machinery for
 training-data priors and joint (rather than sequential) multi-setup
 inversion, both made practical by the surrogate.
 
-Beyond runtime reduction, the seconds-scale inverse unlocks three
-capabilities inaccessible to simulation-in-the-loop rheometry: fresh
-parameter estimates for time-varying fluids, practical
-characterisation of materials conventional rheometers cannot
-measure, and a multi-observation joint protocol that approaches
-parallel-plate rheometer precision from phone videos alone. We
-release the trained surrogate, the $295{,}419$-row MPM training
-corpus, and the inverse code as a reusable community artefact on
-which subsequent video-rheometry research can build without paying
-the simulation training cost again.
+Beyond runtime reduction, the seconds-scale inverse makes two
+capabilities practical in the present paper: fresh parameter
+estimates for time-varying fluids and fast real-fluid validation
+against the Hamamichi materials with parallel-plate rheometer
+references. We release the trained surrogate, the $295{,}419$-row
+MPM training corpus, and the inverse code as a reusable community
+artefact on which subsequent video-rheometry research can build
+without paying the simulation training cost again, including future
+particulate-material studies once a dedicated validation protocol is
+collected.
 
 The broader message is that video rheometry crosses the threshold
 from laboratory demonstration to fieldable tool not by replacing

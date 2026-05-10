@@ -72,13 +72,13 @@
 \hfuzz=1pt       % tolerate up to 1pt overfull without reporting
 
 % --- Figure placeholder mode ---------------------------------------------
-% When \figplaceholdertrue is set, figures whose source data is not yet
-% finalised render as a framed placeholder box of the intended size, so
-% the page layout and figure numbering are correct even before the final
-% images are regenerated. Comment out the next line to render the
-% currently-committed \includegraphics files instead.
+% When \figplaceholdertrue is set, draft-only figures render as framed
+% placeholder boxes. The normal submission path is \figplaceholderfalse:
+% \figureorplaceholder / \widefigureorplaceholder render the image when
+% the file exists and fall back to the same box only when the file is
+% still absent.
 \newif\iffigplaceholder
-\figplaceholdertrue
+\figplaceholderfalse
 
 \newcommand{\figplaceholder}[2][6cm]{%
     \fbox{\parbox[c][#1][c]{0.94\columnwidth}{%
@@ -87,6 +87,22 @@
 \newcommand{\figplaceholderwide}[2][6cm]{%
     \fbox{\parbox[c][#1][c]{0.97\textwidth}{%
         \centering\small\itshape #2}}%
+}
+\newcommand{\figureorplaceholder}[4][6cm]{%
+    \iffigplaceholder
+        \figplaceholder[#1]{#4}%
+    \else
+        \IfFileExists{#3}{\includegraphics[width=#2]{#3}}{%
+            \figplaceholder[#1]{#4}}%
+    \fi
+}
+\newcommand{\widefigureorplaceholder}[4][6cm]{%
+    \iffigplaceholder
+        \figplaceholderwide[#1]{#4}%
+    \else
+        \IfFileExists{#3}{\includegraphics[width=#2]{#3}}{%
+            \figplaceholderwide[#1]{#4}}%
+    \fi
 }
 
 % Metadata Information
@@ -257,8 +273,7 @@ surrogate-accelerated inverse, camera calibration}
 % \includegraphics{figs/teaser.pdf} for the camera-ready.
 \begin{teaserfigure}
 \centering
-\iffigplaceholder
-  \figplaceholderwide[5.5cm]{Placeholder TEASER (5 panels):
+\widefigureorplaceholder[5.5cm]{\textwidth}{figs/teaser.pdf}{Placeholder TEASER (5 panels):
     \emph{(a)} smartphone capturing a dam-break flow alongside a
     printed ChArUco board next to the rectangular container;
     \emph{(b)} automatic two-stage camera calibration $\to$ recovered
@@ -274,9 +289,6 @@ surrogate-accelerated inverse, camera calibration}
     \emph{(e)} recovered parameters re-simulated in a new dam-break
     geometry and in a scene-level MPM application.
     To be replaced with a rendered figs/teaser.pdf.}
-\else
-  \includegraphics[width=\textwidth]{figs/teaser.pdf}
-\fi
 \caption{Our pipeline turns a smartphone dam-break video into the
 Herschel--Bulkley triple $(\sigma_{Y}, \eta, n)$ in seconds.
 \emph{(a)}~The user captures a dam-break alongside a printed ChArUco
