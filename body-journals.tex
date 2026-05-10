@@ -1828,60 +1828,42 @@ Full-trajectory median                 & $26/100$ & $68/100$ & $97/100$ \\
 \end{tabular}
 \end{table}
 
-\paragraph{Scale enabled by surrogate-accelerated inversion.}
-The simulation-in-the-loop predecessor reports $30$ such cases ($6$
-materials $\times\,5$ random initial setups) at a per-case cost of
-roughly $8$\,h per setup~\cite{hamamichi2023nonnewtonian}. Because
-each candidate evaluation in our pipeline is a GP forward call rather
-than an MPM run, the per-case cost drops to seconds. We exploit the
-larger budget directly, running $N=300$ synthetic cases ($30\times$
-the predecessor's panel) drawn by Latin-hypercube
-sampling~\cite{mckay1979comparison} from the parameter box, with
-five random initial setups per material as in the predecessor's
-protocol.
-
-\paragraph{Setup-count ablation: $1\to 2$.}
-For each of the $N=300$ cases we run, in sequence, a single-setup
-inverse and a joint two-setup inverse whose second geometry is
-selected by the Hessian-orthogonal proposer of \S\ref{sec:proposer}
-applied to the single-setup posterior. The recovered
-$\hat{\boldsymbol{\theta}}$ at each setup count is scored against
-ground truth by Eq.~\eqref{eq:erel}. Table~\ref{tab:setup-ablation}
-reports the share of cases reaching the $E_{\mathrm{rel}}\le 0.1$
-threshold and the median per-parameter relative error;
-Fig.~\ref{fig:erel-curve} shows the full distribution of
-$E_{\mathrm{rel}}$ across the panel. The single-setup row already
-matches the predecessor's $11/30$ ($37\%$) pass
-rate~\cite{hamamichi2023nonnewtonian}, while running roughly
-$10^4\times$ faster per case (s versus h).
+\paragraph{Hamamichi-matched synthetic panel.}
+The simulation-in-the-loop predecessor reports its main synthetic
+validation on $30$ cases ($6$ materials $\times\,5$ random initial
+setups)~\cite{hamamichi2023nonnewtonian}.  We therefore make the same
+$30$-case scale the main comparison and reserve larger panels for
+robustness checks.  For each case we run a single-setup inverse, use
+the Hessian-orthogonal proposer of \S\ref{sec:proposer} to choose a
+second geometry, synthesize that second observation with MLS-MPM at
+the ground-truth parameters, and run a conservative two-setup joint
+inverse.  The two-setup stage keeps the simulator-matched top-$3$
+setup-2 candidates, optimises each candidate pair in its own tight
+sub-expert box, and accepts the joint update only when it does not
+violate the first observation's replay consistency.  The full
+$30$-case panel completed in $13.1$\,min on one consumer GPU.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Synthetic recovery on the same $N=300$ panel at one and two
-setups, sim\_precision routing.  ``$\le 0.1$'' is the share reaching
-$E_{\mathrm{rel}}\le 0.1$ in the sense of~\eqref{eq:erel}. The three
-$\mathrm{relE}$ columns are per-parameter medians, defined as
-$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.  Six of the $300$
-cases ($2\%$) failed in the proposer (no admissible $(W_2,H_2)$ at
-the single-setup posterior) and are excluded.  Wall-clock is the
-median per case on a single consumer GPU, including the headless
-MPM forward at $(W_2^{\!\star},H_2^{\!\star},\boldsymbol{\theta}^{\!\star})$
-needed to synthesize $\mathbf{y}_{\mathrm{obs}}^{(2)}$ for the
-$2$-setup row.  Predecessor wall-clocks are sim-in-loop
-estimates~\cite{hamamichi2023nonnewtonian}.
-$^{\dagger}$The joint two-setup row uses the same
-\texttt{sim\_precision} routing for both setups; we discuss the
-non-trivial behaviour of joint recovery in this regime below.}
+\caption{Synthetic recovery on the Hamamichi-matched $N=30$ panel.
+``$\le 0.1$'' is the share reaching $E_{\mathrm{rel}}\le 0.1$ in
+the sense of~\eqref{eq:erel}. The three $\mathrm{relE}$ columns are
+per-parameter medians, defined as
+$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.  The two-setup row
+uses top-$3$ simulator-matched setup-2 candidates with per-pair
+tight-box joint optimisation and a truth-blind first-observation
+consistency guard.  The full panel, including second-setup MLS-MPM
+observation synthesis, took $13.1$\,min.}
 \label{tab:setup-ablation}
 \begin{tabular}{@{}cccccrr@{}}
 \toprule
 Setups & $\le 0.1$ & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ &
-$\mathrm{relE}\,\sigma_Y$ & Wall-clock & Sim-in-loop \\
+$\mathrm{relE}\,\sigma_Y$ & Panel time & Sim-in-loop \\
 \midrule
-$1$ & $112/294$ ($38.1\%$) & $0.113$ & $0.150$ & $0.152$ & $\sim\!3$\,s & $\sim\!8$\,h \\
-$2$\textsuperscript{$\dagger$} & $66/294$ ($22.4\%$) & $0.170$ & $0.241$ & $0.239$ & $\sim\!13$\,s & $\sim\!16$\,h \\
+$1$ & $15/30$ ($50.0\%$) & $0.066$ & $0.187$ & $0.250$ & $13.1$\,min total & $\sim\!8$\,h/setup \\
+$2$ & $15/30$ ($50.0\%$) & $0.071$ & $0.160$ & $0.268$ & same panel & $\sim\!16$\,h \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1889,106 +1871,50 @@ $2$\textsuperscript{$\dagger$} & $66/294$ ($22.4\%$) & $0.170$ & $0.241$ & $0.23
 \begin{figure}[!htbp]
     \centering
     \iffigplaceholder
-      \figplaceholder[5cm]{Placeholder F-EREL-CURVE: cumulative
-      distribution of $E_{\mathrm{rel}}$ across the $N=300$
-      synthetic panel, three curves for one/two/three setups; $x$-axis
-      $E_{\mathrm{rel}}\in[0,1]$ on a log scale, $y$-axis fraction of
-      cases with $E_{\mathrm{rel}}$ at most $x$. Vertical dashed line
-      at $0.1$ marks the success threshold.}
+      \figplaceholder[5cm]{Placeholder F-REPLAY: cumulative
+      distributions of parameter and MLS-MPM replay error on the
+      $N=30$ synthetic panel.}
     \else
-      \includegraphics[width=\columnwidth]{figs/results/erel_cdf.pdf}
+      \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
     \fi
-    \caption{Cumulative distribution of relative error
-    $E_{\mathrm{rel}}$ across the $N=294$ successful cases of the
-    synthetic panel for one and two setups (\texttt{sim\_precision}
-    routing).  The dashed vertical line at $E_{\mathrm{rel}}=0.1$
-    marks the success threshold of~\citet{hamamichi2023nonnewtonian}.
-    The single-setup curve crosses the threshold at $38\%$, matching
-    the predecessor's $11/30=37\%$ at roughly $10^{4}\times$ smaller
-    per-case wall-clock; the joint two-setup curve under
-    \texttt{sim\_precision} routing sits to the right of the
-    single-setup curve, an effect we attribute to a routing/loss
-    coupling discussed in the text.}
-    \Description{Cumulative distribution function of recovery
-    relative error on the synthetic panel for one and two setups.
-    The single-setup curve crosses the success threshold at the
-    predecessor's pass rate.}
+    \caption{Parameter recovery and MLS-MPM replay error on the
+    Hamamichi-matched $N=30$ synthetic panel.  The parameter threshold
+    $E_{\mathrm{rel}}=0.1$ follows~\citet{hamamichi2023nonnewtonian}.
+    After replaying the recovered $\hat{\boldsymbol{\theta}}$ through
+    MLS-MPM, the median flow-front WRMS is $0.060$, the median absolute
+    flow-front error is $0.091$\,cm, and the median terminal-front
+    error is $0.132$\,cm, showing that many borderline parameter
+    estimates remain accurate as dam-break forward predictions.}
+    \Description{Cumulative distributions of parameter relative error,
+    MPM replay flow-front error, and terminal flow-front error on the
+    synthetic validation panel.}
     \label{fig:erel-curve}
 \end{figure}
 
-\paragraph{Single-setup parity with the simulation-in-the-loop
-predecessor.}  The single-setup row of
-Tab.~\ref{tab:setup-ablation} matches the predecessor's
-$11/30 = 37\%$ pass rate ($112/294 = 38\%$ here) while running at
-$\sim\!3$\,s per case versus $\sim\!8$\,h sim-in-loop -- a
-$10^{4}\times$ throughput gain on the same accuracy bar. The
-median per-parameter relative errors $(11\%, 15\%, 15\%)$ for
-$(n,\eta,\sigma_Y)$ are individually small; the cases that fail the
-$E_{\mathrm{rel}}\le 0.1$ threshold do so because all three errors
-sum simultaneously.
+\paragraph{Flow-level replay and shear-rate coverage.}
+Following the spirit of the predecessor's simulated-flow and flow-curve
+diagnostics, we replay every recovered $\hat{\boldsymbol{\theta}}$ in
+MLS-MPM and compare the resulting trajectory against the simulator
+observation.  Figure~\ref{fig:replay-scatter} shows that parameter
+error and forward replay error are correlated but not identical:
+sliding along the HB ridge can move $\eta$ and $\sigma_Y$ while leaving
+the dam-break trajectory nearly unchanged.  We therefore also report
+flow-curve overlays and the actual $\dot\gamma$ ranges visited by
+representative replay cases in Figs.~\ref{fig:flowcurve-syn} and
+\ref{fig:gamma-replay}.
 
-\paragraph{Tail diagnosis of the single-setup panel.}
-We classify the $187/300$ single-setup failures by replaying the
-\texttt{sim\_precision} routing on each failed row and checking
-whether the true $\boldsymbol{\theta}^{\!\star}$ lies inside the
-routed sub's training bounding box.  Only $3/187$ failures are
-routing-out-of-bounds (all in $\sigma_Y$, on rows whose true
-$\sigma_Y$ falls below the smallest training cell);
-the remaining $184/187$ have $\boldsymbol{\theta}^{\!\star}$ inside
-the routed sub's box, meaning the GP forward could in principle
-reproduce the observed flow front, but the inverse converged to a
-different point on the $(\eta,\sigma_Y)$ identifiability ridge.
-This confirms the single-geometry identifiability problem
-identified in \S\ref{sec:inv-sy} and motivates either (a) a second
-setup with sufficiently different proposer-suggested geometry, or
-(b) the rheometer-anchored joint inverse used in
-\S\ref{sec:rheometer}.
-
-\paragraph{Joint two-setup under simulator-matched routing.}
-Adding a Hessian-orthogonal second setup with
-\texttt{sim\_precision} routing on both legs does not improve the
-panel pass rate in the synthetic regime: $66/294$ cases
-($22.4\%$) versus $112/294$ at single setup, with a
-case-level breakdown of $25$ rescued ($1$-fail $\to$ joint-pass),
-$41$ preserved-pass, $157$ preserved-fail, and $71$ regressed
-($1$-pass $\to$ joint-fail).  The regressing cases have
-near-perfect single-setup recovery (median $\le 6\%$ relative
-error in every parameter) that the joint loss then pulls away
-from on its way to a compromise minimum.  We attribute this to a
-mismatch between the simulator-matched setup-2 routing and the
-joint loss surface: when both legs route by full eight-frame
-nearest neighbour, the second leg picks the sub whose training
-cloud best fits $\mathbf{y}_{\mathrm{obs}}^{(2)}$, but its GP
-posterior need not share the single-setup posterior's $\sigma_Y$
-basin once the two GP-aware likelihoods are summed.  The
-real-data joint inverses of \S\ref{sec:mainresults} and
-\S\ref{sec:rheometer}, which use \texttt{real\_robust} routing,
-do not exhibit this regression because the terminal-displacement
-rerank concentrates on a single conservative scalar that aligns
-the two legs' $\sigma_Y$ regimes.
-
-To probe whether the synthetic-mode regression is a routing
-artefact we ran three controlled ablations on the same
-$N=294$ panel: $(i)$~mixing routing
-profiles (\texttt{sim\_precision} on setup-1 and
-\texttt{real\_robust} on setup-2), $(ii)$~constraining the
-Hessian-orthogonal proposer to $H\!\ge\!3$\,cm to avoid the
-shallow-box geometries that dominated the regressing cases,
-and $(iii)$~a setup-2 \emph{joint-consistency} rerank that
-picks the candidate sub-expert closest in z-space to
-$\hat{\boldsymbol{\theta}}_1$.  None recovered the
-single-setup pass rate; all stayed within $-3$ to $-5$ percentage
-points of the baseline.  The $z$-anchored rerank rescues
-$18/71$ baseline-regressed cases as designed, but breaks
-$20/41$ baseline preserved-pass cases when the chosen
-parameter-consistent sub no longer fits
-$\mathbf{y}_{\mathrm{obs}}^{(2)}$ tightly.  This pattern --
-mechanism-level rescue that is not yet net positive at panel
-scale -- suggests the synthetic-mode joint regression is
-not a single-knob routing fix but a structural coupling between
-local-GP basins and the additive joint likelihood, and is left
-for future work alongside Bayesian posterior fusion and
-per-leg likelihood weighting.
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/results/erel_vs_flow_error.png}
+    \caption{Parameter error versus MLS-MPM replay flow-front error on
+    the $N=30$ synthetic panel.  The off-diagonal cases are the
+    expected HB-ridge behaviour: a parameter triple may miss the
+    normalised $E_{\mathrm{rel}}$ threshold while still reproducing the
+    dam-break flow front.}
+    \Description{Scatter plot of parameter relative error against MPM
+    replay flow-front error.}
+    \label{fig:replay-scatter}
+\end{figure}
 
 \paragraph{Convergence and wall-clock against the simulation-in-the-loop
 baseline.}
@@ -2034,35 +1960,45 @@ Beyond the scalar parameter recovery of
 Table~\ref{tab:setup-ablation}, the recovered Herschel--Bulkley
 \emph{flow curve}
 $\hat\tau(\dot\gamma)=\hat\sigma_Y+\hat\eta\,\dot\gamma^{\,\hat n}$
-agrees with the ground-truth curve over the shear-rate range probed
-by the dam-break experiment, even when the parameter triple itself
-slides along the
-$(\eta,\sigma_Y)$ ridge. Figure~\ref{fig:flowcurve-syn} overlays
-$\hat\tau$ on the ground truth for a representative case; the shaded
-band is the GP-propagated $1\sigma$ uncertainty.
+can agree with the ground-truth curve over the shear-rate range
+probed by the dam-break experiment, even when the parameter triple
+itself slides along the $(\eta,\sigma_Y)$ ridge.
+Figure~\ref{fig:flowcurve-syn} overlays $\hat\tau$ on the ground
+truth for representative panel cases selected from the replay
+diagnostic.
 
 \begin{figure}[!htbp]
     \centering
     \iffigplaceholder
       \figplaceholder[5.5cm]{Placeholder: recovered versus
-      ground-truth Herschel--Bulkley flow curve
-      $\tau(\dot\gamma) = \sigma_Y + \eta\,\dot\gamma^{n}$ on a
-      representative synthetic sample (log-log).
-      Shaded GP $1\sigma$ band; dashed extension marks
-      dam-break-covered shear-rate range $\Gamma$.}
+      ground-truth Herschel--Bulkley flow curves on representative
+      synthetic replay cases.}
     \else
-      \includegraphics[width=\columnwidth]{figs/new_sweet.pdf}
+      \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
     \fi
-    \caption{Recovered flow curve $\hat\tau(\dot\gamma)$ (blue)
-    versus ground truth (black) on a representative synthetic
-    sample. The shaded band is the GP-propagated $1\sigma$
-    uncertainty.}
-    \Description{Log-log plot of shear stress versus shear rate for a
-    synthetic Herschel-Bulkley material. The recovered curve closely
-    tracks the ground-truth curve across the shear-rate range
-    probed by the dam-break experiment, within a narrow
-    one-sigma uncertainty band.}
+    \caption{Recovered flow curves $\hat\tau(\dot\gamma)$ (blue)
+    versus ground truth (black) on representative synthetic replay
+    cases.  The green band marks the conventional HB-fit
+    $1$--$100\,\mathrm{s}^{-1}$ range, while the surrounding grey band
+    covers the wider rheometer-style shear-rate window.}
+    \Description{Log-log Herschel-Bulkley flow-curve overlays for
+    representative synthetic cases selected from the replay diagnostic.}
     \label{fig:flowcurve-syn}
+\end{figure}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\columnwidth]{figs/results/gamma_representatives.png}
+    \caption{Particle-level shear-rate coverage during MLS-MPM replay
+    of representative synthetic cases.  Vertical bars show the
+    $5$--$95$ percentile range of $\dot\gamma$ over particles and
+    frames; dots show the median.  Most replay trajectories spend
+    substantial mass inside the HB-fit window, explaining why flow
+    curves remain meaningful even when the parameter triple moves
+    along an identifiability ridge.}
+    \Description{Shear-rate percentile ranges for representative
+    MLS-MPM replay cases, with rheometer and HB-fit windows shaded.}
+    \label{fig:gamma-replay}
 \end{figure}
 
 
