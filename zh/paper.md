@@ -1034,10 +1034,14 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
 材料  & $(W_1,H_1)$ & $(W_2,H_2)$
       & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & 墙上时钟 \\
 \midrule
-Chuno         & $(2.5, 2.7)$ & $(4.0, 2.0)$
-              & $0.66$ & $8.12$  & $19.7$ & $117$\,s \\
-Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
-              & $0.77$ & $21.4$  & $98.0$ & $126$\,s \\
+Chuno              & $(2.5, 2.7)$ & $(4.0, 2.0)$
+                   & $0.66$ & $8.12$  & $19.7$ & $117$\,s \\
+Okonomiyaki        & $(2.2, 2.5)$ & $(7.0, 7.0)$
+                   & $0.77$ & $21.4$  & $98.0$ & $126$\,s \\
+保湿乳             & $(4.5, 3.5)$ & $(4.5, 2.0)$
+                   & $0.85$ & $23.3$  & $167.6$ & $7$\,s \\
+化妆水             & $(6.1, 2.8)$ & $(7.0, 6.5)$
+                   & $0.37$ & $163.1$ & $2.6$  & $5$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1076,7 +1080,7 @@ Okonomiyaki   & $(2.2, 2.5)$ & $(7.0, 7.0)$
         \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_mat6_single_vs_joint.png}{(f) 第六种 Hamamichi 材料(待定):流变仪 + 单 setup + 联合曲线;待采集。}\\
         {\footnotesize (f) [第六种材料]}
     \end{minipage}
-    \caption{Hamamichi 流变仪参考面板上恢复的 HB 流曲线,布局遵循~\citet{hamamichi2023nonnewtonian} 的 Fig.~$13$。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。这里报告两种材料,其余四个 panel 在配对的采集与流变仪扫描完成后填入。两种已报告材料上,联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 位移),联合更新把这一差距闭合。}
+    \caption{Hamamichi 流变仪参考面板上恢复的 HB 流曲线,布局遵循~\citet{hamamichi2023nonnewtonian} 的 Fig.~$13$。点状黑:同批次平板流变仪扫描。红:单 setup 恢复。蓝:联合两 setup 恢复。这里报告四种材料,其余两个 panel 在配对的采集与流变仪扫描完成后填入。Chuno、Okonomiyaki、化妆水(Lotion)上联合曲线在溃坝 $\dot\gamma$ 窗口内与流变仪参考重合;Chuno 上单 setup 曲线偏向更高 $\sigma_Y$(预测中的 ridge 位移),联合更新把这一差距闭合。保湿乳是\S\ref{sec:mainresults} 讨论的合成模式 joint 退步的失败模式样例:在 $(W_2=4.5, H_2=2.0)$ 处 setup-2 sub 选到的高-$\dot\gamma$ 证据把恢复的 $n$ 拉向 Newtonian 极限,虽然单 setup 已经接近,joint 曲线在高 $\dot\gamma$ 处反而偏离了流变仪。}
     \Description{二行三列 log-log 流曲线叠加网格;每个 panel 对应一种 Hamamichi 参考材料的流变仪扫描、单 setup 与联合 setup 恢复。}
     \label{fig:flow-real}
 \end{figure*}
