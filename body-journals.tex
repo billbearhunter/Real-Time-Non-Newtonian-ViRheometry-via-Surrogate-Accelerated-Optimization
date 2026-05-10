@@ -1489,17 +1489,19 @@ evaluation.}
 \subsection{Experimental Setup}
 
 We evaluate HVIMoGP-rBCM and the identifiability-aware inverse
-against four questions: (1) how faithfully does the surrogate
+against five questions: (1) how faithfully does the surrogate
 approximate the MPM forward model, (2) how accurately does the full
 inverse recover $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$ on
 held-out samples, (3) what wall-clock reduction does the surrogate
 deliver relative to simulation-in-the-loop inversion, and (4) does
 the fast inverse remain consistent with independent rheometer
 measurements on the Hamamichi materials for which such references are
-available?
+available, and (5) can seconds-scale inversion recover a
+time-varying yield-stress trajectory from repeated within-batch
+dam-break measurements?
 
 \paragraph{Datasets.}
-We use three evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
+We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
 $22{,}209$ MPM samples held out from the $295{,}419$-row training
 corpus, sampled stratified over
 $(n, \log\eta, \log\sigma_Y, W, H)$. \emph{$T_{\mathrm{inv}}$} is a
@@ -1510,6 +1512,11 @@ the six Hamamichi materials for which parallel-plate rheometer sweeps
 are available; rheometer-infeasible particulate demonstrations are
 left to the time-varying-material study of \S\ref{sec:freshness}
 rather than treated as a separate validation axis.
+\emph{$T_{\mathrm{fresh}}$} follows the V3.1 freshness protocol:
+synthetic prescribed kinetic trajectories for ground-truth recovery,
+six real hand-prepared starch or composite-starch conditions sampled
+within a single $60$\,min batch window, and a repeat batch for
+quantifying cross-batch kinetic drift.
 
 \paragraph{Baselines.}
 \emph{Baseline A} is the simulation-in-the-loop pipeline
@@ -1932,29 +1939,33 @@ diagnostic.
 \subsection{Validation Against Parallel-Plate Rheometers}
 \label{sec:rheometer}
 
-The real-fluid validation in this version is restricted to the
-two Hamamichi materials for which we have completed both dam-break
-captures and same-batch parallel-plate rheometer sweeps:
-Chuno (Korean rice-cake water; low-$\sigma_Y$ shear-thinning regime)
-and Okonomiyaki batter (composite wheat-starch suspension;
-mid-to-high-$\sigma_Y$ regime).  Both materials lie inside the
-training box of \S\ref{sec:data}.  For each material we capture
-two dam-break setups, run the \texttt{real\_robust} routing and
-joint two-setup inverse used everywhere in the paper, and overlay
-the recovered Herschel--Bulkley flow curve against the rheometer
-reference over the shear-rate range actually probed by the
+The real-fluid validation is restricted to the six Hamamichi
+materials for which we have both dam-break captures and
+parallel-plate rheometer sweeps: Chuno, Okonomiyaki sauce,
+moisturising milk, lotion, Japanese pork-cutlet sauce, and sweet
+bean paste.  This keeps the real comparison tied to independent
+instrumental measurements rather than to another video inverse.  For
+each material we use two dam-break setups, run the
+\texttt{real\_robust} routing and joint two-setup inverse, and
+overlay the recovered Herschel--Bulkley flow curve against the
+rheometer reference over the shear-rate range probed by the
 dam-break replay.
 
 Following the convention of the predecessor's Table~$1$ and
-Fig.~$13$~\cite{hamamichi2023nonnewtonian}, the headline real-fluid
-comparison is the flow-curve overlay against the parallel-plate
-rheometer (Fig.~\ref{fig:flow-real}); Tab.~\ref{tab:rheo-recovery}
-lists the two setups we used per material together with the
-recovered Herschel--Bulkley triple, mirroring the columns of
-the predecessor's Table~$1$.  Fig.~\ref{fig:snapdiff} additionally
-shows frame-by-frame silhouette differences between the captured
-video, MPM forward at the recovered $\hat{\boldsymbol{\theta}}$,
-and MPM forward at the rheometer-fitted
+Fig.~$13$~\cite{hamamichi2023nonnewtonian}, the headline comparison
+is the flow-curve overlay against the parallel-plate rheometer
+(Fig.~\ref{fig:flow-real}); Tab.~\ref{tab:rheo-recovery} lists the
+two setups used per material together with the recovered
+Herschel--Bulkley triple, mirroring the columns of the predecessor's
+Table~$1$.  Because inverse quality varies across the six materials,
+we read Fig.~\ref{fig:flow-real} as both validation and diagnostic:
+close overlays indicate parameter recovery inside the dam-break
+shear-rate support, while visibly separated curves expose either a
+ridge-equivalent parameter choice or a support mismatch that the
+dam-break observation cannot resolve.  Fig.~\ref{fig:snapdiff}
+additionally shows frame-by-frame silhouette differences between
+the captured video, MPM forward at the recovered
+$\hat{\boldsymbol{\theta}}$, and MPM forward at the rheometer-fitted
 $\boldsymbol{\theta}^{\!\star}$.
 
 \begin{table}[!htbp]
@@ -2004,51 +2015,41 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_milk_single_vs_joint.png}{(c) Moisturising milk: rheometer + single + joint flow curves; pending capture.}\\
+        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_milk_single_vs_joint.png}{(c) Moisturising milk: rheometer + single + joint flow curves.}\\
         {\footnotesize (c) Moisturising milk}
     \end{minipage}\\[6pt]
     % Row 2: 3 panels
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_lotion_single_vs_joint.png}{(d) Lotion: rheometer + single + joint flow curves; pending capture.}\\
+        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_lotion_single_vs_joint.png}{(d) Lotion: rheometer + single + joint flow curves.}\\
         {\footnotesize (d) Lotion}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_tonkatsu_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer + single + joint flow curves; pending capture.}\\
+        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_tonkatsu_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer + single + joint flow curves.}\\
         {\footnotesize (e) Japanese pork-cutlet sauce}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_sweetbean_single_vs_joint.png}{(f) Sweet bean paste: rheometer + single + joint flow curves; pending capture.}\\
+        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_sweetbean_single_vs_joint.png}{(f) Sweet bean paste: rheometer + single + joint flow curves.}\\
         {\footnotesize (f) Sweet bean paste}
     \end{minipage}
     \caption{Recovered Herschel--Bulkley flow curves on the
     Hamamichi rheometer-reference panel, in the layout
     of~\citet{hamamichi2023nonnewtonian} Fig.~$13$.  Dotted black:
     parallel-plate rheometer sweep on the same batch.  Red:
-    single-setup recovery.  Blue: joint two-setup recovery.  All
-    six materials of the predecessor's rheometer-reference panel
-    are reported.  On Chuno, Okonomiyaki, Lotion, and pork-cutlet
-    sauce the joint curve tracks the parallel-plate reference
-    closely inside the dam-break shear-rate window; on Chuno the
-    single-setup curve is biased toward higher $\sigma_Y$ (the
-    predicted ridge displacement), and the joint update closes
-    that gap.  Sweet bean paste shows the
-    same mechanism in the opposite direction: single setup
-    over-estimates $\sigma_Y$ at $38$\,Pa, joint pulls it to
-    $25$\,Pa within $10\%$ of the rheometer reference, while $n$
-    and $\eta$ compensate along the ridge so the visible
-    log--log flow curve barely moves -- a clean data instance of
-    the $\sigma_Y$/$\eta$ ridge of \S\ref{sec:inv-sy} expressed at
-    the parameter level rather than the curve level.  Moisturising
-    milk illustrates the synthetic-mode joint regression discussed
-    in \S\ref{sec:mainresults}: at $(W_2=4.5, H_2=2.0)$ the
-    setup-2 sub picks up high-$\dot\gamma$ evidence that pulls
-    the recovered $n$ toward the Newtonian limit, producing a
-    joint curve that disagrees with the rheometer at high
-    $\dot\gamma$ even though the single-setup curve was already
-    close.}
+    single-setup recovery.  Blue: joint two-setup recovery.  The
+    panel deliberately shows the full six-material outcome rather
+    than only successful examples.  Several materials track the
+    rheometer sweep over the dam-break-supported shear-rate window;
+    others expose the same limitation seen in the synthetic replay
+    diagnostics, where the observation constrains the visible
+    dam-break flow more tightly than it constrains the individual
+    Herschel--Bulkley triple.  We therefore interpret the panel at
+    the flow-curve level, following the predecessor, and treat
+    material-wise parameter differences along the
+    $\sigma_Y$/$\eta$ ridge as diagnostics rather than hidden
+    failures.}
     \Description{Two-by-three grid of log-log flow-curve overlays.
     Each panel shows a rotational-rheometer sweep alongside the
     single-setup and joint-setup flow curves recovered by our
@@ -2075,9 +2076,7 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
     $(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy} and predict
     visually identical dam-break trajectories inside the captured
     window, so the residual real$-$MPM gap is the dominant source
-    of disagreement, not our parameter-recovery error.  Setup-$1$
-    and the Chuno snapdiffs are reported in the supplemental
-    material.}
+    of disagreement, not our parameter-recovery error.}
     \Description{One silhouette diagnostic panel for Okonomiyaki
     setup-2: three rows of forward simulations (real, recovered
     theta, rheometer-truth theta) followed by three rows of pixel
@@ -2088,23 +2087,23 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
 \end{figure*}
 
 As reported by the predecessor on its own real-fluid panel,
-agreement at the parameter-triple level is not the relevant bar
-for video rheometry: the dam-break observation lies on the
+agreement at the parameter-triple level is not the only relevant bar
+for video rheometry: the dam-break observation can lie on the
 $(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy}, so multiple triples
-predict effectively identical flow curves over the dam-break
-shear-rate window.  Following~\citet{hamamichi2023nonnewtonian},
-we therefore read recovery quality from the flow-curve overlay
-in Fig.~\ref{fig:flow-real}: on both materials the joint
-two-setup curve tracks the parallel-plate reference inside the
-dam-break $\dot\gamma$ window, while the single-setup curve sits
-slightly off on Chuno (the predicted ridge displacement) and the
-joint update closes that gap.  The MPM-vs-MPM bottom row of
-Fig.~\ref{fig:snapdiff} makes the same point in pixel space: the
-silhouette difference between MPM at $\hat{\boldsymbol{\theta}}$
-and MPM at the rheometer-fitted $\boldsymbol{\theta}^{\!\star}$
-is visibly smaller than the real$-$MPM gap above, so any residual
-triple disagreement does not change the dam-break prediction
-inside the captured window.
+may predict similar free-surface motion over the observed
+shear-rate window.  We therefore report the six-material flow-curve
+panel directly instead of reducing it to a single success count.
+Good overlays show where the video inverse agrees with the
+parallel-plate reference; poor overlays identify materials or
+geometries where the real--sim gap or the remaining
+Herschel--Bulkley ridge dominates.  The MPM-vs-MPM bottom row of
+Fig.~\ref{fig:snapdiff} makes this diagnostic reading concrete for
+Okonomiyaki: the silhouette difference between MPM at
+$\hat{\boldsymbol{\theta}}$ and MPM at the rheometer-fitted
+$\boldsymbol{\theta}^{\!\star}$ is smaller than the real$-$MPM gap
+above, so residual triple disagreement can be less important to the
+captured dam-break trajectory than the mismatch between the real
+fluid and the idealized HB-MPM forward model.
 Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.
@@ -2119,80 +2118,96 @@ optimisation run. We test this claim directly on materials whose
 Herschel--Bulkley parameters evolve on a sub-hour timescale, and
 recover their full kinetic curves from dam-break video alone.
 
-\paragraph{Material panel: starch-network kinetics with concentration sweeps.}
-The classical reference experiment for time-resolved rheology is
-the build-up of yield stress $\sigma_Y(t)$ during starch
-retrogradation~\cite{miles1985gelation,karim2000methods,hoover2001composition}.
-We instantiate this as a $3 \times 3$ panel in which three
-supermarket starch sources are each prepared at three concentrations
-(Table~\ref{tab:fresh-mats}): instant rolled oats and potato starch
-(katakuriko) cover amylose-rich and amylopectin-rich starches with
-documented concentration scaling
-$\sigma_{Y,\infty}\propto c^{\alpha}$ with $\alpha\in[2,5]$
-\cite{hoover2001composition,roos1995phase}, and a Japanese pancake
-mix adds a composite wheat starch + leavener system whose
-network-formation rate differs from pure starch
-\cite{larson1999structure}. Concentrations were chosen so that the
-asymptotic yield stress in each material spans the surrogate's
-training box, $\sigma_Y\in[10,100]$\,Pa, by the analytical
-$\sigma_{Y,\infty}\propto c^{\alpha}$ scaling.
-This panel also provides the paper's particulate visual examples:
-rolled oats and pancake mix contain visible grains or composite
-solids, but we treat them as part of the time-varying freshness
-study rather than as a separate rheometer-infeasible validation
+\paragraph{Freshness protocol.}
+We use the V3.1 freshness protocol, which separates the question
+``can the inverse track a changing material?'' from ordinary
+static-flow validation. The protocol has three layers. First, a
+synthetic control prescribes time-varying Herschel--Bulkley
+parameters $\boldsymbol{\theta}(t)$ and checks whether the full
+pipeline recovers the kinetic constants from MPM-generated
+dam-break videos. Second, six real hand-prepared starch or
+composite-starch conditions are measured repeatedly within one
+batch, so the recovered $\sigma_Y(t)$ trajectory is not confounded by
+day-to-day preparation variation. Third, independent anchors--a
+repeat katakuriko batch, 24-hour rheometer plateaus on smooth
+conditions, and concentration-scaling checks--test whether the
+recovered trajectories have the expected physical structure
+\cite{miles1985gelation,karim2000methods,hoover2001composition}.
+
+\paragraph{Material panel.}
+The real panel is deliberately small enough to run as a controlled
+laboratory protocol, but diverse enough to include smooth,
+rheometer-feasible starch gels and visibly particulate materials
+(Table~\ref{tab:fresh-mats}). The smooth katakuriko and shiratama
+conditions provide independent 24-hour rheometer anchors; oats and
+pancake mix provide the paper's rheometer-infeasible, visibly
+chunky examples without elevating them to a separate validation
 claim.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\caption{Time-varying material panel: three starch sources at three
-concentrations each. Preparation uses kettle hot water or a brief
-microwave step only; no stovetop is required.}
+\caption{V3.1 time-varying material panel. Each condition is a
+$400$\,g within-batch session sampled at
+$t\in\{0,20,40\}$\,min. ``24h rheo'' marks conditions for which a
+parallel-plate plateau measurement is used as an independent
+asymptote anchor.}
 \label{tab:fresh-mats}
-\begin{tabular}{@{}lcccl@{}}
+\begin{tabular}{@{}p{0.24\linewidth}ccc p{0.34\linewidth}@{}}
 \toprule
-Material  &
-\multicolumn{3}{c}{Concentration sweep (\% w/w)} &
-Dominant kinetic mechanism \\
-\cmidrule(lr){2-4}
-          & low   & mid   & high  & \\
+Condition & Conc. & Texture & 24h rheo & Expected kinetic regime \\
 \midrule
-Rolled oats   & $5$ & $7$ & $9$
-              & amylose-driven retrogradation \\
-Potato starch & $3$ & $5$ & $7$
-              & amylopectin retrogradation \\
-Pancake mix   & $40$ & $55$ & $70$
-              & composite wheat-starch network \\
+Instant oats      & $5\%$  & chunky & no  & slow particulate setting \\
+Instant oats      & $9\%$  & chunky & no  & faster particulate setting \\
+Katakuriko starch & $3\%$  & smooth & yes & weak potato-starch gel \\
+Katakuriko starch & $7\%$  & smooth & yes & strong potato-starch gel \\
+Shiratama flour   & $7\%$  & smooth & yes & slow rice-flour gel \\
+Pancake mix       & $70\%$ & chunky & no  & composite starch + bubbles \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\paragraph{Synthetic kinetic control.}
+Before using real captures, we run the same pipeline on synthetic
+time-resolved data with prescribed
+$\boldsymbol{\theta}(t)$. Each trajectory is evaluated at
+$t=\{0,20,40\}$\,min, rendered with MPM under the same random
+setup-1 and proposed setup-2 protocol used in the laboratory, and
+then fit back to Eq.~\ref{eq:avrami}. This produces a direct
+ground-truth check on the recovered $(T_k,\sigma_{Y,\infty})$ and
+separates pipeline error from real-fluid preparation and
+image-extraction effects.
+
 \paragraph{Capture protocol.}
-For each of the nine $($material$,$ concentration$)$ conditions, the
-same batch is sampled at six time points $t_i\in\{15,30,60,90,150,
-240\}$\,min after preparation, kept at $25^{\circ}$C between
-captures. At each $t_i$ we run our two-setup dam-break protocol of
-\S\ref{sec:method-block}: a setup-1 geometry $(W_1,H_1)$ is drawn
-once at the beginning of each material session by uniform random
-sampling from the calibrated training box $[2,7]^2$\,cm; the
-setup-2 geometry $(W_2,H_2)$ is then re-derived at every $t_i$ from
-the running estimate $\hat{\boldsymbol{\theta}}_1(t_i)$ via the
-Hessian-orthogonal proposer of
-\S\ref{sec:proposer}~\cite{hamamichi2023nonnewtonian}. The
-two captures of a $t_i$ pair are taken approximately $14$\,min apart
-($\sim 7$\,min before and after the nominal $t_i$), so that within a
-single pair the material state has changed by less than the
-single-setup confidence half-width under the kinetic model below.
-Across the full session, each condition therefore yields six joint
-estimates $\hat{\boldsymbol{\theta}}(t_i)$ with full Laplace 95\% CIs
-from \S\ref{sec:inv-cma}, recovered in seconds per time point on the
-same surrogate bank used everywhere else in the paper.
+Each real session prepares a $400$\,g batch and keeps it at
+$25^{\circ}$C $\pm 0.5^{\circ}$C. We sample the same batch at
+$t_i\in\{0,20,40\}$\,min. At every time point we run a joint
+two-setup dam-break inverse: setup~1 draws
+$(W_1,H_1)$ uniformly from the continuous calibrated box
+$[2,7]^2$\,cm; setup~2 is proposed from the setup-1 snapshot inverse
+by the Hessian-orthogonal proposer of \S\ref{sec:proposer}. The
+proposed $(W_2,H_2)$ is used directly on the continuous $1$\,mm
+geometry grid, without snapping to a small discrete mould library.
+A single ChArUco calibration is shared across the session. The six
+main conditions therefore produce $6$ conditions $\times$ $3$ time
+points $\times$ $2$ setups $=36$ lab videos, plus the setup-2
+proposal snapshots; the katakuriko repeat batch adds another six
+dam-break videos.
+
+\paragraph{Repeat batch and rheometer subset.}
+To expose the failure mode of a hypothetical slow, staggered
+cross-batch protocol, we repeat katakuriko $5\%$ as two independent
+batches and compare the fitted $(T_k,\sigma_{Y,\infty})$ across
+batches. Smooth materials receive 24-hour parallel-plate follow-up:
+katakuriko $3\%$, katakuriko $7\%$, shiratama $7\%$, and both
+katakuriko $5\%$ repeat batches. These measurements are used only as
+plateau anchors, not as inputs to the video inverse.
 
 \paragraph{Kinetic fit and timescale recovery.}
 For each condition, the recovered yield-stress trajectory is fit to
-the first-order Avrami / build-up
-form~\cite{avrami1939kinetics,mewis2009thixotropy,bates1988nonlinear}
+the first-order build-up form
+\cite{avrami1939kinetics,mewis2009thixotropy,bates1988nonlinear}
 \begin{equation}
 \label{eq:avrami}
     \sigma_Y(t)
@@ -2204,88 +2219,67 @@ half-widths from Eq.~(\ref{eq:obs-loss}) as observation
 uncertainties (Bates and Watts~\cite{bates1988nonlinear}). The
 estimated relaxation time $T_k$ and asymptote
 $\sigma_{Y,\infty}$ are reported with $1\sigma$ intervals from the
-fit covariance. If the exponential residual exceeds twice the
-observation band on more than $30\%$ of the time points, we
-report the result of an Avrami-$n>1$
-sigmoid~\cite{avrami1939kinetics} or a two-component
-amylose+amylopectin model~\cite{miles1985gelation} as well, and
-flag the condition as having a non-first-order kinetic mechanism.
-This single, falsifiable kinetic
-hypothesis~\cite{box1987empirical,roache1998verification} replaces
-ad-hoc per-material fits.
+fit covariance. The three-point window is intentionally short:
+it asks whether a fast inverse can identify the local rise of
+$\sigma_Y(t)$ while the batch is still fresh, not whether it can
+replace a full rheometer ageing study. Smooth conditions with
+24-hour rheometer sweeps add an asymptote check; chunky conditions
+are judged by within-batch consistency, visual replay, and
+concentration trends rather than by plate-rheometer data.
 
 \paragraph{Validation against independent anchors.}
-At the per-condition level we score recovered trajectories against
-three independent anchors (Table~\ref{tab:fresh-anchors}):
-\emph{(A)}~the simulation-in-the-loop inverse
-of~\cite{hamamichi2023nonnewtonian} run on the same
-$\mathbf{y}_{\mathrm{obs}}$ exports of the dam-break video,
-quantifying the cost of replacing MPM-in-loop with our surrogate;
-\emph{(B)}~a parallel-plate rheometer sweep at $t=24$\,h on the same
-batch, which captures the kinetic asymptote
-$\sigma_{Y,\infty}$~\cite{macosko1994rheology}; and \emph{(D)}~visual
-sim-real overlay, where MPM forward simulation under the recovered
-$\hat{\boldsymbol{\theta}}(t_i)$ is rendered in the calibrated camera
-and compared frame-by-frame against the captured dam-break video,
-directly visualising the freshness benefit. Cross-condition checks
-\emph{(G)} (concentration scaling: $T_k(c)$ decreasing,
-$\sigma_{Y,\infty}(c)$ increasing per
-Hoover~\cite{hoover2001composition} and Roos~\cite{roos1995phase})
-and \emph{(H)} (mechanism ranking across the three starch sources)
-test the \emph{shape} of the recovered curves rather than any single
-number, which is what an inverse-rheometry method must ultimately
-deliver.
+Table~\ref{tab:fresh-anchors} lists the anchors used by V3.1. The
+synthetic layer is the only one with known ground truth for the
+entire kinetic trajectory; the real layer is designed to test
+physical plausibility and experimental usefulness under the
+constraints that make freshness matter in the first place.
 
 \begin{figure*}[!htbp]
     \centering
-    \widefigureorplaceholder[6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ: $3\times3$
-      panel of $\sigma_Y(t)$ trajectories. Rows: oats / potato
-      starch / pancake mix. Columns: low / mid / high concentration
-      from Tab.~\ref{tab:fresh-mats}. Each panel shows the six
-      recovered $\hat{\sigma}_{Y}(t_i)$ estimates with Laplace 95\%
-      CI bars and the Avrami-1 fit overlay. Anchor markers are
-      added: an open square at the simulation-in-the-loop estimate
-      from~\cite{hamamichi2023nonnewtonian} for the same
-      $\mathbf{y}_{\mathrm{obs}}$ at $t=60$\,min, and a horizontal
-      dashed line at the rheometer plateau at $t=24$\,h.}
-    \caption{Recovered yield-stress kinetics for the $3{\times}3$
-    starch panel. For each material$\times$concentration cell, our
-    pipeline returns six time-resolved estimates $\hat{\sigma}_Y
-    (t_i)$ with Laplace 95\% intervals; the solid curve is the
-    weighted Avrami-1 fit (Eq.~\ref{eq:avrami}). Anchors: the open
-    square is the same-data simulation-in-the-loop estimate of
-    \cite{hamamichi2023nonnewtonian}, and the dashed asymptote is
-    the rheometer plateau. The shape of $\sigma_Y(t)$ across each
-    row recovers the expected $\sigma_{Y,\infty}\propto c^{\alpha}$
-    scaling of starch retrogradation
+    \widefigureorplaceholder[6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
+      six-panel $\sigma_Y(t)$ figure. Panels: oats 5\%, oats 9\%,
+      katakuriko 3\%, katakuriko 7\%, shiratama 7\%, pancake mix
+      70\%. Each panel shows the three recovered
+      $\hat{\sigma}_{Y}(t_i)$ estimates at $t=\{0,20,40\}$ min with
+      Laplace 95\% CI bars and the fit of Eq.~\ref{eq:avrami};
+      smooth panels add a 24-hour rheometer plateau marker.}
+    \caption{Recovered yield-stress kinetics under the V3.1
+    freshness protocol. Each panel is one within-batch session from
+    Table~\ref{tab:fresh-mats}; markers are joint two-setup inverse
+    estimates at $t=\{0,20,40\}$\,min and the solid curve is the
+    weighted fit of Eq.~\ref{eq:avrami}. Smooth starch conditions
+    include a 24-hour rheometer plateau marker when available. The
+    paired oats and katakuriko concentrations test whether the
+    recovered asymptote increases with concentration, as expected
+    for starch-network build-up
     \cite{hoover2001composition,roos1995phase}.}
-    \Description{A three-by-three grid of yield-stress kinetic
-    curves. Each row corresponds to one starch source (oats, potato
-    starch, pancake mix) and each column to one of three
-    concentrations. Per panel six recovered yield-stress points are
-    fit with an exponential build-up model and overlaid with the
-    simulation-in-the-loop reference at one time point and the
-    24-hour rheometer asymptote.}
+    \Description{A six-panel grid of yield-stress kinetic curves.
+    Each panel shows three recovered yield-stress estimates over the
+    first 40 minutes after preparation, with uncertainty bars and an
+    exponential build-up curve. Smooth panels include a 24-hour
+    rheometer asymptote marker.}
     \label{fig:fresh-traj}
 \end{figure*}
 
 \begin{figure*}[!htbp]
     \centering
     \widefigureorplaceholder[4.5cm]{\textwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
-      $3\times 3$ image grid. Rows: the three starch sources at the
-      mid concentration of Tab.~\ref{tab:fresh-mats}. Columns:
-      $t \in \{15, 60, 240\}$\,min. Each cell is a representative
-      still from the calibrated dam-break video.}
-    \caption{Visual evidence of starch-network setting. Three
-    materials (rows, mid concentration) at three time points
-    (columns) after preparation; each cell is a still frame of the
-    calibrated dam-break video. The shrinking flow front along each
-    row is the visual signature of the $\sigma_Y$ build-up
-    recovered in Fig.~\ref{fig:fresh-traj}.}
-    \Description{Image grid showing three starch-based fluids
-    photographed at three different time points after preparation.
-    The flow extent visibly shrinks across each row as yield stress
-    builds up.}
+      representative stills from the calibrated dam-break videos.
+      Rows: selected smooth and chunky conditions. Columns:
+      $t \in \{0,20,40\}$\,min. Each cell shows the observed frame
+      and, where available, an MPM replay under
+      $\hat{\boldsymbol{\theta}}(t)$.}
+    \caption{Visual evidence for within-batch material evolution.
+    Representative still frames show the same prepared batch at
+    $t=\{0,20,40\}$\,min. Smooth starch gels and chunky materials
+    are shown together because the freshness claim is visual and
+    time-resolved: the flow front changes within the same batch
+    faster than a simulation-in-the-loop inverse can return a
+    parameter estimate.}
+    \Description{Image grid showing selected starch-based fluids at
+    three times after preparation. The flow extent changes over the
+    first 40 minutes, and replay overlays compare the captured
+    front with simulation under the recovered parameters.}
     \label{fig:fresh-demos}
 \end{figure*}
 
@@ -2293,61 +2287,60 @@ deliver.
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Independent validation anchors used for the freshness
-panel. Anchors~A and~D test the inverse algorithm against the same
-input data; anchor~B uses an independent instrument; anchors G and
-H test concentration scaling and material ranking against the
-literature.}
+\caption{Validation anchors used by the V3.1 freshness protocol.
+The synthetic layer tests numerical recovery against known kinetic
+ground truth; the real layer tests within-batch usefulness, repeat
+batch drift, smooth-material rheometer plateaus, and visual replay.}
 \label{tab:fresh-anchors}
 \begin{tabular}{@{}lp{0.55\linewidth}@{}}
 \toprule
 Anchor & Description \\
 \midrule
-A. SIL on same $\mathbf{y}_{\mathrm{obs}}$
-       & Run \cite{hamamichi2023nonnewtonian}'s
-         simulation-in-the-loop inverse on the exact same dam-break
-         observations; compare $\hat{\sigma}_Y$ at one time point
-         per condition. \\
-B. Rheometer plateau ($t=24$\,h)
+A. Synthetic kinetic control
+       & Prescribe $\boldsymbol{\theta}(t)$ in simulation, run the
+         same two-setup inverse used for real captures, and report
+         recovery error for $(T_k,\sigma_{Y,\infty})$. \\
+B. Within-batch real trajectory
+       & For each real condition, recover
+         $\hat{\sigma}_Y(t)$ at $t=\{0,20,40\}$\,min from one
+         prepared batch, avoiding cross-day preparation drift. \\
+C. Repeat-batch drift
+       & Repeat katakuriko $5\%$ as independent Batch~A and Batch~B;
+         compare recovered $(T_k,\sigma_{Y,\infty})$ to quantify
+         how much a staggered cross-batch protocol would mix
+         different materials. \\
+D. Rheometer plateau ($t=24$\,h)
        & Parallel-plate measurement
-         \cite{macosko1994rheology} on a 24-hour aged aliquot;
-         compare against the Avrami asymptote
+         \cite{macosko1994rheology} on smooth starch conditions;
+         compare against the fitted asymptote
          $\sigma_{Y,\infty}$. \\
-D. Visual MPM($\hat{\boldsymbol{\theta}}$) replay
+E. Concentration scaling
+       & Check that paired concentrations follow the expected
+         $\sigma_{Y,\infty}\propto c^{\alpha}$ trend for starch
+         network build-up, with $\alpha$ in the broad literature
+         range $[2,5]$
+         \cite{hoover2001composition,roos1995phase}. \\
+F. Visual MPM($\hat{\boldsymbol{\theta}}$) replay
        & MPM forward simulation under recovered
          $\hat{\boldsymbol{\theta}}(t_i)$, rendered through the
          calibrated camera and overlaid on the captured dam-break
          video frame-by-frame
          \cite{roache1998verification}. \\
-F. Avrami residual
-       & Weighted residual of Eq.~\ref{eq:avrami} below twice the
-         observation noise on $\ge 70\%$ of time points; otherwise
-         report a two-component fit. \\
-G. Concentration scaling
-       & $T_k(c)$ decreasing and $\sigma_{Y,\infty}(c)$ increasing
-         within each material as $c$ grows
-         \cite{hoover2001composition,roos1995phase}. \\
-H. Cross-material ranking
-       & Asymptotic $\sigma_{Y,\infty}$ ordering across the three
-         starch sources matches the qualitative ordering reported
-         in starch-rheology
-         literature~\cite{larson1999structure,miles1985gelation}. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Why freshness is the headline contribution.}
 At $\sim 8$\,h per setup, a simulation-in-the-loop inverse can
-return at most one estimate per condition before
-$\sigma_Y(t)$ has changed by an order of magnitude; the recovered
-parameter is then a smeared average over the kinetic window rather
-than a state estimate. At $\sim 15$\,s per setup, our inverse
-returns six time-resolved $\hat{\sigma}_Y(t_i)$ within the same
-$240$\,min window, with each estimate fresher than the next time
-sample. The kinetic curves of Fig.~\ref{fig:fresh-traj} are
-therefore not merely a denser version of the prior result; they are
-qualitatively new information that an hour-scale inverse cannot
-produce on the same materials.
+return at most one joint estimate after the material has already
+aged into a different state. The V3.1 protocol instead acquires
+three joint estimates inside a $60$\,min within-batch window. The
+synthetic control verifies that this measurement cadence can recover
+the prescribed kinetic constants; the real panel then uses the same
+cadence to measure material evolution that is experimentally
+inaccessible to a slow inverse. The point is therefore not merely
+lower latency, but a different experimental regime: time-resolved
+inverse rheology on a batch that is still changing.
 
 
 \subsection{End-to-End Capture-to-Parameter Time Budget}
