@@ -528,19 +528,7 @@ closed-form Fisher-information construction we adopt unchanged.
 
 \begin{figure*}[t]
     \centering
-    \iffigplaceholder
-      \figplaceholderwide[6cm]{Production pipeline placeholder:
-      calibrated video $\to$ eight flow-front distances
-      $\mathbf{y}_{\mathrm{obs}}$; offline MPM corpus $\to$
-      $25$ geometry-conditioned banks of trajectory-shape sub-experts;
-      online three-stage routing with source-aware observation-evidence
-      rerank $\to$ exact GP posterior
-      mean/variance; GP-aware Type-II ML loss $\to$ multi-restart
-      CMA-ES; optional Hessian-orthogonal setup-2 proposal and
-      two-setup joint inverse.}
-    \else
-      \includegraphics[width=\textwidth]{figs/method_overview.pdf}
-    \fi
+    \includegraphics[width=\textwidth]{figs/method_overview.pdf}
     \caption{Production pipeline implemented by the accompanying code.
     The user supplies an observed flow-front vector
     $\mathbf{y}_{\mathrm{obs}}$ and setup geometry $(W,H)$. A frozen
@@ -764,27 +752,6 @@ $s_{\mathrm{prod}}\in\{s_{\mathrm{real}},s_{\mathrm{sim}}\}$, and the
 inverse uses this top-1 expert directly without ensemble aggregation
 across candidates.
 
-\begin{figure*}[t]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[6cm]{Placeholder F-PARTITION: the $25$
-      geometry-conditioned sub-banks, length bins, PCA/K-means shape
-      clusters, and per-sub size / support statistics for the
-      production trajectory-shape bank.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/method/partition_3layer.pdf}
-    \fi
-    \caption{Production routing bank. The model is split by geometry,
-    terminal displacement, and normalised trajectory shape; a final
-    observation-evidence rerank selects the primary sub-expert used by
-    the inverse. The rerank has a real-video robust profile
-    (Eq.~\eqref{eq:y8q}) and a simulator-matched precision profile
-    (Eq.~\eqref{eq:simprecision}).}
-    \Description{Three-layer routing visualisation for geometry,
-    length, shape, and the final observation-evidence rerank.}
-    \label{fig:partition}
-\end{figure*}
-
 \paragraph{Why Deterministic Routing.}
 \label{sec:surr-deterministic}
 At inverse time the material parameters are unknown, but
@@ -963,26 +930,6 @@ through restart dispersion of the CMA-ES optima and a local
 Laplace--Hessian confidence interval (\S\ref{sec:inv-cma}), so the
 reported uncertainty is tied to the likelihood and the data rather
 than to an anchor selected by the user.
-
-\begin{figure}[t]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder F-RIDGE: contours of predicted
-      $y_8$ over $(\log\eta,\log\sigma_Y)$, showing the HB ridge and
-      how two setup likelihoods or Hessian diagnostics reveal the
-      weakly identified direction.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/method/ridge_identifiability.pdf}
-    \fi
-    \caption{HB ridge diagnosis. Single-setup flow-front observations
-    can be nearly constant along a coupled
-    $(\log\eta,\log\sigma_Y)$ direction. We use joint setup likelihoods,
-    restart dispersion, and local Hessian intervals to report this
-    ambiguity rather than imposing an explicit $\sigma_Y$ prior.}
-    \Description{Contour plot of the HB identifiability ridge and its
-    diagnosis by joint likelihood and uncertainty estimates.}
-    \label{fig:ridge}
-\end{figure}
 
 \paragraph{GP-Aware Type-II ML Loss.}
 \label{sec:inv-loss}
@@ -1893,13 +1840,7 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{Placeholder F-REPLAY: cumulative
-      distributions of parameter and MLS-MPM replay error on the
-      $N=30$ synthetic panel.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
     \caption{Parameter recovery and MLS-MPM replay error on the
     Hamamichi-matched $N=30$ synthetic panel.  The parameter threshold
     $E_{\mathrm{rel}}=0.1$ follows~\citet{hamamichi2023nonnewtonian}.
@@ -1939,45 +1880,6 @@ representative replay cases in Figs.~\ref{fig:flowcurve-syn} and
     \label{fig:replay-scatter}
 \end{figure}
 
-\paragraph{Convergence and wall-clock against the simulation-in-the-loop
-baseline.}
-On a single representative case (Fig.~\ref{fig:convergence}), our
-inverse reaches the lowest loss attained by the
-simulation-in-the-loop predecessor at roughly $10^{-3}\times$ its
-wall-clock, while a single-level surrogate without warm-start or
-ridge diagnostic plateaus above the identifiability ridge. The
-crossing point is dictated by the GP forward call cost
-($\sim\!30$\,ms per query) versus the MPM forward call cost
-($\sim\!2$--$5$\,min per query) on the same GPU.
-
-\begin{figure}[!htbp]
-    \centering
-    \iffigplaceholder
-      \figplaceholder[5cm]{Placeholder: CMA-ES loss versus
-      wall-clock trajectory (log-log) on one representative
-      synthetic case, for our pipeline, the simulation-in-the-loop
-      predecessor, and a single-level surrogate baseline. Our
-      pipeline reaches the predecessor's converged loss at roughly
-      $10^{-3}\times$ its wall-clock; the single-level baseline
-      plateaus above the identifiability ridge.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/best_loss_convergence.png}
-    \fi
-    \caption{CMA-ES loss versus wall-clock on a representative
-    synthetic case (log-log). Our pipeline reaches the
-    simulation-in-the-loop predecessor's converged loss at roughly
-    $1/1000$ of the wall-clock; the single-level surrogate baseline
-    stalls at a higher-loss plateau, failing to resolve the
-    identifiability ridge without the GP-aware likelihood and
-    multi-restart diagnostics of \S\ref{sec:inv-cma}.}
-    \Description{Log-scale loss-versus-wall-clock convergence curves
-    for three pipelines on one representative synthetic sample. Our
-    pipeline reaches the predecessor's converged loss at roughly one
-    thousandth of the wall-clock; the single-level baseline plateaus
-    at a higher loss without resolving the yield-stress component.}
-    \label{fig:convergence}
-\end{figure}
-
 \paragraph{Recovered flow curves on synthetic samples.}
 Beyond the scalar parameter recovery of
 Table~\ref{tab:setup-ablation}, the recovered Herschel--Bulkley
@@ -1992,13 +1894,7 @@ diagnostic.
 
 \begin{figure}[!htbp]
     \centering
-    \iffigplaceholder
-      \figplaceholder[5.5cm]{Placeholder: recovered versus
-      ground-truth Herschel--Bulkley flow curves on representative
-      synthetic replay cases.}
-    \else
-      \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
-    \fi
+    \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
     \caption{Recovered flow curves $\hat\tau(\dot\gamma)$ (blue)
     versus ground truth (black) on representative synthetic replay
     cases.  The green band marks the conventional HB-fit
@@ -2181,8 +2077,8 @@ the pixel level on the most-discussed case --- Carbonara
     V1-paper truth (0.9936); setup 2 (W=2.5, H=2.0) is essentially
     tied (0.9966 vs 0.9971). Both $\theta$ produce silhouettes that
     match the captured video to within $0.1\%$ IoU --- the two
-    points lie on a single iso-$\mathbf{y}$ contour
-    (Figure~\ref{fig:ridge}). The 6$\times$ disagreement in
+    points lie on the same iso-$\mathbf{y}$ ambiguity described in
+    \S\ref{sec:inv-sy}. The 6$\times$ disagreement in
     $\sigma_{Y}$ is therefore a property of the observation, not of
     the inverse: the two setups jointly cannot disambiguate it
     within an 8-frame window.}
