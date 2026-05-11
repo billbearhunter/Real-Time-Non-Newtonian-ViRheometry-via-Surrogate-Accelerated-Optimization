@@ -1932,6 +1932,7 @@ Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.
 
+\FloatBarrier
 \subsection{Parameter Freshness for Time-Varying Materials}
 \label{sec:freshness}
 
@@ -2035,6 +2036,8 @@ three-point cadence regardless of inverse quality.
     \label{fig:fresh-A1}
 \end{figure}
 
+\FloatBarrier
+
 % -------------------------------------------------------------------
 \paragraph{Layer B: Sim-in-loop staleness counterfactual.}
 \label{sec:fresh-B}
@@ -2096,6 +2099,8 @@ boundary candidly is part of the claim.
     as the prescribed kinetic timescale shortens.}
     \label{fig:fresh-B1}
 \end{figure*}
+
+\FloatBarrier
 
 % -------------------------------------------------------------------
 \paragraph{Layer C: Within-batch evolution of real materials.}
@@ -2243,9 +2248,9 @@ Pancake mix $70\%$      & ---  & --- & ---  & ---  & ---  \\
 \end{tabular}
 \end{table}
 
-\begin{figure*}[!htbp]
+\begin{figure}[!htbp]
     \centering
-    \widefigureorplaceholder[4.5cm]{\textwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
+    \figureorplaceholder[4.5cm]{\columnwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
       representative stills from the calibrated dam-break videos.
       Rows: selected smooth and chunky conditions. Columns:
       $t \in \{0,20,40\}$\,min. Each cell shows the observed frame
@@ -2263,7 +2268,9 @@ Pancake mix $70\%$      & ---  & --- & ---  & ---  & ---  \\
     three times after preparation, optionally overlaid with MPM
     replays under the recovered parameters at each time point.}
     \label{fig:fresh-demos}
-\end{figure*}
+\end{figure}
+
+\FloatBarrier
 
 % -------------------------------------------------------------------
 \paragraph{Layer D: Real-material staleness verification.}
@@ -2337,6 +2344,8 @@ characterises kinetics on the $0$--$40$\,min window only; the
 $24$\,h rheometer plateau is used as an external check on the
 asymptote, not as a curve our method recovers. Longer-window
 ageing studies are out of scope.
+
+\FloatBarrier
 
 
 \subsection{End-to-End Capture-to-Parameter Time Budget}
