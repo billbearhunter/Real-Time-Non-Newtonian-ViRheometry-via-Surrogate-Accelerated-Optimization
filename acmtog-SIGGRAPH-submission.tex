@@ -191,11 +191,12 @@ simulations. We further replace the manual camera-calibration
 workflow that precedes the inverse with an algorithmic two-stage
 pipeline based on ChArUco markers and silhouette-edge refinement.
 
-We validate our method by comparing against the simulation-in-the-loop
-predecessor on real-video captures and against parallel-plate
-rheometer measurements on materials the rheometers can handle, and
-find that the recovered parameters are on par with the predecessor
-at three orders of magnitude lower latency. The seconds-scale
+We validate our method against the predecessor's simulation-in-the-loop
+benchmark and against parallel-plate rheometer measurements on real
+materials the rheometers can handle. The surrogate inverse preserves
+dam-break replay and flow-curve agreement in the regimes supported by
+the observation, while running at three orders of magnitude lower
+latency. The seconds-scale
 inversion enables two uses inaccessible at hours-per-setup cost:
 \emph{(i)}~\emph{fresh parameters for time-varying fluids}, in which
 the inversion returns the material's current state rather than a

@@ -37,8 +37,9 @@ payoffs that we evaluate in this paper:
 
 We propose a surrogate-accelerated framework that compresses the
 inverse from hours to seconds per setup, making these two payoffs
-available within a practical workflow. Our technical core couples
-three components.
+available within a practical workflow. The inverse core couples the
+first two components below, and the full capture-to-parameter system
+adds the third.
 
 \emph{(i)}~A \emph{hierarchical mixture of Gaussian-process experts}
 (HMoGP) replaces MPM inside the optimizer. The trained surrogate bank
@@ -1384,8 +1385,8 @@ which parallel-plate rheometer sweeps are available.
 \emph{$T_{\mathrm{fresh}}$} follows the freshness protocol of
 \S\ref{sec:freshness}:
 synthetic prescribed kinetic trajectories for ground-truth recovery,
-six real hand-prepared starch or composite-starch conditions sampled
-within a single $60$\,min batch window, and a repeat batch for
+seven real hand-prepared starch or composite-starch conditions sampled
+over a $40$\,min within-batch observation window, with repeat batches for
 quantifying cross-batch kinetic drift.
 
 \paragraph{Reference.}
@@ -1394,8 +1395,8 @@ pipeline of~\cite{hamamichi2023nonnewtonian}: identical dam-break
 observation and CMA-ES-style derivative-free search, but every
 candidate is evaluated by a fresh MPM run. The predecessor's own
 $30$-case panel numbers are reproduced alongside ours in
-Table~\ref{tab:setup-ablation}. The contribution of each component
-of our pipeline is isolated by the surrogate-fidelity diagnostics
+Table~\ref{tab:setup-ablation}. The main error sources in our pipeline
+are separated by the surrogate-fidelity diagnostics
 of \S\ref{sec:fidelity}, which establish that the routed sub-experts
 reproduce the MPM forward to sub-cm flow-front error, and by the
 routing recall reported inline in \S\ref{sec:mainresults}: the
@@ -1948,9 +1949,9 @@ each layer's failure modes alongside its pass conditions.
   reports the bias $\Delta$ as a function of $T_k$. This is the
   layer that converts ``freshness = headline'' from narrative into a
   quantified finding.
-  \item[\textnormal{C.}] \emph{Within-batch real evolution.} On six
+  \item[\textnormal{C.}] \emph{Within-batch real evolution.} On seven
   self-prepared materials, the same pipeline is run three times
-  within a $60$\,min batch window and the recovered
+  over a $40$\,min within-batch observation window and the recovered
   $\hat\sigma_Y(t)$ is fitted to a first-order build-up form. Pass
   conditions are pre-registered before any video is captured.
   \item[\textnormal{D.}] \emph{Real-material staleness verification.}
@@ -2357,10 +2358,10 @@ measurements inside a single user session.
 
 The immediate effect of our pipeline is a three-orders-of-magnitude
 reduction in per-video inverse cost. The seconds-scale inverse
-delivers two experimentally anchored payoffs: \emph{freshness} for
+targets two payoffs evaluated in the results: \emph{freshness} for
 time-varying fluids (\S\ref{sec:freshness}) and fast
-\emph{rheometer-referenced validation} on the Hamamichi materials
-for which parallel-plate sweeps are available (\S\ref{sec:rheometer}).
+\emph{rheometer-referenced validation} on the Hamamichi materials for
+which parallel-plate sweeps are available (\S\ref{sec:rheometer}).
 The first is a temporal improvement that turns ``hours to return a
 past state'' into ``seconds to return the current state.'' The
 second checks that replacing MPM-in-the-loop by a routed GP surrogate
@@ -2395,7 +2396,7 @@ optimiser would slide to $\sigma_Y \to 0$ while inflating $\eta$ to
 match the observation. Conversely, the identifiability-aware inverse
 of \S\ref{sec:inverse} requires an accurate surrogate to be evaluated
 at the $\mathcal{O}(10^{3})$ candidates issued by a multi-restart
-CMA-ES run within seconds (Tab.~\ref{tab:hyper});
+CMA-ES run within seconds (Tab.~\ref{tab:time-budget});
 running the same inverse against a coarse surrogate would
 reintroduce surrogate bias as a new source of error. The
 hierarchical mixture-of-GP (HMoGP) surrogate and the
@@ -2427,7 +2428,7 @@ We presented a surrogate-accelerated framework for non-Newtonian
 video rheometry that compresses the Herschel--Bulkley inverse from
 around eight hours per setup in simulation-in-the-loop prior
 work~\cite{hamamichi2023nonnewtonian} to a median of $12$\,s per
-video on a single consumer GPU. The method rests on two coupled
+video on a single consumer GPU. The inverse core rests on two coupled
 components: a regime-aware hierarchical Mixture-of-GP surrogate
 (HMoGP) whose locally-trained exact-GP experts are routed
 by a deterministic three-stage gate over container geometry,
@@ -2438,6 +2439,9 @@ nearest training neighbour and reports the residual
 yield-stress/consistency ridge through multi-restart dispersion and
 a local Laplace--Hessian $95\%$ confidence interval, rather than
 breaking the ridge with a hand-chosen $\sigma_Y$ prior.
+The full capture-to-parameter workflow additionally replaces the
+manual camera-calibration stage with the ChArUco and silhouette-edge
+pipeline of \S\ref{sec:calib}.
 \citet{hamamichi2023nonnewtonian} mitigates the same ridge with
 Hessian-based similarity analysis, a Poiseuille-flow proxy, active
 setup selection, and iterative multi-setup CMA-ES; our path
