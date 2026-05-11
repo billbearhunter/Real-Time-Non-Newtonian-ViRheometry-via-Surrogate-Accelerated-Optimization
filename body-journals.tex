@@ -18,33 +18,27 @@ cannot, but is bottlenecked by its inner loop---one MPM dam-break
 takes several minutes on modern GPU hardware and the
 derivative-free optimiser issues hundreds of candidates, so the
 end-to-end inverse takes \emph{around eight hours per setup}. This
-latency confines the method to offline research use and precludes
-three capabilities that a faster video-based approach would unlock:
+latency confines the method to offline research use and blocks two
+payoffs that we evaluate in this paper:
 
 \begin{itemize}
-    \item \emph{Tracking parameters of time-varying fluids.} When a
+    \item \emph{Fresh parameters for time-varying fluids.} When a
     material's properties evolve during the measurement
     window---sedimentation, aging, temperature drift, mixing history,
     cooking cooldown---an hour-scale inversion returns a parameter
     describing a past state. The inferred value is stale by the time
     it is delivered.
-    \item \emph{Characterizing many materials in a single session.}
-    Comparing several brands or batches, or sweeping a single material
-    over temperature, dilution, or shear-history conditions, requires
-    running the inverse $N$ times. At hours per setup, even modest $N$
-    is impractical, so per-material rheometry is restricted to
-    handpicked showcase samples rather than scaled to surveys or
-    catalogs.
-    \item \emph{Iterative measurement workflows.} Closed-loop uses,
-    in which each capture's recovered parameters guide the next
-    adjustment to a recipe or process, are foreclosed when the
-    measurement-to-decision latency is hours.
+    \item \emph{Practical repeated real-fluid validation.} Comparing
+    multiple rheometer-referenced materials or repeated setups requires
+    running the inverse many times. At hours per setup, such panels are
+    limited to offline showcase studies; at seconds per setup, they fit
+    inside an ordinary measurement session.
 \end{itemize}
 
 We propose a surrogate-accelerated framework that compresses the
-inverse from hours to seconds per setup, making all three
-capabilities available within a practical workflow. Our technical
-core couples three components.
+inverse from hours to seconds per setup, making these two payoffs
+available within a practical workflow. Our technical core couples
+three components.
 
 \emph{(i)}~A \emph{hierarchical mixture of Gaussian-process experts}
 replaces MPM inside the optimizer. The production surrogate bank
@@ -81,7 +75,7 @@ needed to make that formulation computationally practical. By
 porting the inverse onto a learned surrogate, the same
 setup-selection and two-setup joint machinery becomes affordable per
 material rather than only per showcase, with the inverse returning
-within the latency required by the three uses above.
+within the latency required by these uses.
 
 \section{Related Work}
 
@@ -332,10 +326,12 @@ the fluid surface is a signed-distance field smoothed by
 Laplacian-then-biharmonic passes with per-cell $\varphi$ clamped to
 the local particle-radius range
 $[\varphi_{\min},\,\varphi_{\max}]$, removing the per-frame
-$\varphi$ tuning of earlier pipelines; the silhouette is rendered by
-marching-cubes meshing of the zero-level set, projected through the
-calibrated camera $(\mathbf{K}_{0}, R^{*}, \mathbf{t}^{*})$ of
-\S\ref{sec:calib} to close the loop from particles to $\mathbf{y}$.
+$\varphi$ tuning of earlier pipelines. For synthetic training and
+validation, the simulator reports the front extent in world
+centimetres under a fixed virtual camera convention; the real-camera
+calibration of \S\ref{sec:calib} maps captured pixels into this same
+metric observation space, but is not used to generate the training
+corpus.
 
 
 \subsection{Observation Pipeline}
@@ -636,8 +632,9 @@ The final stage is an observation-evidence rerank. Among the
 PCA-nearest candidate sub-experts $\{s\}$, we score each candidate by
 how well its training output cloud explains the measured
 $\mathbf{y}_{\mathrm{obs}}$, then keep a single primary sub-expert.
-The deployment selects one of two rerank profiles according to the
-observation source.
+The implementation exposes two rerank profiles; the evaluation fixes
+the profile by observation source rather than learning an automatic
+source classifier.
 
 \paragraph{\texttt{real\_robust} (camera deployment).}
 Real videos carry non-trivial extraction noise and model discrepancy,
@@ -816,8 +813,8 @@ observation space,
     \frac{1}{8}\sum_{d=1}^{8}
     \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
 \end{equation}
-The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8)$
-form a non-decreasing schedule: by construction, the early frames
+The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8) =
+(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$ form a non-decreasing schedule: by construction, the early frames
 of the dam-break sequence include the gate-release transient
 (finite-time gate withdrawal, release-timing jitter, transient
 free-surface and surface-tension effects unmodelled by the MPM
@@ -1266,17 +1263,13 @@ Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
 \label{sec:data}
 
 All reported production results use a single frozen surrogate bank
-trained once and re-used across every reported experiment. The bank
-is trained on $295{,}419$ unique MPM simulations, which produce
-$425{,}831$ routed assignment rows after the multi-cell routing of
-\S\ref{sec:surrogate} (a single simulation can be assigned to more
-than one sub-expert when its trajectory straddles two cells). The
-bank contains $25$ geometry-conditioned sub-banks holding $1{,}396$
-exact-GP sub-experts at initial training, growing to $1{,}491$
-after active-infill iterations that retrain individual cells whose
-validation residual exceeds an automatic threshold, with between
-$13{,}581$ and $25{,}032$ assignment rows per geometry sub-bank,
-spanning
+trained once and re-used across every reported experiment. The bank\nis trained on $295{,}419$ unique training MPM simulations. After the multi-cell routing of \S\ref{sec:surrogate}, these
+simulations produce $425{,}831$ routed assignment rows (a single
+simulation can be assigned to more than one sub-expert when its
+trajectory straddles two cells). The final frozen bank contains $25$
+geometry-conditioned sub-banks and $1{,}491$ exact-GP sub-experts,
+with between $13{,}581$ and $25{,}032$ assignment rows per geometry
+sub-bank, spanning
 $n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
 $\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and $W,H\in[2,7]$ cm. No
 material-specific retraining or per-experiment hyperparameter sweep
@@ -1291,7 +1284,7 @@ evaluation.}
 \begin{tabular}{@{}p{0.36\linewidth}p{0.58\linewidth}@{}}
 \toprule
 \textit{Training data} & \\
-\quad unique MPM simulations        & $295{,}419$ \\
+\quad unique training MPM simulations & $295{,}419$ \\
 \quad routed assignment rows        & $425{,}831$ (a simulation may be
                                       routed to more than one cell) \\
 \quad parameter box                 & $n\in[0.3,1.0]$,
@@ -1300,9 +1293,7 @@ evaluation.}
 \midrule
 \textit{Surrogate bank} & \\
 \quad geometry-conditioned sub-banks & $25$ \\
-\quad sub-experts                   & $1{,}396$ at initial training,
-                                      $1{,}491$ after active infill;
-                                      $24$--$71$ per geometry sub-bank \\
+\quad sub-experts                   & $1{,}491$ final frozen experts; $24$--$71$ per geometry sub-bank \\
 \quad routing                       & geometry gate $+$ length bin $+$
                                       PCA/K-means shape $+$
                                       source-aware observation-evidence
@@ -1331,6 +1322,7 @@ evaluation.}
 \midrule
 \textit{Likelihood / UQ} & \\
 \quad loss                          & GP-aware Type-II ML in log space \\
+\quad frame weights $\boldsymbol{\alpha}$ & $(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$ \\
 \quad noise floor                   & $\sigma_{\mathrm{obs,log}}=0.20$ \\
 \quad CI reporting                  & numerical Hessian / Laplace 95\% CI \\
 \bottomrule
@@ -1358,9 +1350,7 @@ time-varying yield-stress trajectory from repeated within-batch
 dam-break measurements?
 
 \paragraph{Datasets.}
-We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} is the
-held-out evaluation split: $22{,}209$ unique MPM simulations held out
-from the $295{,}419$-simulation training corpus (\S\ref{sec:data}),
+We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} is a disjoint held-out evaluation split of $22{,}209$ unique MPM simulations, separate from the $295{,}419$-simulation training corpus (\S\ref{sec:data}),
 sampled stratified over $(n, \log\eta, \log\sigma_Y, W, H)$. After
 the multi-cell routing of \S\ref{sec:surrogate}, this corresponds
 to the $42{,}583$ assignment rows used for the surrogate parity
@@ -1380,18 +1370,14 @@ six real hand-prepared starch or composite-starch conditions sampled
 within a single $60$\,min batch window, and a repeat batch for
 quantifying cross-batch kinetic drift.
 
-\paragraph{Baselines.}
-\emph{Baseline A} is the simulation-in-the-loop pipeline
-of~\cite{hamamichi2023nonnewtonian}: identical observation, identical
-CMA-ES hyperparameters, but every candidate evaluated by a fresh MPM
-run rather than by the surrogate. Baseline~A defines the accuracy
-upper bound and wall-time lower bound of the simulation-in-the-loop
-family. \emph{Baseline B} is a reduced version of our own pipeline
-that isolates the contribution of hierarchical gating and the
-identifiability-aware inverse: it uses a flat Bayesian GMM over
-$(W, H)$ with $K = 12$ and no second-level $\phi$ gate ($12$ experts
-total), top-$2$ hard routing, and a CMA-ES inverse without warm-start
-or $\sigma_Y$ prior.
+\paragraph{Baseline.}
+The accuracy and time reference is the simulation-in-the-loop pipeline
+of~\cite{hamamichi2023nonnewtonian}: identical dam-break observation
+and CMA-ES-style derivative-free search, but every candidate is
+evaluated by a fresh MPM run rather than by the surrogate. This baseline
+defines the accuracy ceiling and wall-time cost of the predecessor
+family; our internal routing/profile ablations are reported inline with
+the relevant synthetic and real experiments.
 
 \paragraph{Metrics.}
 For the forward surrogate we report per-output mean absolute error
@@ -1473,7 +1459,7 @@ subs.
 \caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
 ($N=42{,}583$ held-out assignment rows, produced by the $22{,}209$
 held-out simulations of \S\ref{sec:experimental-setup} after routing;
-all $1{,}491$ post-infill sub-experts visited).
+all $1{,}491$ final sub-experts visited).
 Per-dim numbers are computed on the residual $\hat y_d - y_d$ across
 all rows.}
 \label{tab:fidelity}
@@ -2132,6 +2118,7 @@ appear only as visual examples inside the freshness panel rather than
 as a separate accuracy claim.
 
 \subsection{A Reusable Surrogate as a Community Asset}
+\label{sec:asset}
 
 The separation of a one-time offline training phase from a
 seconds-scale online inference phase produces a reusable artefact
@@ -2181,7 +2168,7 @@ optimise per scene and do not amortise a reusable surrogate, so
 their per-material cost remains in the simulation-in-the-loop
 regime. Our architectural choice of an offline-trained hierarchical
 surrogate is precisely what enables the seconds-scale per-video
-latency and the community-asset property of \S6.2.
+latency and the community-asset property of \S\ref{sec:asset}.
 
 
 \subsection{Conclusion}
