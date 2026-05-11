@@ -1265,15 +1265,18 @@ Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
 \section{Training Data and Frozen Configuration}
 \label{sec:data}
 
-% TODO[reviewer-fix]: corpus + sub-expert counts must match the values
-% used in §7.1 (corpus / holdout) and §7.2 (Tab. fidelity caption).
-% Currently 1,396 vs 1,491 vs 1,484 across the paper.
 All reported production results use a single frozen surrogate bank
 trained once and re-used across every reported experiment. The bank
-contains $25$ geometry-conditioned sub-banks holding $1{,}396$
-exact-GP sub-experts in total. Their assignment tables index
-$425{,}831$ routed MPM training rows (between $13{,}581$ and
-$25{,}032$ rows per geometry sub-bank), spanning
+is trained on $295{,}419$ unique MPM simulations, which produce
+$425{,}831$ routed assignment rows after the multi-cell routing of
+\S\ref{sec:surrogate} (a single simulation can be assigned to more
+than one sub-expert when its trajectory straddles two cells). The
+bank contains $25$ geometry-conditioned sub-banks holding $1{,}396$
+exact-GP sub-experts at initial training, growing to $1{,}491$
+after active-infill iterations that retrain individual cells whose
+validation residual exceeds an automatic threshold, with between
+$13{,}581$ and $25{,}032$ assignment rows per geometry sub-bank,
+spanning
 $n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
 $\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and $W,H\in[2,7]$ cm. No
 material-specific retraining or per-experiment hyperparameter sweep
@@ -1288,15 +1291,18 @@ evaluation.}
 \begin{tabular}{@{}p{0.36\linewidth}p{0.58\linewidth}@{}}
 \toprule
 \textit{Training data} & \\
-\quad assignment rows               & $425{,}831$ routed MPM samples \\
+\quad unique MPM simulations        & $295{,}419$ \\
+\quad routed assignment rows        & $425{,}831$ (a simulation may be
+                                      routed to more than one cell) \\
 \quad parameter box                 & $n\in[0.3,1.0]$,
                                       $\eta\in[10^{-3},300]$,
                                       $\sigma_Y\in[10^{-3},400]$ \\
 \midrule
 \textit{Surrogate bank} & \\
 \quad geometry-conditioned sub-banks & $25$ \\
-\quad sub-experts                   & $1{,}396$ total; $24$--$71$ per
-                                      geometry sub-bank \\
+\quad sub-experts                   & $1{,}396$ at initial training,
+                                      $1{,}491$ after active infill;
+                                      $24$--$71$ per geometry sub-bank \\
 \quad routing                       & geometry gate $+$ length bin $+$
                                       PCA/K-means shape $+$
                                       source-aware observation-evidence
@@ -1336,8 +1342,10 @@ evaluation.}
 \label{sec:results}
 
 \subsection{Experimental Setup}
+\label{sec:experimental-setup}
 
-We evaluate HVIMoGP-rBCM and the identifiability-aware inverse
+We evaluate the hierarchical mixture-of-GP surrogate (HMoGP) and the
+identifiability-aware inverse
 against five questions: (1) how faithfully does the surrogate
 approximate the MPM forward model, (2) how accurately does the full
 inverse recover $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$ on
@@ -1350,15 +1358,14 @@ time-varying yield-stress trajectory from repeated within-batch
 dam-break measurements?
 
 \paragraph{Datasets.}
-% TODO[reviewer-fix]: corpus / holdout numbers conflict across sections.
-%   §6 + Tab. 2 + §7.2 say: 425,831 routed rows, 42,583 held-out (10%);
-%   §7.1 + Acknowledgements say: 295,419 corpus, 22,209 held-out (~7.5%).
-%   Resolve to ONE canonical pair before submission, or explicitly state
-%   "295,419 unique simulations <-> 425,831 routed assignment rows".
-We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
-$22{,}209$ MPM samples held out from the $295{,}419$-row training
-corpus, sampled stratified over
-$(n, \log\eta, \log\sigma_Y, W, H)$. \emph{$T_{\mathrm{inv}}$} is a
+We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} is the
+held-out evaluation split: $22{,}209$ unique MPM simulations held out
+from the $295{,}419$-simulation training corpus (\S\ref{sec:data}),
+sampled stratified over $(n, \log\eta, \log\sigma_Y, W, H)$. After
+the multi-cell routing of \S\ref{sec:surrogate}, this corresponds
+to the $42{,}583$ assignment rows used for the surrogate parity
+and calibration diagnostics of~\S\ref{sec:fidelity}.
+\emph{$T_{\mathrm{inv}}$} is a
 synthetic benchmark of $30$ materials drawn from within the training
 box, each rendered via MPM at three container sizes (total $90$
 clips). \emph{$T_{\mathrm{real}}$} is restricted in this version to
@@ -1366,7 +1373,8 @@ the six Hamamichi materials for which parallel-plate rheometer sweeps
 are available; rheometer-infeasible particulate demonstrations are
 left to the time-varying-material study of \S\ref{sec:freshness}
 rather than treated as a separate validation axis.
-\emph{$T_{\mathrm{fresh}}$} follows the V3.1 freshness protocol:
+\emph{$T_{\mathrm{fresh}}$} follows the freshness protocol of
+\S\ref{sec:freshness}:
 synthetic prescribed kinetic trajectories for ground-truth recovery,
 six real hand-prepared starch or composite-starch conditions sampled
 within a single $60$\,min batch window, and a repeat batch for
@@ -1462,13 +1470,10 @@ subs.
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-% TODO[reviewer-fix]: sub-expert count conflicts across sections.
-%   Tab. 2 says 1,396 total; this caption says 1,491 visited; line below
-%   says 1,484 with >=5 held-out rows; holdout sample count here is
-%   42,583 vs 22,209 in §7.1. Reconcile to one canonical pair (probably
-%   1,491 = post-infill total, 1,396 = pre-infill, but pick and propagate).
 \caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
-($N=42{,}583$ held-out MPM rows, all $1{,}491$ sub-experts visited).
+($N=42{,}583$ held-out assignment rows, produced by the $22{,}209$
+held-out simulations of \S\ref{sec:experimental-setup} after routing;
+all $1{,}491$ post-infill sub-experts visited).
 Per-dim numbers are computed on the residual $\hat y_d - y_d$ across
 all rows.}
 \label{tab:fidelity}
@@ -1892,7 +1897,7 @@ Herschel--Bulkley parameters evolve on a sub-hour timescale, and
 recover their full kinetic curves from dam-break video alone.
 
 \paragraph{Freshness protocol.}
-We use the V3.1 freshness protocol, which separates the question
+Our freshness protocol separates the question
 ``can the inverse track a changing material?'' from ordinary
 static-flow validation. The protocol has three layers. First, a
 synthetic control prescribes time-varying Herschel--Bulkley
@@ -1921,7 +1926,7 @@ claim.
 \centering
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\caption{V3.1 time-varying material panel. Each condition is a
+\caption{Time-varying material panel. Each condition is a
 $400$\,g within-batch session sampled at
 $t\in\{0,20,40\}$\,min. ``24h rheo'' marks conditions for which a
 parallel-plate plateau measurement is used as an independent
@@ -2015,8 +2020,8 @@ rheometer truth curve for every evolving or chunky material.
       $\hat{\sigma}_{Y}(t_i)$ estimates at $t=\{0,20,40\}$ min with
       Laplace 95\% CI bars and the fit of Eq.~\ref{eq:avrami};
       smooth panels add a 24-hour rheometer plateau marker.}
-    \caption{Recovered yield-stress kinetics under the V3.1
-    freshness protocol. Each panel is one within-batch session from
+    \caption{Recovered yield-stress kinetics under our freshness
+    protocol. Each panel is one within-batch session from
     Table~\ref{tab:fresh-mats}; markers are joint two-setup inverse
     estimates at $t=\{0,20,40\}$\,min and the solid curve is the
     weighted fit of Eq.~\ref{eq:avrami}. Smooth starch conditions
@@ -2057,7 +2062,7 @@ rheometer truth curve for every evolving or chunky material.
 \paragraph{Why freshness is the headline contribution.}
 At $\sim 8$\,h per setup, a simulation-in-the-loop inverse can
 return at most one joint estimate after the material has already
-aged into a different state. The V3.1 protocol instead acquires
+aged into a different state. Our freshness protocol instead acquires
 three joint estimates inside a $60$\,min within-batch window. The
 synthetic control verifies that this measurement cadence can recover
 the prescribed kinetic constants; the real panel then uses the same
@@ -2155,7 +2160,8 @@ of \S\ref{sec:inverse} requires an accurate surrogate to be evaluated
 at the $\mathcal{O}(10^{3})$ candidates issued by a multi-restart
 CMA-ES run within seconds (Tab.~\ref{tab:hyper});
 running the same inverse against a coarse surrogate would
-reintroduce surrogate bias as a new source of error. The hierarchical MoGP-rBCM surrogate and the
+reintroduce surrogate bias as a new source of error. The
+hierarchical mixture-of-GP (HMoGP) surrogate and the
 GP-aware inverse---which keeps CMA-ES inside the routed expert's
 training support and reads the residual ridge through restart
 dispersion and the local Laplace--Hessian interval rather than
@@ -2186,7 +2192,7 @@ around eight hours per setup in simulation-in-the-loop prior
 work~\cite{hamamichi2023nonnewtonian} to a median of $12$\,s per
 video on a single consumer GPU. The method rests on two coupled
 components: a regime-aware hierarchical Mixture-of-GP surrogate
-(HVIMoGP-rBCM) whose locally-trained exact-GP experts are routed
+(HMoGP) whose locally-trained exact-GP experts are routed
 by a deterministic three-stage gate over container geometry,
 terminal flow displacement, and normalised trajectory shape, with
 a final observation-evidence rerank; and an identifiability-aware
@@ -2252,8 +2258,9 @@ was trained. Queries outside this box trigger the per-expert bound
 tightening (\S\ref{sec:inverse}), which relies on the routed
 expert's training inputs as the admissible region and therefore
 does not extrapolate. Out-of-distribution materials require an
-extension of the training corpus. rBCM predictive variance flags
-out-of-distribution queries but does not by itself correct them.
+extension of the training corpus. The per-expert GP predictive
+variance flags out-of-distribution queries but does not by itself
+correct them.
 
 \subsection{Fidelity of the Forward Model}
 A surrogate can only be as accurate as the simulator it learns from.

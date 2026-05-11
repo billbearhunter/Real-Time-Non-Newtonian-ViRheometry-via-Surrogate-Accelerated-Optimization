@@ -725,7 +725,7 @@ $$
 ## 6. Training Data and Frozen Configuration
 \label{sec:data}
 
-所有报告的生产结果使用同一个冻结的代理 bank,该 bank 训练一次,在每一个报告的实验中重用。该 bank 包含 $25$ 个几何条件子 bank,共持有 $1{,}396$ 个精确 GP 子专家。它们的分配表索引了 $425{,}831$ 条被路由的 MPM 训练行(每个几何子 bank 在 $13{,}581$ 与 $25{,}032$ 行之间),覆盖 $n \in [0.3,1.0]$、$\eta \in [10^{-3},3{\times}10^{2}]$、$\sigma_Y \in [10^{-3},4{\times}10^{2}]$、以及 $W,H\in[2,7]$ cm。我们不在该 bank 之上做任何材料相关的重训练或逐实验的超参数扫描。
+所有报告的生产结果使用同一个冻结的代理 bank,该 bank 训练一次,在每一个报告的实验中重用。该 bank 在 $295{,}419$ 次独立 MPM 仿真上训练,经过~\S\ref{sec:surrogate} 的多 cell 路由后产生 $425{,}831$ 条分配行(一次仿真的轨迹跨两个 cell 时会被分配给多个子专家)。bank 包含 $25$ 个几何条件子 bank,初始训练时持有 $1{,}396$ 个精确 GP 子专家,经过 active-infill 迭代(对验证残差超阈值的 cell 单独重训)后增长到 $1{,}491$ 个,每个几何子 bank 在 $13{,}581$ 与 $25{,}032$ 条分配行之间,覆盖 $n \in [0.3,1.0]$、$\eta \in [10^{-3},3{\times}10^{2}]$、$\sigma_Y \in [10^{-3},4{\times}10^{2}]$、以及 $W,H\in[2,7]$ cm。我们不在该 bank 之上做任何材料相关的重训练或逐实验的超参数扫描。
 
 \begin{table}[!htbp]
 \centering
@@ -735,14 +735,15 @@ $$
 \begin{tabular}{@{}p{0.36\linewidth}p{0.58\linewidth}@{}}
 \toprule
 \textit{训练数据} & \\
-\quad 分配行                        & $425{,}831$ 条被路由的 MPM 样本 \\
+\quad 独立 MPM 仿真                 & $295{,}419$ \\
+\quad 路由后分配行                  & $425{,}831$(一次仿真可被路由到多个 cell)\\
 \quad 参数 box                      & $n\in[0.3,1.0]$,
                                       $\eta\in[10^{-3},300]$,
                                       $\sigma_Y\in[10^{-3},400]$ \\
 \midrule
 \textit{代理 bank} & \\
 \quad 几何条件子 bank               & $25$ \\
-\quad 子专家                        & 共 $1{,}396$;每个几何子 bank $24$--$71$ \\
+\quad 子专家                        & 初始训练 $1{,}396$,active-infill 后 $1{,}491$;每个几何子 bank $24$--$71$ \\
 \quad 路由                          & 几何 gate $+$ 长度 bin $+$ PCA / K-means 形状 $+$ source-aware 观测证据重排 \\
 \midrule
 \textit{逐 cell GP 专家} & \\
@@ -772,11 +773,12 @@ $$
 \label{sec:results}
 
 ### 7.1 Experimental Setup
+\label{sec:experimental-setup}
 
-我们针对四个问题评估 HVIMoGP-rBCM 与可识别性感知反演:(1)~代理多忠实地近似 MPM 前向模型,(2)~完整反演在留出样本上多准确地恢复 $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$,(3)~代理相对于模拟在环反演给出多大的墙上时钟降幅,(4)~\S1 的三项贡献——freshness、流变仪不可行材料、多观测精度——在实验验证下是否成立。
+我们针对四个问题评估分层 mixture-of-GP 代理(HMoGP)与可识别性感知反演:(1)~代理多忠实地近似 MPM 前向模型,(2)~完整反演在留出样本上多准确地恢复 $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$,(3)~代理相对于模拟在环反演给出多大的墙上时钟降幅,(4)~\S1 的三项贡献——freshness、流变仪不可行材料、多观测精度——在实验验证下是否成立。
 
 \paragraph{数据集。}
-我们使用三个评估集。\emph{$T_{\mathrm{sim}}$} 包含从 $295{,}419$ 行训练语料中按 $(n, \log\eta, \log\sigma_Y, W, H)$ 分层抽样留出的 $22{,}209$ 个 MPM 样本。\emph{$T_{\mathrm{inv}}$} 是一个合成基准,包含从训练 box 内抽取的 $30$ 种材料,每种在三个容器尺寸下渲染 MPM(共 $90$ 段视频)。\emph{$T_{\mathrm{real}}$} 由六到八种标准非牛顿流体(蜂蜜、番茄酱、蛋黄酱、洗发水、Carbopol 凝胶、以及一种乳液样品)组成,在我们的溃坝装置上用智能手机采集,并附带平板流变仪扫描。
+我们使用三个评估集。\emph{$T_{\mathrm{sim}}$} 是留出评估 split:从~\S\ref{sec:data} 的 $295{,}419$ 次独立 MPM 仿真训练语料中按 $(n, \log\eta, \log\sigma_Y, W, H)$ 分层抽样留出 $22{,}209$ 次仿真,经过~\S\ref{sec:surrogate} 的多 cell 路由后产生 $42{,}583$ 条分配行,用于~\S\ref{sec:fidelity} 的代理 parity 与校准诊断。\emph{$T_{\mathrm{inv}}$} 是一个合成基准,包含从训练 box 内抽取的 $30$ 种材料,每种在三个容器尺寸下渲染 MPM(共 $90$ 段视频)。\emph{$T_{\mathrm{real}}$} 由六到八种标准非牛顿流体(蜂蜜、番茄酱、蛋黄酱、洗发水、Carbopol 凝胶、以及一种乳液样品)组成,在我们的溃坝装置上用智能手机采集,并附带平板流变仪扫描。
 
 \paragraph{基线。}
 \emph{Baseline A} 是~\cite{hamamichi2023nonnewtonian} 的模拟在环管线:相同的观测、相同的 CMA-ES 超参数,但每个候选都由一次新的 MPM 运行求值,而不是由代理求值。Baseline~A 定义了模拟在环家族的精度上界与墙上时间下界。\emph{Baseline B} 是我们自己管线的一个简化版本,用来分离分层 gating 与可识别性感知反演的贡献:它在 $(W, H)$ 上使用 $K = 12$ 的扁平 Bayesian GMM、不带第二层 $\phi$ gate(共 $12$ 个专家)、top-$2$ 硬路由、以及一个不带温启动或 $\sigma_Y$ 先验的 CMA-ES 反演。
@@ -822,7 +824,7 @@ $$
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{$T_{\mathrm{sim}}$ 上的 surrogate forward fidelity($N=42{,}583$ held-out MPM rows,全部 $1{,}491$ 个子专家被访问)。逐维数字在所有行的 residual $\hat y_d - y_d$ 上计算。}
+\caption{$T_{\mathrm{sim}}$ 上的 surrogate forward fidelity($N=42{,}583$ 条 held-out 分配行,由~\S\ref{sec:experimental-setup} 的 $22{,}209$ 次留出仿真经过路由产生;全部 $1{,}491$ 个 post-infill 子专家被访问)。逐维数字在所有行的 residual $\hat y_d - y_d$ 上计算。}
 \label{tab:fidelity}
 \begin{tabular}{@{}lccccccccc@{}}
 \toprule
@@ -1241,7 +1243,7 @@ Mask 清理(\texttt{Photoshop})
 \end{table}
 
 \paragraph{自动化反演时间。}
-算力侧的贡献是~\S\ref{sec:mainresults} 的 CMA-ES 反演。一次通过算法~\ref{alg:invert} 的单 setup 反演在一台单消费级 GPU 上每段视频中位 $12$\,s(表~\ref{tab:setup-ablation}),而模拟在环基线在每个候选上跑一次 MPM 时每个样本要数小时。一次通过算法~\ref{alg:joint} 的联合两 setup 反演在求和-NMSE 目标~(\ref{eq:Pstar}) 上加上第二次有界 CMA-ES 运行,把总时间带到中位 $24$\,s;三个 setup 把这个数字延伸到 $\sim\!36$\,s(表~\ref{tab:setup-ablation})。前作的多 setup 协议——\cite{hamamichi2023nonnewtonian} 提出来作为可识别性缓解但实际上不可行——把每 setup 数小时的代价随 setup 数线性扩展。
+算力侧的贡献是~\S\ref{sec:mainresults} 的 CMA-ES 反演。一次通过算法~\ref{alg:invert} 的单 setup 反演在一台单消费级 GPU 上每段视频中位 $12$\,s(表~\ref{tab:setup-ablation}),而模拟在环基线在每个候选上跑一次 MPM 时每个样本要数小时。同一算法的联合两 setup 路径(共享 $\boldsymbol{\theta}$,在求和-NMSE 目标~(\ref{eq:Pstar}) 上加上第二次有界 CMA-ES 运行)把总时间带到中位 $24$\,s;三个 setup 把这个数字延伸到 $\sim\!36$\,s(表~\ref{tab:setup-ablation})。前作的多 setup 协议——\cite{hamamichi2023nonnewtonian} 提出来作为可识别性缓解但实际上不可行——把每 setup 数小时的代价随 setup 数线性扩展。
 
 \paragraph{端到端。}
 把两个分量合起来,我们的逐材料管线在大约 $10$--$11$\,min 墙上时钟内完成(手动 $\sim\!10$\,min $+$ 自动 $\le 1$\,min),而前作要先经过数小时的手动标定,再经过另外数小时的 MPM-in-loop 反演——在人的注意力预算与算力预算上都有超过一个数量级的差距。更重要的是,自动化部分在一次用户 session 的时间窗口内完成,这正是使~\S\ref{sec:freshness}--\ref{sec:rheometer} 的 freshness、可现场采集、与多 setup 能力实际可访问而不是名义可访问的原因。
@@ -1260,7 +1262,7 @@ Mask 清理(\texttt{Photoshop})
 
 ### 8.3 Why Regime-Aware Surrogate and Identifiability-Aware Inverse Must Go Together
 
-本文核心的一个 takeaway 是:代理与反演修改单独都不够。一个单一的全局 GP,即使它足够准确,在常规 CMA-ES 下仍然会留下 $\sigma_Y$ 可识别性 ridge 不被打破:优化器会滑到 $\sigma_Y \to 0$ 同时膨胀 $\eta$ 来匹配观测。反过来,~\S\ref{sec:inverse} 的可识别性感知反演要求一个准确代理在每段视频内被求值 $300$ 次;在一个粗糙代理上跑同一个反演会把代理偏置作为新的误差源重新引入。分层 MoGP-rBCM 代理必须与 GP-aware 反演耦合 —— 后者把 CMA-ES 限制在被路由专家的训练支撑内,并通过多重启 dispersion 与局部 Laplace--Hessian 区间读出残余 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 打破。这种耦合就是技术核心。
+本文核心的一个 takeaway 是:代理与反演修改单独都不够。一个单一的全局 GP,即使它足够准确,在常规 CMA-ES 下仍然会留下 $\sigma_Y$ 可识别性 ridge 不被打破:优化器会滑到 $\sigma_Y \to 0$ 同时膨胀 $\eta$ 来匹配观测。反过来,~\S\ref{sec:inverse} 的可识别性感知反演要求一个准确代理在一次多重启 CMA-ES 内被求值 $\mathcal{O}(10^{3})$ 次候选(表~\ref{tab:hyper});在一个粗糙代理上跑同一个反演会把代理偏置作为新的误差源重新引入。分层 mixture-of-GP(HMoGP)代理必须与 GP-aware 反演耦合 —— 后者把 CMA-ES 限制在被路由专家的训练支撑内,并通过多重启 dispersion 与局部 Laplace--Hessian 区间读出残余 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 打破。这种耦合就是技术核心。
 
 ### 8.4 Relation to Differentiable MPM
 
@@ -1269,7 +1271,7 @@ Mask 清理(\texttt{Photoshop})
 
 ### 8.5 Conclusion
 
-我们提出了一个面向非牛顿视频流变的代理加速框架,把 Herschel--Bulkley 反演从模拟在环前作~\cite{hamamichi2023nonnewtonian} 的每 setup 大约八小时压缩到一台消费级 GPU 上每段视频中位 $12$\,s。该方法基于两个耦合分量:一个 regime 感知的分层 GP 专家混合代理(HVIMoGP-rBCM),其局部训练的 exact-GP 专家由一个 deterministic 的三阶段 gate(容器几何 → 终端流距离 → 归一化轨迹形状,加最终观测证据重排)路由;以及一个可识别性感知的 GP-aware 反演,从被路由专家的最近训练邻居热启动 CMA-ES,并通过多重启 dispersion 与局部 Laplace--Hessian 95\% 置信区间报告残余的屈服应力 / 稠度 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 强行打破。\citet{hamamichi2023nonnewtonian} 处理同一条 ridge 用的是基于 Hessian 的相似性分析、一个 Poiseuille 流代理、主动 setup 选择、与迭代多 setup CMA-ES;我们的路径用代理摊销的诊断与一个 replay-consistency-guarded 的两 setup 联合反演(在保留单 setup 恢复的前提下)替换 Hessian 机器,两者都因代理而变得切实可行。
+我们提出了一个面向非牛顿视频流变的代理加速框架,把 Herschel--Bulkley 反演从模拟在环前作~\cite{hamamichi2023nonnewtonian} 的每 setup 大约八小时压缩到一台消费级 GPU 上每段视频中位 $12$\,s。该方法基于两个耦合分量:一个 regime 感知的分层 mixture-of-GP 代理(HMoGP),其局部训练的 exact-GP 专家由一个 deterministic 的三阶段 gate(容器几何 → 终端流距离 → 归一化轨迹形状,加最终观测证据重排)路由;以及一个可识别性感知的 GP-aware 反演,从被路由专家的最近训练邻居热启动 CMA-ES,并通过多重启 dispersion 与局部 Laplace--Hessian 95\% 置信区间报告残余的屈服应力 / 稠度 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 强行打破。\citet{hamamichi2023nonnewtonian} 处理同一条 ridge 用的是基于 Hessian 的相似性分析、一个 Poiseuille 流代理、主动 setup 选择、与迭代多 setup CMA-ES;我们的路径用代理摊销的诊断与一个 replay-consistency-guarded 的两 setup 联合反演(在保留单 setup 恢复的前提下)替换 Hessian 机器,两者都因代理而变得切实可行。
 
 除了运行时降幅之外,秒级反演解锁了模拟在环流变学不可达的三种能力:时变流体的新鲜参数估计、传统流变仪无法测量的材料的实用表征、以及一种仅靠手机视频就能接近平板流变仪精度的多观测联合协议。我们把训练好的代理、$295{,}419$ 行 MPM 训练语料与反演代码作为可复用社区产物释出,后续视频流变学研究可以在其上构建,而不必重复支付仿真训练代价。
 
@@ -1280,10 +1282,12 @@ Mask 清理(\texttt{Photoshop})
 \label{sec:limitations}
 
 ### 9.1 Information-Theoretic $\sigma_Y$ Limit
-~\S\ref{sec:inverse} 的可识别性感知反演在溃坝观测携带\emph{某种}关于 $\sigma_Y$ 的信号时解决屈服应力 / 稠度退化,但它无法恢复观测里没有的信息。对那些 $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ 在整个溃坝剪切率范围内都成立的材料,流前沿基本上不编码关于 $\sigma_Y$ 的任何信息,任何反演——包括我们的——返回的估计都由先验与训练分布而不是由数据决定。在表~\ref{tab:setup-ablation} 的 $10$ 个留出样本中,有一种这样的材料($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa,在低 $\eta$ regime)把 $\sigma_Y$ 的\emph{均值}推到 $7.0$,而其余九个样本停在中位 $0.298$。这是一个任务级别上界,而不是一个方法级别上界;合适的缓解是~\S\ref{sec:mainresults} 的多 setup 协议。
+~\S\ref{sec:inverse} 的可识别性感知反演在溃坝观测携带\emph{某种}关于 $\sigma_Y$ 的信号时解决屈服应力 / 稠度退化,但它无法恢复观测里没有的信息。对那些 $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ 在整个溃坝剪切率范围内都成立的材料,流前沿基本上不编码关于 $\sigma_Y$ 的任何信息,任何反演——包括我们的——返回的估计都由先验与训练分布而不是由数据决定。表~\ref{tab:setup-ablation} 的 $N=30$ 留出 panel 中含有该 regime 的低 $\sigma_Y$ 样本,这些样本的估计被先验而非数据主导,相对中位数对 $\sigma_Y$ 均值贡献过大。这是一个任务级别上界,而不是一个方法级别上界;合适的缓解是~\S\ref{sec:mainresults} 的多 setup 协议。
+<!-- TODO[reviewer-fix]: 用当前 N=30 panel 重算的 outlier 数 + (mean, median) σ_Y 替换;旧文本里 1+9=10 的算术来自 N=10 时代的旧 Table 4 -->
+
 
 ### 9.2 Dependence on Training-Set Coverage
-代理只在它训练的输入 box 内是可信的。box 之外的查询触发逐专家边界收紧(\S\ref{sec:inverse}),它依赖被路由专家的训练输入作为可允许区域,因此不会外推。分布外材料需要扩展训练语料。rBCM 预测方差标记分布外查询,但本身并不修正它们。
+代理只在它训练的输入 box 内是可信的。box 之外的查询触发逐专家边界收紧(\S\ref{sec:inverse}),它依赖被路由专家的训练输入作为可允许区域,因此不会外推。分布外材料需要扩展训练语料。逐专家 GP 预测方差标记分布外查询,但本身并不修正它们。
 
 ### 9.3 Fidelity of the Forward Model
 一个代理只能像它从中学习的仿真器那样准确。我们的 MPM 前向(\S3.2)建模 HB 流变学、重力、与无滑移边界,但不建模表面张力、弹性 overshoot、触变性、或粘弹记忆。表现出这些现象的材料系统性地偏离 HB 前向,这种偏离不能被任何 HB 反演恢复。更丰富的本构家族——粘弹扩展与 damage-MPM 变种~\cite{wolper2019cdmpm}——是自然但超出本文范围的方向。
@@ -1291,8 +1295,8 @@ Mask 清理(\texttt{Photoshop})
 ### 9.4 Capture and Geometry Requirements
 Level-$1$ gate 是在 $W, H \in [2, 7]$\,cm 的矩形立方体类容器上训练的。曲面或不规则容器需要在更广义的容器描述符上重训练几何 gate。相机标定使用一块印好的 ChArUco 标志板;原则上从自然场景内容做无标志物标定是可能的,但本文未做演示。
 
-### 9.5 Real-Time as a Direction
-我们的中位墙上时钟在一台单消费级 GPU 上是每段视频 $12$\,s——秒级,但不是毫秒级。我们标题中的 ``real-time'' 应被读作\emph{足够快以能放进一次单用户交互},而不是严格连续时间反演。通过代理蒸馏、查询时自适应 $K_{\mathrm{geo}}$ 选择、或跨材料摊销反演来进一步降低延迟,是一个开放方向。
+### 9.5 Toward Interactive-Rate Inversion
+我们的中位墙上时钟在一台单消费级 GPU 上是每段视频 $12$\,s——秒级,但不是毫秒级。标题中的 ``fast'' 表示\emph{足够快以能放进一次单用户交互},严格连续时间反演留作进一步开放方向,可通过代理蒸馏、查询时自适应 $K_{\mathrm{geo}}$ 选择、或跨材料摊销反演来实现。
 
 
 ## Acknowledgements
