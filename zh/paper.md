@@ -538,7 +538,7 @@ $$
     \bigl\langle \mathbf{q}_1,\,\mathbf{q}_2(W,H)\bigr\rangle^2 ,
     \tag{eq:proposer}
 $$
-使联合 Fisher 信息在 $(\mathbf{q}_1, \mathbf{q}_2)$ 子空间里满秩。Hessian 是闭式的,因此求~(\ref{eq:proposer}) 不需要任何前向仿真。我们的贡献是把消耗该提议器输出的联合估计变成每材料而不是每 showcase 可承担。
+使联合 Fisher 信息在 $(\mathbf{q}_1, \mathbf{q}_2)$ 子空间里满秩。Hessian 是闭式的,因此求~(\ref{eq:proposer}) 不需要任何前向仿真。我们的贡献是把消耗该提议器输出的联合估计变成每材料而不是每 showcase 可承担;joint 信息增益依赖每种材料的残余 ridge 几何,在~\S\ref{sec:rheometer} 的流变仪锚定真实材料上表现最明显(稠度参数、ridge 收紧),而在~\S\ref{sec:mainresults} 的合成 $N=30$ Hamamichi-对齐面板上,我们的 replay-consistency guard 让 joint update 保留(而非倒退)单 setup 的恢复(表~\ref{tab:setup-ablation})。
 
 
 ## 5. Camera Calibration
@@ -780,7 +780,9 @@ $$
 我们使用三个评估集。\emph{$T_{\mathrm{sim}}$} 是留出评估 split:从~\S\ref{sec:data} 的 $295{,}419$ 次独立 MPM 仿真训练语料中按 $(n, \log\eta, \log\sigma_Y, W, H)$ 分层抽样留出 $22{,}209$ 次仿真,经过~\S\ref{sec:surrogate} 的多 cell 路由后产生 $42{,}583$ 条分配行,用于~\S\ref{sec:fidelity} 的代理 parity 与校准诊断。\emph{$T_{\mathrm{inv}}$} 是一个合成基准,包含从训练 box 内抽取的 $30$ 种材料,每种在三个容器尺寸下渲染 MPM(共 $90$ 段视频)。\emph{$T_{\mathrm{real}}$} 由六到八种标准非牛顿流体(蜂蜜、番茄酱、蛋黄酱、洗发水、Carbopol 凝胶、以及一种乳液样品)组成,在我们的溃坝装置上用智能手机采集,并附带平板流变仪扫描。
 
 \paragraph{基线。}
-\emph{Baseline A} 是~\cite{hamamichi2023nonnewtonian} 的模拟在环管线:相同的观测、相同的 CMA-ES 超参数,但每个候选都由一次新的 MPM 运行求值,而不是由代理求值。Baseline~A 定义了模拟在环家族的精度上界与墙上时间下界。\emph{Baseline B} 是我们自己管线的一个简化版本,用来分离分层 gating 与可识别性感知反演的贡献:它在 $(W, H)$ 上使用 $K = 12$ 的扁平 Bayesian GMM、不带第二层 $\phi$ gate(共 $12$ 个专家)、top-$2$ 硬路由、以及一个不带温启动或 $\sigma_Y$ 先验的 CMA-ES 反演。
+精度与时间参考是~\cite{hamamichi2023nonnewtonian} 的模拟在环管线:相同的溃坝观测与 CMA-ES 风格无导数搜索,但每个候选都由一次新的 MPM 运行求值而非代理求值。该基线定义了前作家族的精度上界与墙上时间下界;前作自己的 $30$-case 面板数字与我们的结果并列在表~\ref{tab:setup-ablation} 中。
+
+本版未在完整 $N=30$ 面板上跑 from-scratch 的\emph{单一全局 GP} 基线(即,不带分层路由或 GP-aware 似然的代理);取而代之,每个组件的贡献由两件事隔离:\S\ref{sec:fidelity} 的代理保真度诊断(在跑任何反演之前,已经确立路由的子专家把 MPM 前向再现到 sub-cm flow-front 误差),以及~\S\ref{sec:mainresults} 中 inline 报告的 routing recall(simulator-matched profile 在 $61/100$ 案例上 top-$1$ 命中 oracle 子专家、$97/100$ 上 top-$3$、$100/100$ 上 top-$10$)。在整个训练语料上拟合一个全局 GP、并跑同一反演的独立 single-GP baseline 在我们的实现里是 straightforward 的,留作未来工作;我们预期它不会改变逐视频墙上时钟 claim,后者由 CMA-ES 候选数主导而非代理选择主导。
 
 \paragraph{度量。}
 对前向代理我们报告逐输出的平均绝对误差
@@ -904,21 +906,26 @@ Full-trajectory median                 & $26/100$ & $68/100$ & $97/100$ \\
 \end{table}
 
 \paragraph{与 Hamamichi 对齐的合成面板。}
-模拟在环前作的主合成验证报告在 $30$ 个案例上完成($6$ 种材料 $\times\,5$ 个随机初始 setup)~\cite{hamamichi2023nonnewtonian}。因此我们也把同样的 $30$-case 尺度作为主比较,把更大的面板保留为 robustness check。我们的 $30$ 个案例是从 canonical 留出测试集随机抽样而非固定材料列表,因此下面的精度数字最多与前作\emph{可比},不会更优:代理把每次 MPM 前向压缩成局部 GP,在参数恢复上我们期望与模拟在环 oracle 持平、不会超过它。我们的贡献是把这一精度通过墙上时钟坍缩转化成实用流水线。对每个案例,我们先跑单 setup 反演,用~\S\ref{sec:proposer} 的 Hessian-正交提议器选择第二几何,在 ground-truth 参数处用 MLS-MPM 合成该第二观测,然后跑 conservative two-setup joint inverse。two-setup 阶段保留 simulator-matched top-$3$ 个 setup-2 候选(\texttt{sim\_precision} profile 下按 frame-weighted nearest-training-trajectory 距离排序),在每个 candidate pair 自己的 tight sub-expert box 内优化,并且只有当 joint update 不违反第一观测的 truth-blind replay consistency 时才接受。完整 $30$-case 面板在一张消费级 GPU 上用 $13.1$\,min 完成;按前作报告的每次单 setup 反演 $\sim\!8$\,h~\cite{hamamichi2023nonnewtonian} 外推,同样 $30$-case 面板模拟在环大致需要 $240$\,h 量级,即约 $10^{3}\times$ 墙上时钟收缩。图~\ref{fig:flow-error-cdf} 给出该面板上参数误差与 forward replay 误差的累积分布。
+模拟在环前作的主合成验证报告在 $30$ 个案例上完成($6$ 种材料 $\times\,5$ 个随机初始 setup)~\cite{hamamichi2023nonnewtonian}。我们把同样的 $30$-case 尺度作为主比较,把更大的面板保留为 robustness check。我们的 $30$ 个案例是从 canonical 留出测试集随机抽样而非固定材料列表;参数恢复精度上限由模拟在环 oracle 设定,代理把每次 MPM 前向压缩成局部 GP,我们的贡献是把这一精度通过墙上时钟坍缩转化成实用流水线。作为对照,\citet{hamamichi2023nonnewtonian} 在他们自己的 $30$-case 面板上报告单 setup pass rate $11/30$($36.7\%$)、双 setup $20/30$($66.7\%$)、三 setup $26/30$、四 setup $30/30$。两个面板尺寸与协议一致但具体案例不同,所以这些数字应读作前作在各 setup 数下的精度底线。对每个案例,我们先跑单 setup 反演,用~\S\ref{sec:proposer} 的 Hessian-正交提议器选择第二几何,在 ground-truth 参数处用 MLS-MPM 合成该第二观测,然后跑 conservative two-setup joint inverse。two-setup 阶段保留 simulator-matched top-$3$ 个 setup-2 候选(\texttt{sim\_precision} profile 下按 frame-weighted nearest-training-trajectory 距离排序),在每个 candidate pair 自己的 tight sub-expert box 内优化,并且只有当 joint update 不违反第一观测的 truth-blind replay consistency 时才接受。完整 $30$-case 面板在一张消费级 GPU 上用 $13.1$\,min 完成;按前作报告的每次单 setup 反演 $\sim\!8$\,h~\cite{hamamichi2023nonnewtonian} 外推,同样 $30$-case 面板模拟在环大致需要 $240$\,h 量级,即约 $10^{3}\times$ 墙上时钟收缩。图~\ref{fig:flow-error-cdf} 给出该面板上参数误差与 forward replay 误差的累积分布。
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{与 Hamamichi 对齐的 $N=30$ 面板上的合成恢复。``$\le 0.1$'' 是按~\eqref{eq:erel} 达到 $E_{\mathrm{rel}}\le 0.1$ 的占比。三列 $\mathrm{relE}$ 是逐参数中位,定义为 $|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$。pass rate 与前作最多\emph{可比}、不会更优:代理在构造上是 information-lossy 的,我们的贡献是墙上时钟收缩而非精度上限。two-setup 行使用 top-$3$ simulator-matched setup-2 candidates(frame-weighted nearest-training-trajectory 排序)、per-pair tight-box joint optimisation,以及 truth-blind first-observation consistency guard,因此 joint update 是 preserve 而非 regress 单 setup 的结果。完整面板,包括第二 setup 的 MLS-MPM observation synthesis,耗时 $13.1$\,min,而由前作每次反演的墙上时钟外推同一面板大约需要 $\sim\!240$\,h~\cite{hamamichi2023nonnewtonian}。}
+\caption{与 Hamamichi 对齐的 $N=30$ 面板上的合成恢复。``$\le 0.1$'' 是按~\eqref{eq:erel} 达到 $E_{\mathrm{rel}}\le 0.1$ 的占比。三列 $\mathrm{relE}$ 是逐参数中位,定义为 $|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$。斜体行是~\citet{hamamichi2023nonnewtonian} §7.1 在他们自己的尺寸相同但案例独立的 $30$-case 面板上的数字。two-setup 行使用 top-$3$ simulator-matched setup-2 candidates、per-pair tight-box joint optimisation,以及 truth-blind first-observation consistency guard,因此 joint update 在本面板上 preserve 而非 regress 单 setup 的结果——保守的 guard 解释了 joint pass rate 为何停在单 setup 水平,而前作的 multi-setup CMA-ES 通过沿 ridge 滑动转换 case。Joint update 仍然把稠度参数收紧($\mathrm{relE}\,\eta$ 从 $0.187$ 降到 $0.160$,相对改善 $14\%$),而 $n$、$\sigma_Y$ 在采样噪声范围内保持不变。完整面板,包括第二 setup 的 MLS-MPM observation synthesis,耗时 $13.1$\,min,而由前作每次反演的墙上时钟外推同一面板大约需要 $\sim\!240$\,h~\cite{hamamichi2023nonnewtonian}。}
 \label{tab:setup-ablation}
-\begin{tabular}{@{}cccccrr@{}}
+\begin{tabular}{@{}lccccrr@{}}
 \toprule
 Setups & $\le 0.1$ & $\mathrm{relE}\,n$ & $\mathrm{relE}\,\eta$ &
 $\mathrm{relE}\,\sigma_Y$ & Panel time & Sim-in-loop \\
 \midrule
-$1$ & $15/30$ ($50.0\%$) & $0.066$ & $0.187$ & $0.250$ & $13.1$\,min total & $\sim\!8$\,h/setup \\
-$2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $\sim\!16$\,h \\
+\textit{前作, 1} & \textit{$11/30$ ($36.7\%$)} & --- & --- & --- & --- & $\sim\!8$\,h/setup \\
+\textit{前作, 2} & \textit{$20/30$ ($66.7\%$)} & --- & --- & --- & --- & $\sim\!16$\,h \\
+\textit{前作, 3} & \textit{$26/30$ ($86.7\%$)} & --- & --- & --- & --- & $\sim\!24$\,h \\
+\textit{前作, 4} & \textit{$30/30$ ($100\%$)}  & --- & --- & --- & --- & $\sim\!32$\,h \\
+\midrule
+本文 1 & $\mathbf{15/30}$ ($\mathbf{50.0\%}$) & $0.066$ & $0.187$ & $0.250$ & $13.1$\,min total & $\sim\!8$\,h/setup \\
+本文 2 & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ & same panel & $\sim\!16$\,h \\
 \bottomrule
 \end{tabular}
 \end{table}
