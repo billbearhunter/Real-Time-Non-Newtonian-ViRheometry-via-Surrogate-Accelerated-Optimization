@@ -962,15 +962,20 @@ carries the least information. The proposer selects
 making the joint Fisher information full-rank in the
 $(\mathbf{q}_1,\mathbf{q}_2)$ subspace. The Hessian is closed-form,
 so evaluating Eq.~\eqref{eq:proposer} requires no forward
-simulations. Our contribution is to make the joint estimate that
-consumes this proposer's output affordable per material rather than
-per showcase; the joint information gain depends on the residual
-ridge geometry of each material and is most pronounced on the
-rheometer-referenced real materials of \S\ref{sec:rheometer}
-(consistency parameter, ridge tightening), while on the synthetic
-$N=30$ Hamamichi-matched panel of \S\ref{sec:mainresults} our
-replay-consistency guard keeps the joint update from regressing
-the single-setup recovery (Tab.~\ref{tab:setup-ablation}).
+simulations. Our contribution is to make the \emph{two-setup} joint
+estimate that consumes this proposer's output affordable per
+material rather than per showcase; the joint information gain
+depends on the residual ridge geometry of each material and is
+most pronounced on the rheometer-referenced real materials of
+\S\ref{sec:rheometer} (consistency parameter, ridge tightening),
+while on the synthetic $N=30$ Hamamichi-matched panel of
+\S\ref{sec:mainresults} our replay-consistency guard keeps the
+joint update from regressing the single-setup recovery
+(Tab.~\ref{tab:setup-ablation}). The cascaded $3$- and $4$-setup
+refinements that the predecessor reports---each run only on the
+cases that failed at the previous setup---are a natural extension
+of the same proposer and surrogate but are not implemented in this
+paper.
 
 \section{Camera Calibration}
 \label{sec:calib}
@@ -1606,32 +1611,45 @@ recall for camera-noise robustness.
 \paragraph{Hamamichi-matched synthetic panel.}
 The simulation-in-the-loop predecessor reports its main synthetic
 validation on $30$ cases ($6$ materials $\times\,5$ random initial
-setups)~\cite{hamamichi2023nonnewtonian}.  We therefore make the same
-$30$-case scale the main comparison and reserve larger panels for
-robustness checks.  Our $30$ cases are sampled from the canonical
-held-out test split rather than a fixed material list, so the
-precision numbers below are at most \emph{comparable} to the
-predecessor's: the surrogate compresses each MPM forward into a
-local GP, so the ceiling for parameter recovery is set by the
-sim-in-loop oracle, and our contribution is the wall-clock collapse
-that converts that precision into a practical pipeline.
-For reference,~\citet{hamamichi2023nonnewtonian} report on their
-own $30$-case panel single-setup pass rate $11/30$ ($36.7\%$),
-two-setup pass rate $20/30$ ($66.7\%$), three-setup $26/30$, and
-four-setup $30/30$. Our panels are stratified samples of the same
-size from the held-out test split rather than the same case list,
-so the panels are not strictly identical, but they are matched in
-size and protocol; we read these numbers as the predecessor's
-recovery floor at each setup count.
+setups), reaching $11/30$ ($36.7\%$) at $1$~setup and $20/30$
+($66.7\%$) at $2$~setups, with further \emph{cascaded} refinements
+in which setup~$k+1$ is only run on the cases that failed at
+setup~$k$, raising the cumulative pass rate to $26/30$ at $3$~setups
+and $30/30$ at $4$~setups~\cite{hamamichi2023nonnewtonian}. We
+therefore make the same $30$-case scale the main comparison and
+reserve larger panels for robustness checks. Our $30$~cases are
+stratified samples from the held-out MPM test split rather than the
+predecessor's specific $6$-material list; this differs in sampling
+protocol but matches the panel size and the $E_{\mathrm{rel}}\le 0.1$
+recovery threshold, so the numbers in Table~\ref{tab:setup-ablation}
+answer ``does the inverse recover correctly at the predecessor's
+panel scale?'' rather than ``do we beat the predecessor case by
+case?''  A like-for-like rerun on Hamamichi's $6$~rheometer-fitted
+parameter sets, and the cascaded $3$/$4$-setup protocol that the
+predecessor uses to clear the remaining failures, are reserved
+for future work.
+
 For each of our cases we run a single-setup inverse, use the
 Hessian-orthogonal proposer of \S\ref{sec:proposer} to choose
-a second geometry, synthesize that second observation with MLS-MPM
-at the ground-truth parameters, and run the simulator-matched two-setup
-joint profile.  The joint stage keeps the top-$3$ setup-$2$ candidates
-(ranked by frame-weighted nearest-training trajectory distance under
-\texttt{sim\_precision}), optimises each candidate pair in its own
-tight sub-expert box, and accepts the joint update only when it does
-not violate the first observation's truth-blind replay consistency.
+a second geometry, synthesise that second observation with MLS-MPM
+at the ground-truth parameters, and run the simulator-matched
+two-setup joint profile.  The joint stage keeps the top-$3$
+setup-$2$ candidates (ranked by frame-weighted nearest-training
+trajectory distance under \texttt{sim\_precision}), optimises each
+candidate pair in its own tight sub-expert box, and accepts the
+joint update only when it does not violate the first observation's
+truth-blind replay consistency (\S\ref{sec:inv-joint}).  At
+$1$~setup our pipeline converts $15/30$, ahead of the predecessor's
+$11/30$; at $2$~setups we hold the same $15/30$ rather than slide
+to the predecessor's $20/30$, because our truth-blind guard rejects
+joint updates that would regress setup~$1$ replay---the
+predecessor's unguarded multi-setup CMA-ES instead accepts those
+updates and converts an additional $9$ cases.  This is a
+documented trade-off, not a free win for either side: our guard
+pays a panel-level conversion cost in exchange for never
+overwriting a recovered single-setup estimate, which matters when
+the inverse is used as a per-batch instrument rather than a
+per-showcase study.
 Fig.~\ref{fig:flow-error-cdf} reports the cumulative distributions
 of parameter and forward replay error across the panel.
 
@@ -1647,15 +1665,23 @@ $|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.
 Italicised rows are predecessor numbers
 from~\citet{hamamichi2023nonnewtonian} (\S 7.1), reported on a
 size-matched but distinct $30$-case panel (6 materials $\times$ 5
-random initial setups). The two-setup row uses top-$3$
-simulator-matched setup-$2$ candidates (frame-weighted
-nearest-training-trajectory ranking) with per-pair tight-box joint
-optimisation and a truth-blind first-observation WRMS guard, so the
-joint update preserves rather than regresses the single-setup
-result; the conservative guard explains why the joint pass rate
-stays at the single-setup level on this panel, while the predecessor's
-multi-setup CMA-ES converts cases by sliding along the ridge. The
-joint update still tightens the consistency parameter
+random initial setups). The predecessor's $3$- and $4$-setup rows
+are \emph{cascaded}: setup~$k+1$ is only run on the cases that
+failed at setup~$k$, so the $26/30$ and $30/30$ figures stack
+incremental conversions ($+6$, $+4$) rather than represent
+independent $3$- or $4$-setup runs on all $30$ cases. Our pipeline
+currently implements $1$- and $2$-setup variants; the corresponding
+cascaded $3$/$4$-setup rows are deferred to future work. At
+$1$~setup our pipeline already converts $15/30$ versus the
+predecessor's $11/30$; at $2$~setups we hold $15/30$ rather than
+match the predecessor's $20/30$, because our two-setup joint runs
+a truth-blind first-observation WRMS guard that rejects joint
+updates which would regress setup~$1$ (\S\ref{sec:inv-joint}). This
+is a documented trade-off: the guard pays a panel-level conversion
+cost in exchange for never overwriting a recovered single-setup
+estimate---the behaviour needed when the inverse is used as a
+per-batch instrument rather than a per-showcase study. Even under
+the guard, the joint update tightens the consistency parameter
 ($\mathrm{relE}\,\eta$ $0.187\to 0.160$, $14\%$ relative
 improvement) while keeping $n$ and $\sigma_Y$ within sampling
 noise. The speed comparison is separated into manual processing and
