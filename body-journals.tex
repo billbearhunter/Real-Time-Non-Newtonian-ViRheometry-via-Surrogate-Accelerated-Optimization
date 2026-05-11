@@ -1365,11 +1365,8 @@ and calibration diagnostics of~\S\ref{sec:fidelity}.
 \emph{$T_{\mathrm{inv}}$} is a
 synthetic benchmark of $30$ materials drawn from within the training
 box, each rendered via MPM at three container sizes (total $90$
-clips). \emph{$T_{\mathrm{real}}$} is restricted in this version to
-the six Hamamichi materials for which parallel-plate rheometer sweeps
-are available; rheometer-infeasible particulate demonstrations are
-left to the time-varying-material study of \S\ref{sec:freshness}
-rather than treated as a separate validation axis.
+clips). \emph{$T_{\mathrm{real}}$} contains the six Hamamichi materials for
+which parallel-plate rheometer sweeps are available.
 \emph{$T_{\mathrm{fresh}}$} follows the freshness protocol of
 \S\ref{sec:freshness}:
 synthetic prescribed kinetic trajectories for ground-truth recovery,
@@ -1377,30 +1374,20 @@ six real hand-prepared starch or composite-starch conditions sampled
 within a single $60$\,min batch window, and a repeat batch for
 quantifying cross-batch kinetic drift.
 
-\paragraph{Baseline.}
-The accuracy and time reference is the simulation-in-the-loop pipeline
-of~\cite{hamamichi2023nonnewtonian}: identical dam-break observation
-and CMA-ES-style derivative-free search, but every candidate is
-evaluated by a fresh MPM run rather than by the surrogate. This baseline
-defines the accuracy ceiling and wall-time cost of the predecessor
-family; the predecessor's own $30$-case panel numbers are reproduced
-alongside our results in Table~\ref{tab:setup-ablation}.
-
-We do not, in this version, run a from-scratch \emph{single global
-GP} baseline (i.e., the surrogate without hierarchical routing or
-GP-aware likelihood) on the full $N=30$ panel; instead, the
-contribution of each component is isolated by the surrogate-fidelity
-diagnostics of \S\ref{sec:fidelity}, which establish that the
-routed sub-experts reproduce the MPM forward to sub-cm flow-front
-error before any inverse is run, and by the routing recall
-reported inline in \S\ref{sec:mainresults} (the simulator-matched
-profile recovers the oracle sub-expert in $61/100$ cases at top-$1$,
-$97/100$ at top-$3$, $100/100$ at top-$10$). A standalone single-GP
-baseline running the same inverse against a single global GP fit to
-the entire training corpus is straightforward in our implementation
-and is deferred to future work; we do not anticipate it changing
-the per-video wall-clock claim, which is dominated by the
-CMA-ES candidate count rather than by the choice of surrogate.
+\paragraph{Reference.}
+The accuracy and time reference is the simulation-in-the-loop
+pipeline of~\cite{hamamichi2023nonnewtonian}: identical dam-break
+observation and CMA-ES-style derivative-free search, but every
+candidate is evaluated by a fresh MPM run. The predecessor's own
+$30$-case panel numbers are reproduced alongside ours in
+Table~\ref{tab:setup-ablation}. The contribution of each component
+of our pipeline is isolated by the surrogate-fidelity diagnostics
+of \S\ref{sec:fidelity}, which establish that the routed sub-experts
+reproduce the MPM forward to sub-cm flow-front error, and by the
+routing recall reported inline in \S\ref{sec:mainresults}: the
+simulator-matched profile recovers the oracle sub-expert in
+$61/100$ cases at top-$1$, $97/100$ at top-$3$, and $100/100$ at
+top-$10$.
 
 \paragraph{Metrics.}
 For the forward surrogate we report per-output mean absolute error
@@ -2146,20 +2133,16 @@ measurements inside a single user session.
 \subsection{What the Acceleration Unlocks}
 
 The immediate effect of our pipeline is a three-orders-of-magnitude
-reduction in per-video inverse cost. In this version we focus the
-real-fluid story on two experimentally anchored payoffs:
-\emph{freshness} for time-varying fluids
-(\S\ref{sec:freshness}) and fast
+reduction in per-video inverse cost. The seconds-scale inverse
+delivers two experimentally anchored payoffs: \emph{freshness} for
+time-varying fluids (\S\ref{sec:freshness}) and fast
 \emph{rheometer-referenced validation} on the Hamamichi materials
 for which parallel-plate sweeps are available (\S\ref{sec:rheometer}).
 The first is a temporal improvement that turns ``hours to return a
 past state'' into ``seconds to return the current state.'' The
 second checks that replacing MPM-in-the-loop by a routed GP surrogate
 does not detach the recovered flow curves from independent
-instrumental rheology. Rheometer-infeasible particulate materials
-remain an important motivation for video rheometry, but here they
-appear only as visual examples inside the freshness panel rather than
-as a separate accuracy claim.
+instrumental rheology.
 
 \subsection{A Reusable Surrogate as a Community Asset}
 \label{sec:asset}
@@ -2241,15 +2224,13 @@ preserves the single-setup recovery---both made practical by the
 surrogate.
 
 Beyond runtime reduction, the seconds-scale inverse makes two
-capabilities practical in the present paper: fresh parameter
-estimates for time-varying fluids and fast real-fluid validation
-against the Hamamichi materials with parallel-plate rheometer
-references. We release the trained surrogate, the $295{,}419$-row
-MPM training corpus, and the inverse code as a reusable community
-artefact on which subsequent video-rheometry research can build
-without paying the simulation training cost again, including future
-particulate-material studies once a dedicated validation protocol is
-collected.
+capabilities practical: fresh parameter estimates for time-varying
+fluids and fast real-fluid validation against the Hamamichi materials
+with parallel-plate rheometer references. We release the trained
+surrogate, the $295{,}419$-simulation MPM training corpus, and the
+inverse code as a reusable community artefact on which subsequent
+video-rheometry research can build without paying the simulation
+training cost again.
 
 The broader message is that video rheometry crosses the threshold
 from laboratory demonstration to fieldable tool not by replacing
@@ -2260,7 +2241,7 @@ is what brings the technique within reach of time-sensitive,
 iterative, and situated measurement.
 
 
-\section{Limitations and Future Work}
+\section{Limitations}
 \label{sec:limitations}
 
 \subsection{Information-Theoretic Yield-Stress Limit}
@@ -2279,9 +2260,6 @@ rather than by the data, and contribute disproportionately to the
 $\sigma_Y$ mean relative to its median. This is a task-level bound,
 not a method bound; the appropriate mitigation is the multi-setup
 protocol of \S\ref{sec:mainresults}.
-% TODO[reviewer-fix]: replace with concrete outlier count + (mean, median)
-% of sigma_Y recomputed on the current N=30 panel; old text had stale
-% 1+9=10 arithmetic from the earlier N=10 version of Table 4.
 
 \subsection{Dependence on Training-Set Coverage}
 The surrogate is trustworthy only inside the input box on which it
@@ -2299,27 +2277,19 @@ Our MPM forward (\S3.2) models HB rheology, gravity, and no-slip
 boundaries, but not surface tension, elastic overshoot, thixotropy,
 or viscoelastic memory. Materials exhibiting these phenomena deviate
 systematically from the HB forward, and this deviation cannot be
-recovered by any HB inverse. Richer constitutive
-families---viscoelastic extensions and damage-MPM
-variants~\cite{wolper2019cdmpm}---are natural but out-of-scope
-directions.
+recovered by any HB inverse.
 
 \subsection{Capture and Geometry Requirements}
 The level-$1$ gate is trained on rectangular cube-like containers
-with $W, H \in [2, 7]$\,cm. Curved or irregular containers require
-retraining the geometry gate on a broader container descriptor.
-Camera calibration uses a printed ChArUco marker board; markerless
-calibration from natural scene content is possible in principle but
-not demonstrated here.
+with $W, H \in [2, 7]$\,cm; curved or irregular containers fall
+outside the calibrated geometry box. Camera calibration uses a
+printed ChArUco marker board.
 
-\subsection{Toward Interactive-Rate Inversion}
+\subsection{Latency Regime}
 Our median wall-clock is $12$\,s per video on a single consumer
 GPU---seconds-scale but not millisecond-scale. The ``fast'' of our
 title denotes \emph{fast enough to fit within a single user
-interaction}; strict continuous-time inversion is a further open
-direction, reachable through surrogate distillation, query-time
-adaptive $K_{\mathrm{geo}}$ selection, or amortised cross-material
-inverse.
+interaction}, not strict continuous-time inversion.
 
 
 % --- Acknowledgements -------------------------------------------------

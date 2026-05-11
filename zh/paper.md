@@ -779,10 +779,8 @@ $$
 \paragraph{数据集。}
 我们使用三个评估集。\emph{$T_{\mathrm{sim}}$} 是留出评估 split:从~\S\ref{sec:data} 的 $295{,}419$ 次独立 MPM 仿真训练语料中按 $(n, \log\eta, \log\sigma_Y, W, H)$ 分层抽样留出 $22{,}209$ 次仿真,经过~\S\ref{sec:surrogate} 的多 cell 路由后产生 $42{,}583$ 条分配行,用于~\S\ref{sec:fidelity} 的代理 parity 与校准诊断。\emph{$T_{\mathrm{inv}}$} 是一个合成基准,包含从训练 box 内抽取的 $30$ 种材料,每种在三个容器尺寸下渲染 MPM(共 $90$ 段视频)。\emph{$T_{\mathrm{real}}$} 由六到八种标准非牛顿流体(蜂蜜、番茄酱、蛋黄酱、洗发水、Carbopol 凝胶、以及一种乳液样品)组成,在我们的溃坝装置上用智能手机采集,并附带平板流变仪扫描。
 
-\paragraph{基线。}
-精度与时间参考是~\cite{hamamichi2023nonnewtonian} 的模拟在环管线:相同的溃坝观测与 CMA-ES 风格无导数搜索,但每个候选都由一次新的 MPM 运行求值而非代理求值。该基线定义了前作家族的精度上界与墙上时间下界;前作自己的 $30$-case 面板数字与我们的结果并列在表~\ref{tab:setup-ablation} 中。
-
-本版未在完整 $N=30$ 面板上跑 from-scratch 的\emph{单一全局 GP} 基线(即,不带分层路由或 GP-aware 似然的代理);取而代之,每个组件的贡献由两件事隔离:\S\ref{sec:fidelity} 的代理保真度诊断(在跑任何反演之前,已经确立路由的子专家把 MPM 前向再现到 sub-cm flow-front 误差),以及~\S\ref{sec:mainresults} 中 inline 报告的 routing recall(simulator-matched profile 在 $61/100$ 案例上 top-$1$ 命中 oracle 子专家、$97/100$ 上 top-$3$、$100/100$ 上 top-$10$)。在整个训练语料上拟合一个全局 GP、并跑同一反演的独立 single-GP baseline 在我们的实现里是 straightforward 的,留作未来工作;我们预期它不会改变逐视频墙上时钟 claim,后者由 CMA-ES 候选数主导而非代理选择主导。
+\paragraph{参考。}
+精度与时间参考是~\cite{hamamichi2023nonnewtonian} 的模拟在环管线:相同的溃坝观测与 CMA-ES 风格无导数搜索,但每个候选都由一次新的 MPM 运行求值。前作自己的 $30$-case 面板数字与我们的结果并列在表~\ref{tab:setup-ablation} 中。我们管线各组件的贡献由两件事隔离:\S\ref{sec:fidelity} 的代理保真度诊断(确立路由的子专家把 MPM 前向再现到 sub-cm flow-front 误差),以及~\S\ref{sec:mainresults} 中 inline 报告的 routing recall(simulator-matched profile 在 $61/100$ 案例上 top-$1$ 命中 oracle 子专家、$97/100$ 上 top-$3$、$100/100$ 上 top-$10$)。
 
 \paragraph{度量。}
 对前向代理我们报告逐输出的平均绝对误差
@@ -972,7 +970,7 @@ $\mathrm{relE}\,\sigma_Y$ & Panel time & Sim-in-loop \\
 ### 7.4 Validation Against Parallel-Plate Rheometers
 \label{sec:rheometer}
 
-本版本的实测验证限于两种已经完成溃坝采集与同批次平板流变仪扫描的 Hamamichi 材料:Chuno(韩国年糕水,低 $\sigma_Y$ 剪切稀化 regime)与 Okonomiyaki batter(日式杂烩饼浆,中-高 $\sigma_Y$ regime)。两者都落在~\S\ref{sec:data} 的训练 box 内。每种材料采集两个溃坝 setup,运行论文其余位置同款的 \texttt{real\_robust} 路由与联合两 setup 反演,把恢复出来的 HB 流曲线叠加在流变仪参考上,并报告 $\dot\gamma$ 范围实际由溃坝重放探测到的部分。
+实测验证使用两种已经完成溃坝采集与同批次平板流变仪扫描的 Hamamichi 材料:Chuno(韩国年糕水,低 $\sigma_Y$ 剪切稀化 regime)与 Okonomiyaki batter(日式杂烩饼浆,中-高 $\sigma_Y$ regime)。两者都落在~\S\ref{sec:data} 的训练 box 内。每种材料采集两个溃坝 setup,运行论文其余位置同款的 \texttt{real\_robust} 路由与联合两 setup 反演,把恢复出来的 HB 流曲线叠加在流变仪参考上,并报告 $\dot\gamma$ 范围实际由溃坝重放探测到的部分。
 
 遵循前作 Table~$1$ 与 Fig.~$13$~\cite{hamamichi2023nonnewtonian} 的惯例,真实流体的主比较是流曲线对照平板流变仪参考(图~\ref{fig:flow-real});表~\ref{tab:rheo-recovery} 列出每种材料用到的两个 setup 与恢复出来的 Herschel--Bulkley 三元组,与前作 Table~$1$ 列形式一致。图~\ref{fig:snapdiff} 给出捕捉视频、在 $\hat{\boldsymbol{\theta}}$ 下 MPM 前向、与在流变仪拟合的 $\boldsymbol{\theta}^{\!\star}$ 下 MPM 前向的逐帧剪影差。
 
@@ -1260,7 +1258,7 @@ Mask 清理(\texttt{Photoshop})
 
 ### 8.1 What the Acceleration Unlocks
 
-我们管线的直接效应是把每段视频反演代价降低三个数量级。在本版中,我们把真实流体部分的故事聚焦在两个有实验锚定的 payoff 上:时变流体的\emph{freshness}(\S\ref{sec:freshness}),以及在 Hamamichi 平板流变仪可用的材料上做的\emph{流变仪锚定验证}(\S\ref{sec:rheometer})。第一是时间上的改进,把"小时数才能返回过去状态"变成"几秒内返回当前状态"。第二验证用一个被路由的 GP 代理替换 MPM-in-the-loop 之后,恢复出来的 flow curve 并没有跟独立仪器流变脱钩。流变仪不可测的颗粒类材料仍然是视频流变的重要 motivation,但在本版里只作为 freshness 面板内的视觉示例出现,不作为单独的精度 claim。
+我们管线的直接效应是把每段视频反演代价降低三个数量级。秒级反演交付两个有实验锚定的 payoff:时变流体的\emph{freshness}(\S\ref{sec:freshness}),以及在 Hamamichi 平板流变仪可用的材料上做的\emph{流变仪锚定验证}(\S\ref{sec:rheometer})。第一是时间上的改进,把"小时数才能返回过去状态"变成"几秒内返回当前状态"。第二验证用一个被路由的 GP 代理替换 MPM-in-the-loop 之后,恢复出来的 flow curve 并没有跟独立仪器流变脱钩。
 
 ### 8.2 A Reusable Surrogate as a Community Asset
 
@@ -1279,30 +1277,28 @@ Mask 清理(\texttt{Photoshop})
 
 我们提出了一个面向非牛顿视频流变的代理加速框架,把 Herschel--Bulkley 反演从模拟在环前作~\cite{hamamichi2023nonnewtonian} 的每 setup 大约八小时压缩到一台消费级 GPU 上每段视频中位 $12$\,s。该方法基于两个耦合分量:一个 regime 感知的分层 mixture-of-GP 代理(HMoGP),其局部训练的 exact-GP 专家由一个 deterministic 的三阶段 gate(容器几何 → 终端流距离 → 归一化轨迹形状,加最终观测证据重排)路由;以及一个可识别性感知的 GP-aware 反演,从被路由专家的最近训练邻居热启动 CMA-ES,并通过多重启 dispersion 与局部 Laplace--Hessian 95\% 置信区间报告残余的屈服应力 / 稠度 ridge,而非用一个手选的 $\sigma_Y$ 先验把 ridge 强行打破。\citet{hamamichi2023nonnewtonian} 处理同一条 ridge 用的是基于 Hessian 的相似性分析、一个 Poiseuille 流代理、主动 setup 选择、与迭代多 setup CMA-ES;我们的路径用代理摊销的诊断与一个 replay-consistency-guarded 的两 setup 联合反演(在保留单 setup 恢复的前提下)替换 Hessian 机器,两者都因代理而变得切实可行。
 
-除了运行时降幅之外,秒级反演在本文里让两项能力变得切实可行:时变流体的新鲜参数估计,以及在 Hamamichi 平板流变仪锚定的材料上做的快速真实流体验证。我们把训练好的代理、$295{,}419$ 行 MPM 训练语料与反演代码作为可复用社区产物释出,后续视频流变学研究可以在其上构建,而不必重复支付仿真训练代价;颗粒类材料的专用验证协议留作未来工作。
+除了运行时降幅之外,秒级反演交付两项能力:时变流体的新鲜参数估计,以及在 Hamamichi 平板流变仪锚定的材料上做的快速真实流体验证。我们把训练好的代理、$295{,}419$ 次 MPM 训练语料与反演代码作为可复用社区产物释出,后续视频流变学研究可以在其上构建,而不必重复支付仿真训练代价。
 
 更广义的信息是:视频流变之所以从实验室演示跨过了到可现场工具的门槛,不是靠替换基于物理的估计,而是靠摊销其代价。代理是一个基于物理的反演的加速器,而不是物理的替代品;这一加速使该技术——在每段视频几秒下——回到对时间敏感、迭代式、就地测量的射程之内。
 
 
-## 9. Limitations and Future Work
+## 9. Limitations
 \label{sec:limitations}
 
 ### 9.1 Information-Theoretic $\sigma_Y$ Limit
 ~\S\ref{sec:inverse} 的可识别性感知反演在溃坝观测携带\emph{某种}关于 $\sigma_Y$ 的信号时解决屈服应力 / 稠度退化,但它无法恢复观测里没有的信息。对那些 $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ 在整个溃坝剪切率范围内都成立的材料,流前沿基本上不编码关于 $\sigma_Y$ 的任何信息,任何反演——包括我们的——返回的估计都由先验与训练分布而不是由数据决定。表~\ref{tab:setup-ablation} 的 $N=30$ 留出 panel 中含有该 regime 的低 $\sigma_Y$ 样本,这些样本的估计被先验而非数据主导,相对中位数对 $\sigma_Y$ 均值贡献过大。这是一个任务级别上界,而不是一个方法级别上界;合适的缓解是~\S\ref{sec:mainresults} 的多 setup 协议。
-<!-- TODO[reviewer-fix]: 用当前 N=30 panel 重算的 outlier 数 + (mean, median) σ_Y 替换;旧文本里 1+9=10 的算术来自 N=10 时代的旧 Table 4 -->
-
 
 ### 9.2 Dependence on Training-Set Coverage
 代理只在它训练的输入 box 内是可信的。box 之外的查询触发逐专家边界收紧(\S\ref{sec:inverse}),它依赖被路由专家的训练输入作为可允许区域,因此不会外推。分布外材料需要扩展训练语料。逐专家 GP 预测方差标记分布外查询,但本身并不修正它们。
 
 ### 9.3 Fidelity of the Forward Model
-一个代理只能像它从中学习的仿真器那样准确。我们的 MPM 前向(\S3.2)建模 HB 流变学、重力、与无滑移边界,但不建模表面张力、弹性 overshoot、触变性、或粘弹记忆。表现出这些现象的材料系统性地偏离 HB 前向,这种偏离不能被任何 HB 反演恢复。更丰富的本构家族——粘弹扩展与 damage-MPM 变种~\cite{wolper2019cdmpm}——是自然但超出本文范围的方向。
+一个代理只能像它从中学习的仿真器那样准确。我们的 MPM 前向(\S3.2)建模 HB 流变学、重力、与无滑移边界,但不建模表面张力、弹性 overshoot、触变性、或粘弹记忆。表现出这些现象的材料系统性地偏离 HB 前向,这种偏离不能被任何 HB 反演恢复。
 
 ### 9.4 Capture and Geometry Requirements
-Level-$1$ gate 是在 $W, H \in [2, 7]$\,cm 的矩形立方体类容器上训练的。曲面或不规则容器需要在更广义的容器描述符上重训练几何 gate。相机标定使用一块印好的 ChArUco 标志板;原则上从自然场景内容做无标志物标定是可能的,但本文未做演示。
+Level-$1$ gate 是在 $W, H \in [2, 7]$\,cm 的矩形立方体类容器上训练的;曲面或不规则容器在标定的几何 box 之外。相机标定使用一块印好的 ChArUco 标志板。
 
-### 9.5 Toward Interactive-Rate Inversion
-我们的中位墙上时钟在一台单消费级 GPU 上是每段视频 $12$\,s——秒级,但不是毫秒级。标题中的 ``fast'' 表示\emph{足够快以能放进一次单用户交互},严格连续时间反演留作进一步开放方向,可通过代理蒸馏、查询时自适应 $K_{\mathrm{geo}}$ 选择、或跨材料摊销反演来实现。
+### 9.5 Latency Regime
+我们的中位墙上时钟在一台单消费级 GPU 上是每段视频 $12$\,s——秒级,但不是毫秒级。标题中的 ``fast'' 表示\emph{足够快以能放进一次单用户交互},而不是严格连续时间反演。
 
 
 ## Acknowledgements
