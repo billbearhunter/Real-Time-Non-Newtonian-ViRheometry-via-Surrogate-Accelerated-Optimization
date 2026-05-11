@@ -1,34 +1,25 @@
 \section{Introduction}
 
 Many everyday fluids---yogurts, pastes, sauces, slurries, cosmetic
-emulsions---exhibit non-Newtonian behavior that governs how they pour,
-spread, cling, and deform. Characterizing this behavior quantitatively
-requires measuring shear-rate-dependent stress, traditionally using
-parallel-plate or cone-and-plate rheometers. However, these instruments
-fail on a practically important class of materials: those containing
-inclusions larger than the instrument's measurement gap---chunky sauces,
-particulate suspensions, foods with solids---and those whose rheology
-evolves faster than a multi-minute lab procedure can capture.
+emulsions---exhibit non-Newtonian behaviour that governs how they
+pour, spread, cling, and deform. Parallel-plate and cone-and-plate
+rheometers measure this behaviour through a controlled-gap shear
+flow, but fail on materials with inclusions larger than the
+measurement gap and on materials whose rheology evolves faster than
+the lab procedure can capture.
 
-Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian} addresses
-this gap by estimating Herschel--Bulkley parameters
-$(\sigma_Y, \eta, n)$ from observations of a simple dam-break flow,
-without contacting the material with any instrument. The underlying
-principle is inverse simulation: a material point method (MPM) forward
-model is repeatedly executed inside an optimizer until the simulated
-flow reproduces the observed silhouette. Since the forward model is
-physics-based, the approach naturally handles the very materials that
-instrumental rheometers cannot, and recovers a full constitutive triple
-from a single short video.
-
-However, this otherwise uniquely capable approach is bottlenecked by the
-cost of its inner loop. A single MPM dam-break simulation takes several
-minutes on modern GPU hardware, and derivative-free optimization
-typically issues hundreds of candidate evaluations before convergence.
-The end-to-end inverse therefore takes \emph{around eight hours per
-setup}, confining the method to offline research use and precluding
-three capabilities that would otherwise be within reach of a
-video-based approach:
+Non-Newtonian video rheometry~\cite{hamamichi2023nonnewtonian}
+addresses this gap by estimating Herschel--Bulkley parameters
+$(\sigma_Y, \eta, n)$ from a simple dam-break flow: a material point
+method (MPM) forward model is repeatedly executed inside an optimiser
+until the simulated flow reproduces the observed silhouette. The
+approach naturally handles materials that instrumental rheometers
+cannot, but is bottlenecked by its inner loop---one MPM dam-break
+takes several minutes on modern GPU hardware and the
+derivative-free optimiser issues hundreds of candidates, so the
+end-to-end inverse takes \emph{around eight hours per setup}. This
+latency confines the method to offline research use and precludes
+three capabilities that a faster video-based approach would unlock:
 
 \begin{itemize}
     \item \emph{Tracking parameters of time-varying fluids.} When a
@@ -82,43 +73,15 @@ annotation, removing the largest fixed cost of the capture
 workflow.
 
 Our work inherits the problem setup, dam-break observation protocol,
-and inverse formulation from~\cite{hamamichi2023nonnewtonian}, and
-contributes the machinery needed to make that formulation
-computationally practical. \cite{hamamichi2023nonnewtonian} addresses
-the yield-stress/consistency degeneracy with a multi-stage protocol
-combining loss-Hessian similarity analysis, a plane-Poiseuille-flow
-proxy for the Hessian, Hessian-guided active selection of successive
-setups, and iterative multi-setup CMA-ES; the protocol is sound and
-was validated on $30$ material-trial cases, but it inherits the
-per-iterate MPM cost. By porting the inverse pipeline onto a learned
-surrogate, the same setup-selection and two-setup joint machinery becomes
-affordable per material rather than only per showcase, and the inverse
-returns within the latency required by the three uses above. The
-main contributions are:
-
-\begin{itemize}
-    \item A \emph{hierarchical mixture of Gaussian-process experts}
-    that replaces MPM inside the inverse loop with a frozen bank of
-    routed exact GP experts, structured by geometry, trajectory
-    length, and normalized shape to handle the non-stationarity of the
-    Herschel--Bulkley forward map.
-    \item A \emph{GP-aware inverse} that uses predictive uncertainty
-    directly in the likelihood, warm-starts and bounds CMA-ES within
-    the routed subproblem, and reports the residual
-    yield-stress/consistency ridge through restart and Hessian-based
-    uncertainty diagnostics.
-    \item An \emph{algorithmic two-stage camera-calibration pipeline}
-    based on ChArUco markers and silhouette-edge refinement,
-    replacing the manual workflow of prior work and removing the
-    largest fixed cost from each capture.
-    \item An evaluation establishing that seconds-scale video
-    rheometry enables three uses inaccessible at hours-per-setup
-    cost: \emph{(i)}~tracking how a material's parameters evolve in
-    real time; \emph{(ii)}~characterizing many materials, batches,
-    or conditions within a single measurement session; and
-    \emph{(iii)}~iterative measurement workflows where each capture's
-    parameters guide the next adjustment.
-\end{itemize}
+and inverse formulation
+from~\citet{hamamichi2023nonnewtonian}---including the multi-setup
+joint inversion they introduce to address the
+yield-stress/consistency degeneracy---and contributes the machinery
+needed to make that formulation computationally practical. By
+porting the inverse onto a learned surrogate, the same
+setup-selection and two-setup joint machinery becomes affordable per
+material rather than only per showcase, with the inverse returning
+within the latency required by the three uses above.
 
 \section{Related Work}
 
@@ -149,42 +112,32 @@ parameters is made quantitative by the similarity analyses
 of~\citet{liumei1989slow} and~\citet{balmforth2007two}, the same
 analytic framework leveraged by~\citet{hamamichi2023nonnewtonian}.
 
-Our forward simulator inherits the material point method (MPM)
-lineage that brought continuum simulation into
-graphics~\cite{stomakhin2013material,jiang2015affine,hu2018moving,
-jiang2016material}, with shear-thinning and yield-stress rheology
-realized through return-mapping
+Our forward simulator inherits the MPM lineage brought into
+graphics by~\cite{stomakhin2013material,jiang2015affine,hu2018moving,
+jiang2016material}, with yield-stress rheology realised through
+return-mapping
 formulations~\cite{yue2015continuum,ram2015material,klar2016drucker,
-tampubolon2017multi,wolper2019cdmpm}. We adopt the Herschel--Bulkley
-return map of~\citet{yue2015continuum} on a Taichi-based
-implementation~\cite{hu2019taichi}; the sauce-specific
-shear-thinning simulator of~\citet{nagasawa2019mixing}, from the
-same lab as our direct predecessor, shares our material focus. A
-broader introduction to fluid simulation for graphics appears
-in~\cite{bridson2015fluid}.
+tampubolon2017multi,wolper2019cdmpm}. We use the Herschel--Bulkley
+return map of~\citet{yue2015continuum} on
+Taichi~\cite{hu2019taichi}; \citet{nagasawa2019mixing}, from the
+same lab as our predecessor, shares our material focus.
 
 
 \subsection{Video-Based Material Estimation}
 
 Estimating simulation parameters from video by matching rendered and
 observed dynamics has a long lineage in graphics and
-vision~\cite{bhat2002computing,monszpart2016smash}. Takahashi and
-Lin~\cite{takahashi2019video} established the video-to-parameter
-pattern for viscous fluids by matching rendered and observed
-dam-break silhouettes on a per-scene basis;
-Hamamichi~et~al.~\cite{hamamichi2023nonnewtonian} extended this to
-the non-Newtonian Herschel--Bulkley triple $(\sigma_Y,\eta,n)$ and is
-the direct predecessor of our work. Their treatment of the
-yield-stress/consistency degeneracy combines a loss-Hessian
-similarity analysis, a plane-Poiseuille-flow proxy for the Hessian,
-Hessian-guided active selection of successive setups, and iterative
-multi-setup CMA-ES; the protocol is sound and was validated on $30$
-material-trial cases, but it inherits the per-iterate MPM cost. We
-inherit their dam-break observation protocol, their
-Herschel--Bulkley inverse objective, and their
-simulation-in-the-loop formulation, and contribute the surrogate
-machinery that makes the same multi-setup machinery affordable per
-material rather than only per showcase.
+vision~\cite{bhat2002computing,monszpart2016smash}.
+\citet{takahashi2019video} established the video-to-parameter pattern
+for viscous fluids by matching rendered and observed dam-break
+silhouettes per scene; \citet{hamamichi2023nonnewtonian} extended
+this to the Herschel--Bulkley triple $(\sigma_Y,\eta,n)$ and is the
+direct predecessor of our work. We inherit their dam-break observation
+protocol, inverse objective, and simulation-in-the-loop formulation
+(including the multi-setup machinery they introduce against the
+yield-stress/consistency degeneracy), and contribute the surrogate
+that makes the same machinery affordable per material rather than
+per showcase.
 
 Related work recovers material parameters from other visual
 modalities: video-based cloth friction~\cite{rasheed2020visual},
@@ -244,74 +197,58 @@ where the yield term is dominated by the viscous contribution.
 
 \subsection{Surrogate-Accelerated Inverse}
 
-Gaussian-process regression~\cite{rasmussen2006gaussian} provides a
-natural surrogate for expensive simulators because it couples
+Gaussian-process regression~\cite{rasmussen2006gaussian} pairs
 flexible nonparametric regression with calibrated predictive
-uncertainty. For data sizes beyond exact-GP feasibility, sparse and
-variational approximations~\cite{snelson2006sparse,
+uncertainty, making it a natural surrogate for expensive simulators;
+sparse and variational approximations~\cite{snelson2006sparse,
 quinonero2005unifying,titsias2009variational,hensman2013gaussian,
-matthews2016sparse} replace the full covariance with an
-inducing-variable approximation. A single global GP is insufficient
-for functions with heterogeneous local structure;
-mixture-of-experts (MoE)
+matthews2016sparse} extend it past exact-GP data limits. For
+heterogeneous local structure, mixture-of-experts
 models~\cite{jordan1994hierarchical,yuksel2012twenty} decompose
-prediction into multiple specialists with a gating mechanism, and
-mixtures of GPs instantiate this idea with GP
+prediction across specialists with a gating mechanism; mixture-of-GP
+variants instantiate this with GP
 experts~\cite{tresp2001mixtures,rasmussen2002infinite,
 meeds2006alternative,nguyen2008local,yuan2008variational,
-trapp2020deep}. For aggregating independent GP predictions, the
-Bayesian Committee Machine~\cite{tresp2000bayesian} and its
-variants~\cite{cao2014generalized,deisenroth2015distributed,
-liu2018generalized} provide closed-form variance-weighted fusion;
-sparse-expert plus committee aggregation has recently been applied
-to physics emulation~\cite{cohen2024sparse}.
+trapp2020deep}, and the Bayesian Committee
+Machine~\cite{tresp2000bayesian,cao2014generalized,
+deisenroth2015distributed,liu2018generalized} aggregates independent
+GP predictions by closed-form variance-weighted fusion (recently
+applied to physics emulation~\cite{cohen2024sparse}).
 
-Inverting expensive simulators has been addressed under the headings
-of Bayesian calibration of computer models~\cite{kennedy2001bayesian}
-and simulation-based inference~\cite{cranmer2020frontier}, with
-efficient global optimization~\cite{jones1998efficient} and Bayesian
-optimization~\cite{snoek2012practical,shahriari2016taking} as the
-dominant search strategies when the objective is expensive and
-derivative-free. The pattern of running derivative-free optimization
-on a GP surrogate~\cite{bajaj2019gaussian,hansen2016cma} has been
-applied to inverse viscoplasticity~\cite{vandamme2021bayesian} and
-viscoelasticity~\cite{hashemi2025bayesian}. The substitution of an
-expensive simulator by a trained surrogate inside a derivative-free
-inverse is not heuristic: \citet{stuart2018posterior} prove that the
-Hellinger distance between a GP-surrogate-based posterior and the
-true simulator-based posterior is bounded by moments of the
-surrogate's predictive error, and~\citet{teckentrup2020convergence}
-extends the guarantee to the realistic setting in which kernel
-hyperparameters are estimated from data. The replacement of
-MPM-in-the-loop by a learned GP surrogate therefore inherits the
-same posterior-fidelity guarantees that justify Bayesian
-calibration~\cite{kennedy2001bayesian} and modern simulation-based
-inference~\cite{cranmer2020frontier}.
+Inverting expensive simulators has been studied under Bayesian
+calibration of computer models~\cite{kennedy2001bayesian} and
+simulation-based inference~\cite{cranmer2020frontier}, with efficient
+global~\cite{jones1998efficient} and
+Bayesian~\cite{snoek2012practical,shahriari2016taking} optimisation
+as the dominant search strategies, and derivative-free optimisation
+on GP surrogates~\cite{bajaj2019gaussian,hansen2016cma} applied to
+inverse viscoplasticity~\cite{vandamme2021bayesian} and
+viscoelasticity~\cite{hashemi2025bayesian}. The substitution itself
+is not heuristic: \citet{stuart2018posterior} bound the Hellinger
+distance between the surrogate-based and true-simulator posteriors
+by moments of the surrogate's predictive error, with the bound
+extended to learned-hyperparameter settings
+by~\citet{teckentrup2020convergence}.
 
 
 \subsection{Camera Calibration}
 
-Estimating camera pose and intrinsics from images is a foundational
-computer-vision task; the textbook treatment of multi-view geometry
-appears in~\cite{hartley2004multiple}. Marker-based calibration
-provides closed-form initial poses through detected fiducials:
-AprilTag~\cite{olson2011apriltag},
-ARTag~\cite{fiala2005artag}, and the
-ArUco / ChArUco family~\cite{garrido2014automatic,
-garrido2016generation} all yield 3D-to-2D correspondences solvable
-via PnP variants such as EPnP~\cite{lepetit2009epnp}. Sub-pixel
-corner refinement using the gradient-based detector
-of~\citet{forstner1987fast} sharpens correspondences before pose
-recovery. Beyond marker-driven initialization, silhouette- and
-edge-based refinement aligns the camera against object boundaries
-through chamfer-distance optimization on a Euclidean distance
-transform~\cite{borgefors1986distance,maurer2003linear}, with edge
-maps from the Canny detector~\cite{canny1986computational}. Our
-calibration pipeline (\S\ref{sec:calib}) combines a ChArUco initial
-pose with a two-phase silhouette-edge refinement, replacing the
-manual fSpy-and-Photoshop workflow used
-by~\cite{hamamichi2023nonnewtonian} and removing the largest fixed
-cost from each capture.
+Camera pose and intrinsics from images is a foundational
+computer-vision task~\cite{hartley2004multiple}. Marker-based
+fiducials---AprilTag~\cite{olson2011apriltag},
+ARTag~\cite{fiala2005artag}, ArUco/ChArUco~\cite{garrido2014automatic,
+garrido2016generation}---supply 3D-to-2D correspondences solvable
+via PnP variants like EPnP~\cite{lepetit2009epnp}, with sub-pixel
+corner refinement~\cite{forstner1987fast} sharpening the
+correspondences. Silhouette- and edge-based refinement aligns the
+camera against object boundaries through chamfer-distance
+optimisation on a Euclidean distance
+transform~\cite{borgefors1986distance,maurer2003linear} of Canny
+edges~\cite{canny1986computational}. Our pipeline
+(\S\ref{sec:calib}) combines ChArUco initialisation with two-phase
+silhouette-edge refinement, replacing the manual
+fSpy-and-Photoshop workflow used
+by~\cite{hamamichi2023nonnewtonian}.
 
 
 \section{Background}
@@ -389,23 +326,16 @@ flow front cannot retract. We write the forward simulator as
 $\mathbf{y} = \mathcal{S}(\boldsymbol{\theta};\,W, H)$.
 
 \paragraph{Implementation details.}
-Three details of the forward simulator deserve mention.
-\emph{(i)~Container walls} use sticky boundaries: momentum on
-interior grid cells is zeroed each step, and any particle that
-penetrates a wall is flagged as interior and excluded from the
-downstream silhouette so wall-embedded fluid cannot produce
-spurious bright pixels in $\mathcal{S}(\boldsymbol{\theta}; W, H)$.
-\emph{(ii)~The fluid surface} is extracted by Laplacian-then-biharmonic
-smoothing of a rasterised signed-distance field, with per-cell
-$\varphi$ clamped each smoothing step to the range
-$[\varphi_{\min},\,\varphi_{\max}]$ admitted by the local
-particle-radius bounds; this automatic clamp removes the per-frame
-$\varphi$ tuning used in earlier pipelines.
-\emph{(iii)~The rendered silhouette} is produced by marching-cubes
-meshing of the zero-level set followed by projection through the
+Container walls use sticky boundaries (interior-cell momentum zeroed
+each step; wall-penetrating particles excluded from the silhouette);
+the fluid surface is a signed-distance field smoothed by
+Laplacian-then-biharmonic passes with per-cell $\varphi$ clamped to
+the local particle-radius range
+$[\varphi_{\min},\,\varphi_{\max}]$, removing the per-frame
+$\varphi$ tuning of earlier pipelines; the silhouette is rendered by
+marching-cubes meshing of the zero-level set, projected through the
 calibrated camera $(\mathbf{K}_{0}, R^{*}, \mathbf{t}^{*})$ of
-\S\ref{sec:calib}, closing the loop from MPM particles to the
-$8$-dimensional flow-distance vector $\mathbf{y}$.
+\S\ref{sec:calib} to close the loop from particles to $\mathbf{y}$.
 
 
 \subsection{Observation Pipeline}
@@ -488,13 +418,13 @@ and propose multi-setup joint inversion as a mitigation, paying
 the simulation-in-the-loop cost $N$ times for an $N$-setup
 estimate.
 
-In addition, when the target material itself evolves during the
-measurement window---sedimentation, aging, temperature drift,
-mixing, cooking cooldown---the true parameter state
-$\boldsymbol{\theta}_{t}$ drifts during the inverse, and an
-hour-scale estimate no longer describes the current condition. We
-therefore want estimation latency short enough to \emph{track} the
-evolving state, not just to reduce amortised compute cost.
+When the target material itself evolves during the measurement
+window (sedimentation, aging, temperature drift, cooking cooldown),
+the true state $\boldsymbol{\theta}_{t}$ drifts during the inverse
+and an hour-scale estimate no longer describes the current
+condition; we therefore want estimation latency short enough to
+\emph{track} the evolving state, not merely to reduce amortised
+compute cost.
 
 \section{Method (Surrogate-Accelerated Inverse)}
 \label{sec:method-block}
@@ -749,29 +679,20 @@ frame-weighted trajectory to $\mathbf{y}_{\mathrm{obs}}$,
 \end{equation}
 where $\{Y_{s,i,\cdot}\}_i$ are the trajectories assigned to sub $s$
 and $\alpha_d$ are the frame weights used by the inverse loss
-(\S\ref{sec:inv-nn}; Tab.~\ref{tab:hyper}).  For a single dam-break
-inverse, both profiles return one primary sub-expert
-$s_{\mathrm{prod}}\in\{s_{\mathrm{real}},s_{\mathrm{sim}}\}$ and the
-optimizer stays inside that sub-expert's local training box.  For a two-setup inverse, the same framework keeps the first setup as a
-top-$1$ anchor and treats the routed setup-$2$ candidates as discrete
-joint hypotheses.  The profile controls only three knobs: the routing
-score, the number $M$ of setup-$2$ hypotheses, and the hypothesis
-selection rule.  The simulator-matched profile used in
-\S\ref{sec:mainresults} sets routing to \texttt{sim\_precision},
-keeps $M=3$ setup-$2$ candidates, optimises each pair in its own
-tight box, and applies a first-observation WRMS guard.  The camera
-profile used in \S\ref{sec:rheometer} sets routing to
-\texttt{real\_robust}, keeps $M=10$ setup-$2$ basin
-hypotheses, and selects conservatively to reduce real--sim-gap
-failures.
-
-\paragraph{Why Deterministic Routing.}
-\label{sec:surr-deterministic}
-At inverse time the material parameters are unknown, but
-$(W,H,\mathbf{y}_{\mathrm{obs}})$ are observed. Routing on observable
-quantities avoids a circular gate that would require the unknown
-$\boldsymbol{\theta}$, and makes out-of-support cases diagnosable by
-checking the selected sub's training box.
+(\S\ref{sec:inv-nn}; Tab.~\ref{tab:hyper}). Each profile returns one
+primary sub-expert
+$s_{\mathrm{prod}}\in\{s_{\mathrm{real}},s_{\mathrm{sim}}\}$. The
+two-setup path keeps the first setup as a top-$1$ anchor and treats
+the routed setup-$2$ candidates as discrete joint hypotheses; the
+profile controls only the routing score, the number $M$ of setup-$2$
+hypotheses, and the hypothesis selection rule
+(\texttt{sim\_precision} with $M=3$ and a first-observation WRMS
+guard for \S\ref{sec:mainresults}; \texttt{real\_robust} with $M=10$
+and conservative selection for \S\ref{sec:rheometer}).
+Routing on observed $(W,H,\mathbf{y}_{\mathrm{obs}})$ rather than the
+unknown $\boldsymbol{\theta}$ avoids a circular gate and makes
+out-of-support cases diagnosable by inspecting the selected sub's
+training box.
 
 \paragraph{Per-Cell Gaussian-Process Experts.}
 \label{sec:surr-experts}
@@ -868,21 +789,14 @@ Fit global input/output scalers (Eqs.~\eqref{eq:xscale}, \eqref{eq:yscale})\;
 \Return{production model bank.}
 \end{algorithm}
 
-\begin{algorithm}[!htbp]
-\caption{Online forward pass
-$\hat{\mathbf{y}}=\tilde{\mathcal{S}}(\boldsymbol{\theta};W,H)$.}
-\label{alg:forward}
-\KwIn{$\boldsymbol{\theta}$, geometry $(W,H)$, observed routing vector
-$\mathbf{y}_{\mathrm{obs}}$.}
-\KwOut{Monotone predicted flow-front vector $\hat{\mathbf{y}}$.}
-\BlankLine
-Route $(W,H,\mathbf{y}_{\mathrm{obs}})$ through
-Eqs.~\eqref{eq:gate}--\eqref{eq:simprecision} to select $s_{\mathrm{prod}}$\;
-standardise $\mathbf{x}_{\log}$ and evaluate the selected ExactGP
-(Eq.~\eqref{eq:gp-predictive})\;
-decode the mean to physical units and apply Eq.~\eqref{eq:mono}\;
-\Return{$\hat{\mathbf{y}}$ and GP predictive std.}
-\end{algorithm}
+The online forward pass is therefore: route
+$(W,H,\mathbf{y}_{\mathrm{obs}})$ through
+Eqs.~\eqref{eq:gate}--\eqref{eq:simprecision} to select
+$s_{\mathrm{prod}}$, standardise the input by Eq.~\eqref{eq:xscale},
+evaluate the selected ExactGP via Eq.~\eqref{eq:gp-predictive}, decode
+the mean to physical units, and apply the monotonic guard of
+Eq.~\eqref{eq:mono}. The GP also returns a predictive standard
+deviation that the inverse loss of \S\ref{sec:inv-loss} consumes.
 
 \subsection{GP-Aware Inverse}
 \label{sec:inverse}
@@ -936,13 +850,11 @@ $p_{\mathrm{sup}}$ are listed in \S\ref{sec:data}.
 
 \paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
 \label{sec:inv-sy}
-Herschel--Bulkley observations can remain weakly identified along a
-$(\eta,\sigma_Y)$ ridge. We do not break this ridge with a
-hand-chosen $\sigma_Y$ prior; the residual ambiguity is exposed
-through restart dispersion of the CMA-ES optima and a local
-Laplace--Hessian confidence interval (\S\ref{sec:inv-cma}), so the
-reported uncertainty is tied to the likelihood and the data rather
-than to an anchor selected by the user.
+Rather than break the residual $(\eta,\sigma_Y)$ identifiability
+ridge with a hand-chosen prior, we expose it through CMA-ES restart
+dispersion and the local Laplace--Hessian confidence interval
+(\S\ref{sec:inv-cma}), tying reported uncertainty to the likelihood
+rather than to a user-selected anchor.
 
 \paragraph{GP-Aware Type-II ML Loss.}
 \label{sec:inv-loss}
@@ -984,87 +896,65 @@ material; its specific value is reported in \S\ref{sec:data}.
 
 \paragraph{Optimiser and Uncertainty Output.}
 \label{sec:inv-cma}
-We optimise Eq.~\eqref{eq:Pprime} with
-CMA-ES~\cite{hansen2016cma}, a derivative-free
-evolution strategy that adapts a multivariate-Gaussian sampling
-distribution to the loss landscape. CMA-ES is well-suited to the
-piecewise-smooth, ridge-prone surface produced by Eq.~\eqref{eq:obs-loss};
-its adaptation removes the need for ad hoc step-size schedules.
-Each independent restart is seeded deterministically; the
-lowest-loss restart is reported as the MAP estimate, while the
-standard deviation of restart optima provides a truth-blind
-ridge-degeneracy diagnostic. A finite-difference Hessian of
-Eq.~\eqref{eq:obs-loss} at the MAP yields a local Laplace 95\%
-interval for $(n,\eta,\sigma_Y)$. The population size, step, generation
-budget, and restart count used in our experiments are listed in
-\S\ref{sec:data}.
-
-\paragraph{Batched Per-Generation Evaluation.}
-\label{sec:inv-batch}
-Each CMA-ES generation evaluates the loss at $\lambda$ candidate
-$\mathbf{z}$'s. Because exact GPs support batched test inputs
-natively (Eq.~\eqref{eq:gp-predictive} applied to a stacked
-$\mathbf{X}_*$)~\cite{rasmussen2006gaussian}, the entire generation is
-evaluated by a single forward call rather than $\lambda$ sequential
-calls; the per-candidate Mahalanobis, Occam, and support terms are
-then aggregated outside the GP. This amortises the fixed per-call
-overhead of GPU dispatch over the whole generation and does not
-change the optimisation trajectory; the empirical wall-clock gain is
-reported in \S\ref{sec:results}.
+We minimise Eq.~\eqref{eq:Pprime} with multi-restart
+CMA-ES~\cite{hansen2016cma}, whose adaptive sampling distribution
+suits the piecewise-smooth, ridge-prone surface produced by
+Eq.~\eqref{eq:obs-loss}. Each restart is seeded deterministically;
+the lowest-loss restart is reported as the MAP, the standard
+deviation across restarts is a truth-blind ridge diagnostic, and a
+finite-difference Hessian at the MAP yields a Laplace 95\% interval.
+Each CMA-ES generation is evaluated as a single batched GP forward
+call (Eq.~\eqref{eq:gp-predictive} on a stacked
+$\mathbf{X}_*$)~\cite{rasmussen2006gaussian}, amortising the GPU
+dispatch overhead over $\lambda$ candidates without altering the
+optimisation trajectory. Population size, restart count, and other
+hyperparameters are listed in \S\ref{sec:data}.
 
 \paragraph{Joint Two-Setup Inverse.}
 \label{sec:inv-joint}
-For two observations $a,b$ of the same material, the two routed
-setups retain their own GP experts but share the same
-$\boldsymbol{\theta}$. The production implementation minimises
-Eq.~\eqref{eq:Pstar}; if the two sub boxes overlap, the intersection
-is used, otherwise their padded union provides a conservative search
-box. The estimate from setup~$a$ is used as a warm start for the
-joint stage, so that setup~$b$ contributes information \emph{on top
-of} the single-setup posterior rather than restarting the search.
+For two observations of the same material, the routed setups retain
+their own GP experts but share one $\boldsymbol{\theta}$. The
+production implementation minimises Eq.~\eqref{eq:Pstar} over the
+intersection of the two padded sub boxes (or their padded union when
+disjoint), warm-started from the single-setup optimum so that the
+second observation adds information \emph{on top of} the first
+posterior rather than restarting the search.
 
 \begin{algorithm}[!htbp]
-\caption{Online single-setup inverse.}
+\caption{Online inverse (single-setup, or joint when a second setup
+$(\mathbf{y}^{(b)},W_b,H_b)$ is supplied).}
 \label{alg:invert}
-\KwIn{$\mathbf{y}_{\mathrm{obs}}$, $(W,H)$, production GP bank.}
-\KwOut{$\hat{\boldsymbol{\theta}}$, posterior diagnostics.}
+\KwIn{$(\mathbf{y}_{\mathrm{obs}},W,H)$ and optionally a second
+$(\mathbf{y}^{(b)},W_b,H_b)$; production GP bank.}
+\KwOut{$\hat{\boldsymbol{\theta}}$ and posterior diagnostics.}
 \BlankLine
-Route $(W,H,\mathbf{y}_{\mathrm{obs}})$ to the primary sub
-using the deployment profile (Eqs.~\eqref{eq:y8q}, \eqref{eq:simprecision})\;
-construct the padded box $\Theta_{k^\star}$ and nearest-neighbour
-warm start (Eqs.~\eqref{eq:tight-box}, \eqref{eq:nn})\;
-run multi-restart CMA-ES on Eq.~\eqref{eq:Pprime}\;
-optionally evaluate the Hessian interval at the best point\;
+Route each supplied setup to its primary sub using the deployment
+profile (Eqs.~\eqref{eq:y8q}, \eqref{eq:simprecision})\;
+construct the padded search box (Eq.~\eqref{eq:tight-box}; for two
+setups, the intersection of the per-sub boxes, or a padded union
+when they are disjoint) and the nearest-neighbour warm start
+(Eq.~\eqref{eq:nn}) on the first setup\;
+run multi-restart CMA-ES on Eq.~\eqref{eq:Pprime} (single-setup) or
+Eq.~\eqref{eq:Pstar} (joint, warm-started from the single-setup
+optimum)\;
+optionally evaluate the Laplace Hessian interval at the best
+point\;
 \Return{$\hat{\boldsymbol{\theta}}$ and diagnostics.}
 \end{algorithm}
 
 \subsection{Hessian-Orthogonal Setup-2 Proposal (Inherited)}
 \label{sec:proposer}
 
-The choice of the second container geometry $(W_2,H_2)$ is not part
-of our methodological contribution. We use the closed-form,
-Fisher-information-based proposer of
-\citet{hamamichi2023nonnewtonian} (DOI \texttt{10.1145/3618310})
-verbatim, and summarise it here only so that the joint algorithm
-that follows is self-contained.
-
-Given the single-setup estimate
-$\hat{\boldsymbol{\theta}}_1$ obtained from the first geometry
-$(W_1,H_1)$, \citet{hamamichi2023nonnewtonian} approximate the dam
-break by plane-Poiseuille flow under the Herschel--Bulkley
-constitutive law and derive an analytical Hessian
-$\mathbf{H}(\hat{\boldsymbol{\theta}}_1;W,H)$ of their similarity
-loss with respect to $\boldsymbol{\theta}$. Let
-$\mathbf{q}_1$ be the unit eigenvector of
-$\mathbf{H}(\hat{\boldsymbol{\theta}}_1;W_1,H_1)$ associated with the
-smallest eigenvalue: this is the direction in
-$\boldsymbol{\theta}$-space along which the first setup carries the
-\emph{least} information. A second setup is informative to the joint
-estimator precisely when its principal least-informative direction
-$\mathbf{q}_2(W,H)$ is orthogonal to $\mathbf{q}_1$, since the joint
-Fisher information is then full-rank in the
-$(\mathbf{q}_1,\mathbf{q}_2)$ subspace. The proposer therefore
-selects
+The choice of $(W_2,H_2)$ is not part of our contribution: we adopt
+the closed-form, Fisher-information-based proposer of
+\citet{hamamichi2023nonnewtonian} verbatim. Given the single-setup
+estimate $\hat{\boldsymbol{\theta}}_1$, they approximate the dam
+break by plane-Poiseuille flow and derive an analytical
+loss-Hessian $\mathbf{H}(\hat{\boldsymbol{\theta}}_1;W,H)$. Let
+$\mathbf{q}_1$ be the unit eigenvector associated with the smallest
+eigenvalue of $\mathbf{H}(\hat{\boldsymbol{\theta}}_1;W_1,H_1)$---the
+direction in $\boldsymbol{\theta}$-space along which the first setup
+carries the least information. The proposer selects
 \begin{equation}
 \label{eq:proposer}
     (W_2^\star,H_2^\star)
@@ -1072,32 +962,12 @@ selects
     \arg\min_{(W,H)\in\mathcal{W}}
     \bigl\langle \mathbf{q}_1,\,\mathbf{q}_2(W,H)\bigr\rangle^2 ,
 \end{equation}
-where $\mathcal{W}$ is the calibrated geometry box. Because the
-Hessian is closed-form, no forward simulations or surrogate calls are
-required to evaluate Eq.~\eqref{eq:proposer}.
-
-We adopt this proposer without modification: our contribution is to
-make the joint estimate that consumes its output affordable per
-material rather than per showcase. The implementation is a faithful
-port of the formulas in \citet{hamamichi2023nonnewtonian}, and any
-material-independent derivation steps---definition of the similarity
-loss, the plane-Poiseuille reduction, and the analytical Hessian---are
-properly attributed to that paper.
-
-\begin{algorithm}[!htbp]
-\caption{Online joint two-setup inverse.}
-\label{alg:joint}
-\KwIn{Two observations of the same material,
-$(\mathbf{y}^{(a)},W_a,H_a)$ and
-$(\mathbf{y}^{(b)},W_b,H_b)$.}
-\KwOut{Shared $\hat{\boldsymbol{\theta}}$.}
-\BlankLine
-Route both setups independently to their primary subs\;
-form the joint search box from the two sub supports\;
-minimise the summed GP-aware likelihood of Eq.~\eqref{eq:Pstar}
-with multi-restart CMA-ES\;
-\Return{shared $\hat{\boldsymbol{\theta}}$ and two-setup diagnostics.}
-\end{algorithm}
+making the joint Fisher information full-rank in the
+$(\mathbf{q}_1,\mathbf{q}_2)$ subspace. The Hessian is closed-form,
+so evaluating Eq.~\eqref{eq:proposer} requires no forward
+simulations. Our contribution is to make the joint estimate that
+consumes this proposer's output affordable per material rather than
+per showcase.
 
 \section{Camera Calibration}
 \label{sec:calib}
@@ -1227,29 +1097,22 @@ $\rho_{\delta}$ is the Huber loss with a $\delta = 2$\,px threshold,
     \end{cases}
 \end{equation}
 which prevents any single mis-refined corner from dominating the fit.
-The minimisation uses Nelder--Mead~\cite{nelder1965simplex} because
-$\pi$ is cheap to evaluate but awkward to differentiate under the
-$\boldsymbol{\theta}_{\mathrm{cam}}$ parameterisation; the adaptive
-variant of~\citet{gao2012implementing} is reserved for the
-non-smooth Phase~B below, where its larger contraction step helps
-escape pixel-grid plateaus of the IoU objective. Stage~1
-returns an intrinsic matrix $\mathbf{K}_{0}$ (derived from
-$\mathrm{fov}$ and the image size) and an initial extrinsic
-$(R_{0}, \mathbf{t}_{0})$ (derived from $\mathbf{E}, \mathbf{l}$
-via Eq.~\eqref{eq:basis}).
+Eq.~\eqref{eq:stage1} is minimised with
+Nelder--Mead~\cite{nelder1965simplex}, returning
+$\mathbf{K}_{0}$ (from $\mathrm{fov}$ and image size) and an initial
+extrinsic $(R_{0}, \mathbf{t}_{0})$.
 
 \paragraph{Stage 2: silhouette-guided extrinsic refinement.}
-Stage~1 is typically accurate to a few pixels but can leave a small
-residual offset, since the ChArUco board is not rigidly coupled to
-the container. Stage~2 \emph{fixes} $\mathbf{K}_{0}$ and refines only the
-extrinsic parameters so that a rendered container silhouette
-aligns with the reference frame $I_{0}$ captured at the instant
-of dam release. We use a two-phase schedule.
+Stage~1 is typically accurate to a few pixels but the ChArUco board
+is not rigidly coupled to the container; Stage~2 fixes
+$\mathbf{K}_{0}$ and refines only the extrinsic so that the rendered
+container silhouette aligns with the reference frame $I_{0}$ at dam
+release, in two phases.
 
 \emph{Phase~A (smooth chamfer).}
-A Canny edge detector~\cite{canny1986computational} applied to
-$I_{0}$ yields a target-edge pixel set $E$, from which we
-precompute an exact Euclidean distance
+The Canny edge set~\cite{canny1986computational} of $I_{0}$ yields a
+target-edge pixel set $E$, from which we precompute an exact
+Euclidean distance
 transform~\cite{maurer2003linear,borgefors1986distance}
 \begin{equation}
 \label{eq:edt}
@@ -1300,16 +1163,12 @@ needed to avoid the combinatorial local minima of
 Eq.~\eqref{eq:iou}.
 
 \paragraph{Safety clamp.}
-After refinement we check the deviation from the Stage-$1$ prior,
-$\Delta_{\mathrm{rot}} = \|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ and
-$\Delta_{t} = \|\mathbf{t}^{*} - \mathbf{t}_{0}\|$; if either
-exceeds the safety threshold ($3^{\circ}$ or $3$\,cm by default) we
-fall back to the ChArUco extrinsic. The safety threshold is set
-slightly looser than the Phase-$A$ box ($2.5^{\circ}/2$\,cm), so
-that the unbounded Phase-$B$ Nelder--Mead can in principle move
-beyond the box but only mild excursions are accepted; this guards
-against strong local minima in either phase, particularly when the
-ChArUco board placement is sloppy.
+If $\|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ or
+$\|\mathbf{t}^{*} - \mathbf{t}_{0}\|$ exceed the safety thresholds
+($3^{\circ}$ or $3$\,cm; loosened past the Phase-A box so the
+unbounded Phase-B can move beyond it for mild excursions), we fall
+back to the ChArUco extrinsic, guarding against strong local minima
+when the ChArUco board placement is sloppy.
 
 \paragraph{Flow-front extraction.}
 Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
@@ -1354,31 +1213,7 @@ Eq.~\eqref{eq:mono} applied in physical space), producing the
 observation
 $\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8})
 \in \mathbb{R}_{\ge 0}^{8}$ that the inverse of
-Algorithms~\ref{alg:invert} and~\ref{alg:joint} consumes.
-
-\begin{algorithm}[!htbp]
-\caption{Stage 1 reprojection oracle.}
-\label{alg:reproj}
-\KwIn{$6$-vector $\boldsymbol{\theta}_{\mathrm{cam}}{=}
-  (l_{x},l_{z},\theta_{E},\phi_{E},\mathrm{fov},d_{\mathrm{eye}})$;
-  board coordinates $\{\mathbf{P}_{i}\}_{i\in\mathcal{I}}$;
-  image size $(W,H)$.}
-\KwOut{Projected pixels $\{\pi(\mathbf{P}_{i};
-  \boldsymbol{\theta}_{\mathrm{cam}})\}$.}
-\BlankLine
-
-Set $\mathbf{l}{=}(l_{x},0,l_{z})^{\!\top}$ and compute eye position
-  $\mathbf{E}$ (Eq.~\eqref{eq:eye})\;
-Build orthonormal basis $(\mathbf{C}_{x},\mathbf{C}_{y},\mathbf{C}_{z})$
-  with $\mathbf{C}_{x}$ horizontal (Eq.~\eqref{eq:basis}); set
-  $s{=}1/(2\tan(\mathrm{fov}/2))$ (Eq.~\eqref{eq:scale})\;
-
-\ForEach{corner $i\in\mathcal{I}$}{
-  Camera-frame coordinates $\mathbf{Y}_{i}$ (Eq.~\eqref{eq:screen});
-    project to pixels via Eq.~\eqref{eq:project}\;
-}
-\Return{$\{\mathbf{u}_{i}\}_{i\in\mathcal{I}}$.}
-\end{algorithm}
+Algorithm~\ref{alg:invert} consumes.
 
 \begin{algorithm}[!htbp]
 \caption{Two-stage camera calibration.}
@@ -1396,7 +1231,8 @@ Detect ChArUco corners in $I_{\mathrm{bg}}$ with sub-pixel
   refinement~\cite{garrido2014automatic,forstner1987fast}\;
 Run Nelder--Mead on $\boldsymbol{\theta}_{\mathrm{cam}}$ to minimise
   Huber reprojection loss $\mathcal{L}_{1}$ (Eqs.~\eqref{eq:stage1},
-  \eqref{eq:huber}), using Algorithm~\ref{alg:reproj} for $\pi$\;
+  \eqref{eq:huber}), evaluating $\pi$ via
+  Eqs.~\eqref{eq:eye}--\eqref{eq:project}\;
 Extract $(\mathbf{K}_{0},R_{0},\mathbf{t}_{0})$ from
   $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$
   (Eqs.~\eqref{eq:eye}--\eqref{eq:scale})\;
@@ -1641,9 +1477,9 @@ $0.5$\,cm held-out MAE; the few lower outliers are recently infilled
 local cells that the inverse-time rerank avoids except for explicitly
 near-boundary queries.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\columnwidth]{figs/true_vs_pred.png}
+    \includegraphics[width=\textwidth]{figs/true_vs_pred.png}
     \caption{Surrogate parity on $N=42{,}583$ held-out MPM rows,
     one panel per flow-front frame $d=1\!\dots\!8$. Each row is
     forwarded by its training-time sub-expert assignment (oracle
@@ -1656,7 +1492,7 @@ near-boundary queries.
     samples; the cloud follows the identity line within line width
     across the full range for each of the eight flow-front frames.}
     \label{fig:parity}
-\end{figure}
+\end{figure*}
 
 \paragraph{Posterior-uncertainty calibration.}
 Because the inverse loop weights residuals by $\sigma_{\mathrm{pred}}$
