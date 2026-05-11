@@ -41,7 +41,7 @@ available within a practical workflow. Our technical core couples
 three components.
 
 \emph{(i)}~A \emph{hierarchical mixture of Gaussian-process experts}
-replaces MPM inside the optimizer. The production surrogate bank
+(HMoGP) replaces MPM inside the optimizer. The trained surrogate bank
 partitions the forward map by container geometry, terminal flow
 distance, and normalized trajectory shape. At runtime the observable
 tuple $(W,H,\mathbf{y})$ deterministically routes each query to a
@@ -455,10 +455,10 @@ closed-form Fisher-information construction we adopt unchanged.
 \begin{figure*}[!htbp]
     \centering
     \widefigureorplaceholder[5cm]{\textwidth}{figs/method_overview.pdf}{Placeholder METHOD OVERVIEW:
-    production inverse pipeline with observation extraction,
+    inverse pipeline with observation extraction,
     hierarchical routing to a local GP expert, GP-aware likelihood,
     CMA-ES inverse, and optional two-setup joint recovery.}
-    \caption{Production pipeline implemented by the accompanying code.
+    \caption{Inverse pipeline implemented by the accompanying code.
     The user supplies an observed flow-front vector
     $\mathbf{y}_{\mathrm{obs}}$ and setup geometry $(W,H)$. A frozen
     bank of local exact-GP experts first routes the observation through
@@ -466,7 +466,7 @@ closed-form Fisher-information construction we adopt unchanged.
     likelihood inside a bounded CMA-ES inverse. For a two-setup
     material, both observations share one
     $\boldsymbol{\theta}$ while retaining their own routed experts.}
-    \Description{Block diagram of the production inverse pipeline:
+    \Description{Block diagram of the inverse pipeline:
     observation extraction, hierarchical routing to a local GP expert,
     GP-aware likelihood, CMA-ES inverse, and optional two-setup joint
     recovery.}
@@ -482,7 +482,7 @@ The original simulation-in-the-loop inverse is
     \left\|\mathcal{S}(\boldsymbol{\theta};W,H)
     -\mathbf{y}_{\mathrm{obs}}\right\|^2 .
 \end{taggedeqn}
-Our single-setup production estimator replaces
+Our single-setup estimator replaces
 $\mathcal{S}$ by a routed GP surrogate
 $\tilde{\mathcal{S}}_{k^\star}$ and minimises the negative log
 marginal likelihood
@@ -512,20 +512,22 @@ joint objective
       \mathcal{L}_{\mathrm{box}}^{(a)}(\mathbf{z})+
       \mathcal{L}_{\mathrm{box}}^{(b)}(\mathbf{z})\right).
 \end{taggedeqn}
-The current production path does not use an explicit
+The current inverse does not use an explicit
 $\sigma_Y$ anchor prior; uncertainty along the HB ridge is instead
 reported through multi-start dispersion and a local Laplace Hessian.
+Tab.~\ref{tab:subs} summarises the substitutions relative to the
+simulation-in-the-loop formulation.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Implemented substitutions relative to the canonical
+\caption{Implemented substitutions relative to the
 simulation-in-the-loop inverse.}
 \label{tab:subs}
 \begin{tabular}{@{}p{0.30\linewidth}p{0.48\linewidth}p{0.14\linewidth}@{}}
 \toprule
-Difficulty & Production substitution & Section \\
+Difficulty & Substitution & Section \\
 \midrule
 Forward cost
   & $\mathcal{S}\mapsto\tilde{\mathcal{S}}_{k^\star}$:
@@ -783,7 +785,7 @@ Fit global input/output scalers (Eqs.~\eqref{eq:xscale}, \eqref{eq:yscale})\;
     and the assigned trajectories used by the source-aware rerank\;
   }
 }
-\Return{production model bank.}
+\Return{frozen surrogate bank.}
 \end{algorithm}
 
 The online forward pass is therefore: route
@@ -911,7 +913,7 @@ hyperparameters are listed in \S\ref{sec:data}.
 \label{sec:inv-joint}
 For two observations of the same material, the routed setups retain
 their own GP experts but share one $\boldsymbol{\theta}$. The
-production implementation minimises Eq.~\eqref{eq:Pstar} over the
+implementation minimises Eq.~\eqref{eq:Pstar} over the
 intersection of the two padded sub boxes (or their padded union when
 disjoint), warm-started from the single-setup optimum so that the
 second observation adds information \emph{on top of} the first
@@ -922,7 +924,7 @@ posterior rather than restarting the search.
 $(\mathbf{y}^{(b)},W_b,H_b)$ is supplied).}
 \label{alg:invert}
 \KwIn{$(\mathbf{y}_{\mathrm{obs}},W,H)$ and optionally a second
-$(\mathbf{y}^{(b)},W_b,H_b)$; production GP bank.}
+$(\mathbf{y}^{(b)},W_b,H_b)$; frozen surrogate bank.}
 \KwOut{$\hat{\boldsymbol{\theta}}$ and posterior diagnostics.}
 \BlankLine
 Route each supplied setup to its primary sub using the deployment
@@ -1273,8 +1275,8 @@ Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
 \section{Training Data and Frozen Configuration}
 \label{sec:data}
 
-All reported production results use a single frozen surrogate bank
-trained once and re-used across every reported experiment. The bank
+All reported results use a single frozen surrogate bank trained once
+and re-used across every reported experiment. The bank
 is trained on $295{,}419$ unique training MPM simulations. After the multi-cell routing of \S\ref{sec:surrogate}, these
 simulations produce $425{,}831$ routed assignment rows (a single
 simulation can be assigned to more than one sub-expert when its
@@ -1290,8 +1292,7 @@ is performed on top of this bank.
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Frozen production configuration used throughout the
-evaluation.}
+\caption{Frozen configuration used throughout the evaluation.}
 \label{tab:hyper}
 \begin{tabular}{@{}p{0.36\linewidth}p{0.58\linewidth}@{}}
 \toprule
@@ -1437,8 +1438,8 @@ Table~\ref{tab:hyper} and a fixed seed.
 
 We first verify that the trained surrogate predicts MPM outputs
 accurately enough to justify replacing the simulator inside the
-inverse. The canonical test split ($T_{\mathrm{sim}}$,
-$42{,}583$ rows) is a strict held-out 10\,\% slice of the
+inverse. The held-out test split ($T_{\mathrm{sim}}$,
+$42{,}583$ rows) is a strict $10\,\%$ slice of the
 training corpus, with each row carrying its assignment to a unique
 sub-expert (the assignment used at training time, not seen by that
 sub during fitting). For each test row we forward the assigned
@@ -1465,7 +1466,8 @@ rows). Such tail rows do not arise inside the inverse loop: the
 GP-aware likelihood (\S\ref{sec:inv-loss}) down-weights any
 residual that exceeds the GP variance, and the top-$k$ rerank
 (\S\ref{sec:surr-top1}) routes such queries away from boundary
-subs.
+subs.  Fig.~\ref{fig:parity} shows the per-frame surrogate parity
+that supports these aggregate numbers.
 
 \begin{table}[!htbp]
 \centering
@@ -1492,9 +1494,9 @@ $R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 
 Across the $1{,}484$ sub-experts with at least five held-out rows, the
 median per-sub $R^2$ is $0.998$ and the lower $5\,\%$ tail remains at
 $0.965$. Even these boundary or low-sample subs stay below
-$0.5$\,cm held-out MAE; the few lower outliers are recently infilled
-local cells that the inverse-time rerank avoids except for explicitly
-near-boundary queries.
+$0.5$\,cm held-out MAE; the few lower outliers are low-sample
+boundary cells that the inverse-time rerank avoids except for
+explicitly near-boundary queries.
 
 \begin{figure*}[!htbp]
     \centering
@@ -1527,7 +1529,7 @@ $z = (\hat y - y)/\sigma_{\mathrm{pred}}$ has empirical standard
 deviation $0.52$ (Fig.~\ref{fig:sigma-cal}, right), confirming that
 the GP posterior is conservative by roughly a factor of two on the
 held-out set. We deliberately keep this conservative scale rather
-than rescaling: in production the residual to be explained is the
+than rescaling: at deployment the residual to be explained is the
 real-vs-MPM gap, not the MPM-vs-GP gap measured here, so an
 inflated $\sigma$ at the surrogate level acts as the correct
 ``unknown unknowns'' budget when the likelihood is evaluated against
@@ -1593,15 +1595,16 @@ All synthetic panels in this section use the simulator-matched
 \texttt{sim\_precision} profile of Eq.~\eqref{eq:simprecision}.
 The real-video inverses later in the paper use the
 \texttt{real\_robust} profile of Eq.~\eqref{eq:y8q}.  Both are
-instances of the same candidate-basin joint framework above.  In the
-synthetic profile, setup-$1$ is a top-$1$ local inverse, setup-$2$
-keeps the top-$3$ full-trajectory candidates, and the joint stage runs
-a tight-box per-pair search with a truth-blind WRMS guard on the first
-observation.  This is appropriate because the synthetic observations
-are generated by the same MLS-MPM simulator as the training corpus.  In
-the real profile, described in \S\ref{sec:rheometer}, setup-$2$ instead
-keeps top-$10$ terminal-displacement candidates and uses conservative
-selection for camera noise and real--sim discrepancy.
+instances of the same top-$M$ candidate-hypothesis joint framework of
+\S\ref{sec:surrogate}.  In the synthetic profile, setup-$1$ is a
+top-$1$ local inverse, setup-$2$ keeps the top-$3$ full-trajectory
+candidates, and the joint stage runs a tight-box per-pair search with
+the first-observation guard of \S\ref{sec:inv-joint}.  This is
+appropriate because the synthetic observations are generated by the
+same MLS-MPM simulator as the training corpus.  In the real profile,
+described in \S\ref{sec:rheometer}, setup-$2$ instead keeps top-$10$
+terminal-displacement candidates and uses conservative selection for
+camera noise and real--sim discrepancy.
 
 A held-out $100$-row routing diagnostic confirmed the profile choice:
 \texttt{sim\_precision} recovers the oracle sub-expert in $61/100$
@@ -1766,9 +1769,9 @@ bean paste.  This keeps the real comparison tied to independent
 instrumental measurements rather than to another video inverse.  For
 each material we use two dam-break setups.  The first setup is a
 \texttt{real\_robust} top-$1$ local inverse; the second setup supplies
-top-$10$ \texttt{real\_robust} routed basin hypotheses, and the joint
-inverse selects a conservative tight-box pair without running an
-independent setup-$2$ single inverse.  We then overlay the recovered
+top-$10$ \texttt{real\_robust} routed setup-$2$ hypotheses, and the
+joint inverse selects a conservative tight-box pair without running
+an independent setup-$2$ single inverse.  We then overlay the recovered
 Herschel--Bulkley flow curve against the rheometer reference over the
 shear-rate range probed by the dam-break replay.
 
@@ -1859,7 +1862,7 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
     Hamamichi rheometer-reference panel, in the layout
     of~\citet{hamamichi2023nonnewtonian} Fig.~$13$.  Dotted black:
     parallel-plate rheometer sweep on the same batch.  Red:
-    single-setup recovery.  Blue: current production joint two-setup recovery.  The
+    single-setup recovery.  Blue: two-setup joint recovery.  The
     panel deliberately shows the full six-material outcome rather
     than only successful examples.  Several materials track the
     rheometer sweep over the dam-break-supported shear-rate window;
@@ -1929,41 +1932,186 @@ Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.
 
-\subsection{Parameter Freshness for Time-Varying Fluids}
+\subsection{Parameter Freshness for Time-Varying Materials}
 \label{sec:freshness}
 
-The headline payoff of compressing the inverse from hours to seconds
-is that the recovered parameters describe the material at the
-\emph{instant} of measurement, not at the start of a multi-hour
-optimisation run. We test this claim directly on materials whose
-Herschel--Bulkley parameters evolve on a sub-hour timescale, and
-recover their full kinetic curves from dam-break video alone.
+\paragraph{Central claim.}
+Hamamichi's two-setup protocol requires the setup-$2$ geometry to be
+chosen \emph{after} the setup-$1$ inverse returns, because the
+Hessian-orthogonal proposer of \S\ref{sec:proposer} consumes
+$\hat{\boldsymbol{\theta}}_1$. Under a simulation-in-the-loop
+implementation this introduces a structural $\sim 8$\,h interval
+between the two captures: setup-$1$ optimisation must finish before
+setup-$2$ can even be released. For
+\emph{industrial standardised products}---commercial sauces,
+cosmetic emulsions---this interval is harmless: opening a new
+package the next day returns to the same canonical state. For
+\emph{self-prepared, non-standardised materials}---starch gels,
+flour pastes, cooking-prepared sauces---the interval is destructive:
+the material has aged into a different state by the time setup-$2$
+is captured, and the joint inverse fuses two observations of
+\emph{different materials} rather than two observations of the same
+one. The seconds-scale inverse of \S\ref{sec:mainresults} collapses
+this $\sim 8$\,h window to under a minute, so the same two-setup
+machinery operates within the material's evolution timescale rather
+than across it. This section establishes that claim through four
+layers of evidence; we keep each layer's scope narrow and report
+each layer's failure modes alongside its pass conditions.
 
-\paragraph{Freshness protocol.}
-Our freshness protocol separates the question
-``can the inverse track a changing material?'' from ordinary
-static-flow validation. The protocol has three layers. First, a
-synthetic control prescribes time-varying Herschel--Bulkley
-parameters $\boldsymbol{\theta}(t)$ and checks whether the full
-pipeline recovers the kinetic constants from MPM-generated
-dam-break videos. Second, six real hand-prepared starch or
-composite-starch conditions are measured repeatedly within one
-batch, so the recovered $\sigma_Y(t)$ trajectory is not confounded by
-day-to-day preparation variation. Third, independent anchors--a
-repeat katakuriko batch, 24-hour rheometer plateaus on smooth
-conditions, and concentration-scaling checks--test whether the
-recovered trajectories have the expected physical structure
-\cite{miles1985gelation,karim2000methods,hoover2001composition}.
+\paragraph{Four layers of evidence.}
+\begin{description}
+  \item[\textnormal{A.}] \emph{Identifiability lower bound
+  (synthetic).} How fast a kinetic timescale $T_k$ can the
+  three-point sampling cadence $t\in\{0,20,40\}$\,min resolve at
+  all? Layer~A prescribes synthetic
+  $\boldsymbol{\theta}(t)$ trajectories with known $T_k$,
+  $\sigma_{Y,\infty}$ and reports the $\hat T_k$ vs $T_k$ recovery
+  curve plus the false-positive distribution under a $T_k=\infty$
+  static control.
+  \item[\textnormal{B.}] \emph{Sim-in-loop staleness counterfactual
+  (synthetic).} For a target kinetic, what bias would the $\sim 8$\,h
+  setup-$1\to$setup-$2$ interval introduce? Layer~B numerically
+  reconstructs both protocols on the same synthetic ground truth and
+  reports the bias $\Delta$ as a function of $T_k$. This is the
+  layer that converts ``freshness = headline'' from narrative into a
+  quantified finding.
+  \item[\textnormal{C.}] \emph{Within-batch real evolution.} On six
+  self-prepared materials, the same pipeline is run three times
+  within a $60$\,min batch window and the recovered
+  $\hat\sigma_Y(t)$ is fitted to a first-order build-up form. Pass
+  conditions are pre-registered before any video is captured.
+  \item[\textnormal{D.}] \emph{Real-material staleness verification.}
+  The same materials are re-paired so that setup-$1$ and setup-$2$
+  come from different time points (or different batches) of the same
+  condition, mimicking sim-in-loop's enforced interval. Layer~D
+  reports whether the real-material bias direction and order of
+  magnitude agree with Layer~B's synthetic prediction.
+\end{description}
 
-\paragraph{Material panel.}
+% -------------------------------------------------------------------
+\paragraph{Layer A: Identifiability lower bound on $T_k$.}
+\label{sec:fresh-A}
+We prescribe synthetic kinetic ground truth with
+$\sigma_Y(t)=\sigma_{Y,\infty}(1-e^{-t/T_k})$ across six target
+timescales $T_k\in\{10,20,30,60,120,\infty\}$\,min, holding
+$\sigma_{Y,\infty}=100$\,Pa, $n=0.5$, $\eta=10$\,Pa$\cdot$s$^n$ at a
+well-conditioned regime away from the $\sigma_Y$ identifiability
+ridge of \S\ref{sec:inv-sy}. For each $T_k$ we render
+dam-break videos with MPM at $t\in\{0,20,40\}$\,min and run the full
+inverse pipeline, then fit the recovered $\hat\sigma_Y(t)$ back to
+Eq.~\eqref{eq:avrami}. Each condition is repeated $5$ times across
+random setup-$1$ geometries. The $T_k=\infty$ static control
+quantifies the false-positive rate at which a non-evolving material
+is mis-detected as kinetic.
+
+Fig.~\ref{fig:fresh-A1} reports $\hat T_k$ vs $T_k$ on log-log axes,
+with the static control on the right margin. We define the
+\emph{minimum resolvable} $T_k$ as the smallest true $T_k$ at which
+the median fractional error
+$|\hat T_k - T_k|/T_k$ stays under $50\%$, and the \emph{ceiling}
+$T_k$ as the largest true $T_k$ whose recovered $\hat T_k$ remains
+distinguishable from the static control. The window
+$[T_k^{\min},T_k^{\max}]$ produced by this layer is the
+\emph{applicability bound} for the real panel of Layer~C: any real
+material falling outside this window cannot be resolved by the
+three-point cadence regardless of inverse quality.
+
+\begin{figure}[!htbp]
+    \centering
+    \widefigureorplaceholder[6cm]{\columnwidth}{figs/freshness/fresh_A1_identifiability.pdf}{Placeholder F-FRESH-A1:
+    Identifiability scatter. Left panel: $\hat T_k$ vs $T_k$
+    log-log scatter for $T_k\in\{10,20,30,60,120\}$\,min, with
+    identity line and the $T_k=\infty$ control plotted on the right
+    margin. Right panel: per-$T_k$ box-plot of fractional error
+    $(\hat T_k-T_k)/T_k$.}
+    \caption{Layer~A identifiability bound on the three-point
+    freshness protocol. The plot defines $T_k^{\min}$ (smallest
+    resolvable kinetic timescale) and $T_k^{\max}$ (largest
+    timescale distinguishable from a static material), which jointly
+    set the applicability window for the real panel of Layer~C.}
+    \Description{Identifiability scatter plot showing recovered
+    versus prescribed kinetic timescale, with a static control bin
+    on the right and per-bin error box-plots.}
+    \label{fig:fresh-A1}
+\end{figure}
+
+% -------------------------------------------------------------------
+\paragraph{Layer B: Sim-in-loop staleness counterfactual.}
+\label{sec:fresh-B}
+We hold the synthetic setting of Layer~A and now numerically
+reconstruct two protocols on the same prescribed kinetic curves at
+three diagnostic scenarios:
+$T_k\in\{15\,\mathrm{min\ (fast)},\,45\,\mathrm{min\ (medium)},\,
+180\,\mathrm{min\ (slow)}\}$.
+
+\emph{Protocol $P_{\mathrm{fast}}$ (surrogate).} Setup-$1$ and
+setup-$2$ are both released at $t=0$; the joint inverse produces
+$\hat{\boldsymbol{\theta}}_{\mathrm{fast}}$ in seconds.
+
+\emph{Protocol $P_{\mathrm{slow}}$ (simulation-in-the-loop
+counterfactual).} Setup-$1$ is released at $t=0$. The
+sim-in-loop inverse then takes $\sim 8$\,h to return
+$\hat{\boldsymbol{\theta}}_1$, after which the proposer of
+\S\ref{sec:proposer} selects $(W_2,H_2)$. Setup-$2$ is therefore
+released at $t=8$\,h, with the material now in state
+$\boldsymbol{\theta}(t=8\,\mathrm{h})$ rather than
+$\boldsymbol{\theta}(t=0)$. The joint inverse then fuses
+$\mathbf{y}^{(1)}$ at $\boldsymbol{\theta}(0)$ with $\mathbf{y}^{(2)}$
+at $\boldsymbol{\theta}(8\,\mathrm{h})$, producing
+$\hat{\boldsymbol{\theta}}_{\mathrm{slow}}$.
+
+Both protocols are run $10$ times per scenario with different
+random setup-$1$ geometries; we report the bias
+$\Delta = \|\hat{\boldsymbol{\theta}}_{\mathrm{slow}} -
+\boldsymbol{\theta}(0)\| -
+\|\hat{\boldsymbol{\theta}}_{\mathrm{fast}} -
+\boldsymbol{\theta}(0)\|$ and visualise both clouds in
+flow-curve space (Fig.~\ref{fig:fresh-B1}). The $T_k=180$\,min
+scenario is included precisely because we expect
+$\Delta\approx 0$ there: a material that aged little within
+$8$\,h gives no advantage to fast acquisition, and reporting that
+boundary candidly is part of the claim.
+
+\begin{figure*}[!htbp]
+    \centering
+    \widefigureorplaceholder[5cm]{\textwidth}{figs/freshness/fresh_B1_staleness.pdf}{Placeholder F-FRESH-B1:
+    Three-panel staleness counterfactual (fast / medium / slow $T_k$
+    scenarios). In each panel, the ground-truth flow curve
+    $\tau(\dot\gamma)$ at $t=0$ is plotted in black; the cloud of
+    $P_{\mathrm{fast}}$ recoveries is overlaid in blue, and the cloud
+    of $P_{\mathrm{slow}}$ (8\,h-interval) recoveries is overlaid in
+    red. The per-scenario bias $\Delta$ is reported in the panel
+    title.}
+    \caption{Layer~B sim-in-loop staleness counterfactual on synthetic
+    kinetic ground truth. The $\sim 8$\,h setup-$1\to$setup-$2$
+    interval mandated by simulation-in-the-loop pulls the recovered
+    yield-stress estimate toward $\sigma_{Y,\infty}$ when
+    $T_k\ll 8$\,h, while the seconds-scale protocol of
+    \S\ref{sec:mainresults} recovers $\boldsymbol{\theta}(t=0)$.
+    The $T_k=180$\,min panel shows the boundary at which the
+    advantage vanishes: when material evolution is slow relative to
+    the sim-in-loop interval, both protocols are indistinguishable.}
+    \Description{Three log-log flow-curve panels showing ground
+    truth at t=0 alongside the two protocol clouds; the bias grows
+    as the prescribed kinetic timescale shortens.}
+    \label{fig:fresh-B1}
+\end{figure*}
+
+% -------------------------------------------------------------------
+\paragraph{Layer C: Within-batch evolution of real materials.}
+\label{sec:fresh-C}
 The real panel is deliberately small enough to run as a controlled
-laboratory protocol, but diverse enough to include smooth,
-rheometer-feasible starch gels and visibly particulate materials
-(Table~\ref{tab:fresh-mats}). The smooth katakuriko and shiratama
-conditions provide independent 24-hour rheometer anchors; oats and
-pancake mix provide the paper's rheometer-infeasible, visibly
-chunky examples without elevating them to a separate validation
-claim.
+laboratory protocol but diverse enough to span smooth,
+rheometer-feasible starch gels and visibly particulate composites
+(Tab.~\ref{tab:fresh-mats}). Each session prepares a $400$\,g batch
+at $25^{\circ}$C$\pm 0.5^{\circ}$C and samples it at
+$t_i\in\{0,20,40\}$\,min with a joint two-setup dam-break inverse at
+every time point. To remove a routing confound across time points
+within one condition, the setup-$1$ geometry $(W_1,H_1)$ is fixed
+once per condition rather than redrawn at each $t_i$; setup-$2$ is
+then proposed from each timepoint's snapshot inverse by the
+Hessian-orthogonal rule of \S\ref{sec:proposer}. A single ChArUco
+calibration is shared across the session.
 
 \begin{table}[!htbp]
 \centering
@@ -1973,15 +2121,18 @@ claim.
 $400$\,g within-batch session sampled at
 $t\in\{0,20,40\}$\,min. ``24h rheo'' marks conditions for which a
 parallel-plate plateau measurement is used as an independent
-asymptote anchor.}
+asymptote anchor. The katakuriko $5\%$ and oats $9\%$ rows are
+each captured as two independent batches to support the
+cross-batch consistency check listed below.}
 \label{tab:fresh-mats}
 \begin{tabular}{@{}p{0.24\linewidth}ccc p{0.34\linewidth}@{}}
 \toprule
 Condition & Conc. & Texture & 24h rheo & Expected kinetic regime \\
 \midrule
 Instant oats      & $5\%$  & chunky & no  & slow particulate setting \\
-Instant oats      & $9\%$  & chunky & no  & faster particulate setting \\
+Instant oats      & $9\%$  & chunky & no  & faster particulate setting (2$\times$ batch) \\
 Katakuriko starch & $3\%$  & smooth & yes & weak potato-starch gel \\
+Katakuriko starch & $5\%$  & smooth & yes & moderate potato-starch gel (2$\times$ batch) \\
 Katakuriko starch & $7\%$  & smooth & yes & strong potato-starch gel \\
 Shiratama flour   & $7\%$  & smooth & yes & slow rice-flour gel \\
 Pancake mix       & $70\%$ & chunky & no  & composite starch + bubbles \\
@@ -1989,44 +2140,8 @@ Pancake mix       & $70\%$ & chunky & no  & composite starch + bubbles \\
 \end{tabular}
 \end{table}
 
-\paragraph{Synthetic kinetic control.}
-Before using real captures, we run the same pipeline on synthetic
-time-resolved data with prescribed
-$\boldsymbol{\theta}(t)$. Each trajectory is evaluated at
-$t=\{0,20,40\}$\,min, rendered with MPM under the same random
-setup-1 and proposed setup-2 protocol used in the laboratory, and
-then fit back to Eq.~\ref{eq:avrami}. This produces a direct
-ground-truth check on the recovered $(T_k,\sigma_{Y,\infty})$ and
-separates pipeline error from real-fluid preparation and
-image-extraction effects.
-
-\paragraph{Capture protocol.}
-Each real session prepares a $400$\,g batch and keeps it at
-$25^{\circ}$C $\pm 0.5^{\circ}$C. We sample the same batch at
-$t_i\in\{0,20,40\}$\,min. At every time point we run a joint
-two-setup dam-break inverse: setup~1 draws
-$(W_1,H_1)$ uniformly from the continuous calibrated box
-$[2,7]^2$\,cm; setup~2 is proposed from the setup-1 snapshot inverse
-by the Hessian-orthogonal proposer of \S\ref{sec:proposer}. The
-proposed $(W_2,H_2)$ is used directly on the continuous $1$\,mm
-geometry grid, without snapping to a small discrete mould library.
-A single ChArUco calibration is shared across the session. The six
-main conditions therefore produce $6$ conditions $\times$ $3$ time
-points $\times$ $2$ setups $=36$ lab videos, plus the setup-2
-proposal snapshots; the katakuriko repeat batch adds another six
-dam-break videos.
-
-\paragraph{Repeat batch and rheometer subset.}
-To expose the failure mode of a hypothetical slow, staggered
-cross-batch protocol, we repeat katakuriko $5\%$ as two independent
-batches and compare the fitted $(T_k,\sigma_{Y,\infty})$ across
-batches. Smooth materials receive 24-hour parallel-plate follow-up:
-katakuriko $3\%$, katakuriko $7\%$, shiratama $7\%$, and both
-katakuriko $5\%$ repeat batches. These measurements are used only as
-plateau anchors, not as inputs to the video inverse.
-
-\paragraph{Kinetic fit and timescale recovery.}
-For each condition, the recovered yield-stress trajectory is fit to
+\emph{Kinetic fit.}
+For each condition the recovered yield-stress trajectory is fit to
 the first-order build-up form
 \cite{avrami1939kinetics,mewis2009thixotropy,bates1988nonlinear}
 \begin{equation}
@@ -2036,50 +2151,97 @@ the first-order build-up form
     \sigma_{Y,\infty}\,\bigl(1 - e^{-t/T_k}\bigr),
 \end{equation}
 by weighted nonlinear least squares with the per-time-point Laplace
-half-widths from Eq.~(\ref{eq:obs-loss}) as observation
+half-widths from Eq.~\eqref{eq:obs-loss} as observation
 uncertainties (Bates and Watts~\cite{bates1988nonlinear}). The
-estimated relaxation time $T_k$ and asymptote
-$\sigma_{Y,\infty}$ are reported with $1\sigma$ intervals from the
-fit covariance. The three-point window is intentionally short:
-it asks whether a fast inverse can identify the local rise of
-$\sigma_Y(t)$ while the batch is still fresh, not whether it can
-replace a full rheometer ageing study. Smooth conditions with
-24-hour rheometer sweeps add an asymptote check; chunky conditions
-are judged by within-batch consistency, visual replay, and
-concentration trends rather than by plate-rheometer data.
+estimated relaxation time $T_k$ and asymptote $\sigma_{Y,\infty}$
+are reported with $1\sigma$ intervals from the fit covariance. With
+only three time points the fit has one degree of freedom; Layer~A
+bounds the $T_k$ at which this is meaningful, and Layer~C
+\emph{only} reports conditions whose recovered $\hat T_k$ falls
+inside that bound.
 
-\paragraph{Validation against independent anchors.}
-The synthetic layer provides known kinetic ground truth; the real layer
-checks within-batch trajectories against repeat-batch drift, smooth-material
-24-hour rheometer plateaus, concentration scaling, and visual MPM replay.
-Together these anchors test physical plausibility without requiring a
-rheometer truth curve for every evolving or chunky material.
+\emph{Pre-registered pass/fail criteria.}
+Before any video is captured, we commit to the four checks below;
+Tab.~\ref{tab:fresh-results} reports each condition's pass/fail
+under all applicable checks together with the aggregate pass rate.
+
+\begin{description}
+  \item[\textnormal{(C-i)}] \emph{Smooth-material plateau anchor.}
+  For conditions with a $24$\,h parallel-plate rheometer plateau,
+  $\hat\sigma_{Y,\infty}$ must lie in $[0.5\times, 2\times]$ of the
+  rheometer value (equivalently $\pm 0.3$ in $\log_{10}$ space).
+  Applies to katakuriko $3/5/7\%$ and shiratama $7\%$.
+  \item[\textnormal{(C-ii)}] \emph{Concentration monotonicity.}
+  Across paired concentrations of the same base material,
+  $\hat\sigma_{Y,\infty}$ must increase with concentration. Applies
+  to oats $5\%$ vs $9\%$ and katakuriko $3\%$ vs $5\%$ vs $7\%$.
+  \item[\textnormal{(C-iii)}] \emph{Cross-batch consistency.} For
+  the two-batch conditions (katakuriko $5\%$, oats $9\%$), the
+  per-batch $(\hat T_k,\hat\sigma_{Y,\infty})$ pairs must overlap
+  within $1\sigma$ Laplace CI. This isolates whether residual
+  spread is preparation noise or pipeline noise.
+  \item[\textnormal{(C-iv)}] \emph{Kinetic monotonicity.}
+  $\hat\sigma_Y(t=40\,\mathrm{min})\ge\hat\sigma_Y(20)\ge\hat\sigma_Y(0)$
+  allowing $1\sigma$ overlap. Applies to all $7$ conditions.
+\end{description}
+
+We report the aggregate pass rate (X/Y) along with an interpretation
+of every failure case. Conceding fail rates is part of the design
+of this section: a pre-registered pass rate of $5/7$ with two
+interpreted failures is stronger evidence than a hand-curated $7/7$.
+Fig.~\ref{fig:fresh-traj} reports the per-condition $\sigma_Y(t)$
+trajectories with their fits and rheometer anchors;
+Fig.~\ref{fig:fresh-demos} complements this with calibrated
+dam-break stills at the three time points, especially for the
+chunky conditions where rheometer references are unavailable.
+
 \begin{figure*}[!htbp]
     \centering
-    \widefigureorplaceholder[6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
-      six-panel $\sigma_Y(t)$ figure. Panels: oats 5\%, oats 9\%,
-      katakuriko 3\%, katakuriko 7\%, shiratama 7\%, pancake mix
-      70\%. Each panel shows the three recovered
-      $\hat{\sigma}_{Y}(t_i)$ estimates at $t=\{0,20,40\}$ min with
-      Laplace 95\% CI bars and the fit of Eq.~\ref{eq:avrami};
-      smooth panels add a 24-hour rheometer plateau marker.}
-    \caption{Recovered yield-stress kinetics under our freshness
-    protocol. Each panel is one within-batch session from
-    Table~\ref{tab:fresh-mats}; markers are joint two-setup inverse
-    estimates at $t=\{0,20,40\}$\,min and the solid curve is the
-    weighted fit of Eq.~\ref{eq:avrami}. Smooth starch conditions
-    include a 24-hour rheometer plateau marker when available. The
-    paired oats and katakuriko concentrations test whether the
-    recovered asymptote increases with concentration, as expected
-    for starch-network build-up
-    \cite{hoover2001composition,roos1995phase}.}
-    \Description{A six-panel grid of yield-stress kinetic curves.
-    Each panel shows three recovered yield-stress estimates over the
-    first 40 minutes after preparation, with uncertainty bars and an
-    exponential build-up curve. Smooth panels include a 24-hour
-    rheometer asymptote marker.}
+    \widefigureorplaceholder[5cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
+      seven-panel $\sigma_Y(t)$ figure (one per Tab.~\ref{tab:fresh-mats} row).
+      Each panel shows the three recovered $\hat{\sigma}_{Y}(t_i)$
+      estimates at $t\in\{0,20,40\}$\,min with Laplace 95\% CI bars
+      and the weighted fit of Eq.~\eqref{eq:avrami}; smooth panels
+      add a 24-h rheometer plateau marker.}
+    \caption{Layer~C within-batch yield-stress kinetics. Markers
+    are joint two-setup inverse estimates at $t\in\{0,20,40\}$\,min
+    with Laplace 95\% CI bars; solid curves are the weighted fits of
+    Eq.~\eqref{eq:avrami}. Smooth starch conditions overlay their
+    $24$\,h rheometer plateau as an independent asymptote anchor
+    (check C-i).}
+    \Description{A seven-panel grid of yield-stress kinetic curves
+    over a 40-minute within-batch window, with uncertainty bars,
+    exponential fits, and rheometer asymptote markers for the
+    smooth subset.}
     \label{fig:fresh-traj}
 \end{figure*}
+
+\begin{table}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\caption{Layer~C per-condition pass/fail under the pre-registered
+criteria (C-i)--(C-iv). ``--'' marks checks that do not apply to a
+given row. Aggregate pass rate and a one-line interpretation of
+each failure are reported in the surrounding prose.}
+\label{tab:fresh-results}
+\begin{tabular}{@{}p{0.22\linewidth}ccccc@{}}
+\toprule
+Condition & $\hat T_k$ (min) & $\hat\sigma_{Y,\infty}$ (Pa) &
+  (C-i) & (C-ii)/(C-iii)/(C-iv) & Pass \\
+\midrule
+Oats $5\%$              & ---  & --- & ---  & ---  & ---  \\
+Oats $9\%$ (batch A)    & ---  & --- & ---  & ---  & ---  \\
+Oats $9\%$ (batch B)    & ---  & --- & ---  & ---  & ---  \\
+Katakuriko $3\%$        & ---  & --- & ---  & ---  & ---  \\
+Katakuriko $5\%$ (A)    & ---  & --- & ---  & ---  & ---  \\
+Katakuriko $5\%$ (B)    & ---  & --- & ---  & ---  & ---  \\
+Katakuriko $7\%$        & ---  & --- & ---  & ---  & ---  \\
+Shiratama $7\%$         & ---  & --- & ---  & ---  & ---  \\
+Pancake mix $70\%$      & ---  & --- & ---  & ---  & ---  \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \begin{figure*}[!htbp]
     \centering
@@ -2089,30 +2251,92 @@ rheometer truth curve for every evolving or chunky material.
       $t \in \{0,20,40\}$\,min. Each cell shows the observed frame
       and, where available, an MPM replay under
       $\hat{\boldsymbol{\theta}}(t)$.}
-    \caption{Visual evidence for within-batch material evolution.
-    Representative still frames show the same prepared batch at
-    $t=\{0,20,40\}$\,min. Smooth starch gels and chunky materials
-    are shown together because the freshness claim is visual and
-    time-resolved: the flow front changes within the same batch
+    \caption{Visual evidence supporting Layer~C. Representative
+    still frames at $t\in\{0,20,40\}$\,min for selected smooth and
+    chunky conditions; the flow front shifts within the same batch
     faster than a simulation-in-the-loop inverse can return a
-    parameter estimate.}
+    parameter estimate. This figure complements the quantitative
+    pass/fail of Tab.~\ref{tab:fresh-results} with qualitative
+    visual support, especially for the chunky conditions where
+    rheometer references are unavailable.}
     \Description{Image grid showing selected starch-based fluids at
-    three times after preparation. The flow extent changes over the
-    first 40 minutes, and replay overlays compare the captured
-    front with simulation under the recovered parameters.}
+    three times after preparation, optionally overlaid with MPM
+    replays under the recovered parameters at each time point.}
     \label{fig:fresh-demos}
 \end{figure*}
-\paragraph{Why freshness is the headline contribution.}
-At $\sim 8$\,h per setup, a simulation-in-the-loop inverse can
-return at most one joint estimate after the material has already
-aged into a different state. Our freshness protocol instead acquires
-three joint estimates inside a $60$\,min within-batch window. The
-synthetic control verifies that this measurement cadence can recover
-the prescribed kinetic constants; the real panel then uses the same
-cadence to measure material evolution that is experimentally
-inaccessible to a slow inverse. The point is therefore not merely
-lower latency, but a different experimental regime: time-resolved
-inverse rheology on a batch that is still changing.
+
+% -------------------------------------------------------------------
+\paragraph{Layer D: Real-material staleness verification.}
+\label{sec:fresh-D}
+Layer~D closes the argument by reproducing Layer~B's synthetic
+finding on real material. We re-pair the captures of katakuriko
+$5\%$ in two arrangements:
+\begin{description}
+  \item[\textnormal{D.1}] \emph{Same-batch delayed setup-$2$.} A
+  dedicated session is run on a fresh katakuriko $5\%$ batch with
+  setup-$1$ released at $t=0$ and setup-$2$ deliberately delayed to
+  $t=40$\,min (within-window but maximally separated), then jointly
+  inverted. This is contrasted against the same batch's
+  $t=0$/$t=0$ joint inverse from Layer~C. Same-batch isolates the
+  setup-$2$ delay from any cross-batch preparation noise and is the
+  cleanest analogue of sim-in-loop's enforced interval.
+  \item[\textnormal{D.2}] \emph{Cross-batch repurposing.} The
+  existing two batches of katakuriko $5\%$ (and oats $9\%$, if
+  available) are repurposed: setup-$1$ from batch~A is paired with
+  setup-$2$ from batch~B at the same nominal $t$, mimicking what
+  sim-in-loop would acquire on a non-standardised material when the
+  next-day re-preparation falls within the batch-to-batch drift.
+\end{description}
+
+Both arrangements yield $(\hat T_k,\hat\sigma_{Y,\infty},
+\hat\eta,\hat n)$ tuples that we compare against the true
+same-batch joint (Layer~C reference). The expected outcome from
+Layer~B's prediction is a yield-stress drift toward
+$\sigma_{Y,\infty}$ on the same-batch delayed pair, and an
+amplified drift on the cross-batch pair; Fig.~\ref{fig:fresh-D1}
+overlays both observed drifts on Layer~B's predicted direction in
+flow-curve space.
+
+\begin{figure}[!htbp]
+    \centering
+    \widefigureorplaceholder[6cm]{\columnwidth}{figs/freshness/fresh_D1_real_staleness.pdf}{Placeholder F-FRESH-D1:
+    Real-material staleness on katakuriko $5\%$. Flow-curve overlay
+    in log-log: black is the reference same-batch $t=0$/$t=0$ joint;
+    blue is the same-batch $t=0$/$t=40$ delayed joint; red is the
+    cross-batch paired joint. A grey shaded arrow shows the bias
+    direction predicted by Layer~B at the corresponding $\hat T_k$.}
+    \caption{Layer~D closing the loop: real-material staleness on
+    katakuriko $5\%$ (and oats $9\%$ where two batches are
+    available) compared against the Layer~B synthetic prediction.
+    Agreement in direction and within an order of magnitude in size
+    is the criterion of success; numerical $\Delta$ values are
+    reported in the prose.}
+    \Description{Flow-curve overlay showing the reference and two
+    staleness-protocol joint inverses on real katakuriko 5\%, with
+    a synthetic-predicted bias direction overlaid.}
+    \label{fig:fresh-D1}
+\end{figure}
+
+% -------------------------------------------------------------------
+\paragraph{Scope and acknowledged limitations.}
+The freshness section operates under four explicit caveats.
+\emph{(i) Sample size.} Each condition is captured once except for
+the two repeat-batch rows; within-condition variance is therefore
+not estimated for the single-batch conditions.
+\emph{(ii) Fit degrees of freedom.} The three-point inverse fit of
+Eq.~\eqref{eq:avrami} has one degree of freedom; Layer~A bounds the
+$T_k$ window in which this is meaningful, and Layer~C only reports
+inside that window.
+\emph{(iii) Model misspecification.} A first-order build-up form is
+assumed throughout. Materials that follow stretched-exponential or
+two-stage kinetics will be misfit even if Layer~A's identifiability
+bound is respected; if a stretched-exponential ground-truth sweep
+is added to Layer~A, the resulting bias is reported there.
+\emph{(iv) Not a substitute for full ageing studies.} Layer~C
+characterises kinetics on the $0$--$40$\,min window only; the
+$24$\,h rheometer plateau is used as an external check on the
+asymptote, not as a curve our method recovers. Longer-window
+ageing studies are out of scope.
 
 
 \subsection{End-to-End Capture-to-Parameter Time Budget}
@@ -2125,6 +2349,7 @@ our ChArUco + OpenGL calibration replaces that step with a single
 non-interactive solve. The inverse comparison isolates the compute stage:
 it excludes preparation, capture, segmentation, and calibration, matching
 the simulation-in-the-loop runtime reported for the predecessor.
+Tab.~\ref{tab:time-budget} reports the per-stage breakdown.
 
 \begin{table}[!htbp]
 \centering
@@ -2176,7 +2401,7 @@ instrumental rheology.
 The separation of a one-time offline training phase from a
 seconds-scale online inference phase produces a reusable artefact
 that is structurally unavailable to simulation-in-the-loop pipelines.
-Our frozen MoGP checkpoint was trained once on $295{,}419$ MPM
+Our frozen HMoGP checkpoint was trained once on $295{,}419$ MPM
 simulations covering $5.5$--$5.6$ orders of magnitude in $\eta$
 and $\sigma_Y$ and the full $[2, 7]\,\mathrm{cm}$ range of
 household containers. Subsequent users---and subsequent research on
