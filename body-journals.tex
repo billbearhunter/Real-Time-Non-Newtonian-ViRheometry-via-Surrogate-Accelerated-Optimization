@@ -460,14 +460,11 @@ closed-form Fisher-information construction we adopt unchanged.
     inverse pipeline with observation extraction,
     hierarchical routing to a local GP expert, GP-aware likelihood,
     CMA-ES inverse, and optional two-setup joint recovery.}
-    \caption{Inverse pipeline implemented by the accompanying code.
-    The user supplies an observed flow-front vector
-    $\mathbf{y}_{\mathrm{obs}}$ and setup geometry $(W,H)$. A frozen
-    bank of local exact-GP experts first routes the observation through
-    a geometry and y-shape partition, then evaluates a GP-aware
-    likelihood inside a bounded CMA-ES inverse. For a two-setup
-    material, both observations share one
-    $\boldsymbol{\theta}$ while retaining their own routed experts.}
+    \caption{High-level inverse pipeline. The observed setup geometry
+    and flow-front vector route to a local exact-GP expert; CMA-ES then
+    searches the selected expert under a GP-aware likelihood. In the
+    two-setup case, both observations share one material vector while
+    retaining setup-specific experts.}
     \Description{Block diagram of the inverse pipeline:
     observation extraction, hierarchical routing to a local GP expert,
     GP-aware likelihood, CMA-ES inverse, and optional two-setup joint
