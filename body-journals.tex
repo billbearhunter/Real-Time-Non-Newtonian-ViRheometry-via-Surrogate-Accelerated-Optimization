@@ -815,9 +815,12 @@ observation space,
     \frac{1}{8}\sum_{d=1}^{8}
     \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
 \end{equation}
-The frame weights $\boldsymbol{\alpha}=(\alpha_1,\ldots,\alpha_8) =
-(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$ form a non-decreasing schedule: by construction, the early frames
-of the dam-break sequence include the gate-release transient
+The frame weights form the frozen non-decreasing schedule
+\[
+\boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0).
+\]
+By construction, the early frames of the dam-break sequence include
+the gate-release transient
 (finite-time gate withdrawal, release-timing jitter, transient
 free-surface and surface-tension effects unmodelled by the MPM
 forward), while the late frames have settled into the steady
@@ -877,15 +880,16 @@ discrepancy:
 The per-setup negative log marginal likelihood is
 \begin{equation}
 \label{eq:obs-loss}
+\begin{aligned}
     \mathcal{L}_{\mathrm{GP}}(\mathbf{z})
-    =
+    &=
     \frac{1}{8}\sum_{d=1}^{8}
     \left[
       \frac{\alpha_d^2\, r_d(\mathbf{z})^2}{2v_d(\mathbf{z})}
       +\frac{1}{2}\log v_d(\mathbf{z})
-    \right],
-    \qquad
-    r_d=\log\hat{y}_d-\log y_{\mathrm{obs},d}.
+    \right],\\
+    r_d&=\log\hat{y}_d-\log y_{\mathrm{obs},d}.
+\end{aligned}
 \end{equation}
 The log-variance term is the Occam factor: it prevents the optimiser
 from preferring regions only because the GP predictive variance is
@@ -1471,8 +1475,8 @@ that supports these aggregate numbers.
 
 \begin{table}[!htbp]
 \centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
 \caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
 ($N=42{,}583$ held-out assignment rows, produced by the $22{,}209$
 held-out simulations of \S\ref{sec:experimental-setup} after routing;
@@ -1564,6 +1568,7 @@ these justify substituting MPM by the surrogate inside the
 inverse loop.
 
 
+\FloatBarrier
 \subsection{Synthetic Validation at Scale}
 \label{sec:mainresults}
 
@@ -1576,15 +1581,18 @@ from the calibrated parameter box of \S\ref{sec:data}, and report
 the relative error
 \begin{equation}
 \label{eq:erel}
-    E_{\mathrm{rel}}(\hat{\boldsymbol{\theta}},\boldsymbol{\theta}^{\!\star})
-    \;=\;
-    \sqrt{
-      \biggl(\frac{\hat n - n^{\!\star}}{n_{\max}-n_{\min}}\biggr)^{\!2}
-      +
-      \biggl(\frac{\hat\eta - \eta^{\!\star}}{\eta_{\max}-\eta_{\min}}\biggr)^{\!2}
-      +
-      \biggl(\frac{\hat\sigma_Y - \sigma_Y^{\!\star}}{\sigma_{Y,\max}-\sigma_{Y,\min}}\biggr)^{\!2}
-    }
+\begin{aligned}
+E_{\mathrm{rel}}
+&= \Bigg[
+\biggl(\frac{\hat n-n^{\!\star}}{n_{\max}-n_{\min}}\biggr)^{\!2}
++
+\biggl(\frac{\hat\eta-\eta^{\!\star}}{\eta_{\max}-\eta_{\min}}\biggr)^{\!2}
+\\[-1mm]
+&\qquad+
+\biggl(\frac{\hat\sigma_Y-\sigma_Y^{\!\star}}
+{\sigma_{Y,\max}-\sigma_{Y,\min}}\biggr)^{\!2}
+\Bigg]^{1/2}.
+\end{aligned}
 \end{equation}
 introduced by~\citet{hamamichi2023nonnewtonian}, with the parameter
 box of \S\ref{sec:data} setting the normalisation. Following their
@@ -1661,34 +1669,12 @@ of parameter and forward replay error across the panel.
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \caption{Synthetic recovery on the Hamamichi-matched $N=30$ panel.
-``$\le 0.1$'' is the share reaching $E_{\mathrm{rel}}\le 0.1$ in
-the sense of~\eqref{eq:erel}. The three $\mathrm{relE}$ columns are
-per-parameter medians, defined as
-$|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.
-Italicised rows are predecessor numbers
-from~\citet{hamamichi2023nonnewtonian} (\S 7.1), reported on a
-size-matched but distinct $30$-case panel (6 materials $\times$ 5
-random initial setups). The predecessor's $3$- and $4$-setup rows
-are \emph{cascaded}: setup~$k+1$ is only run on the cases that
-failed at setup~$k$, so the $26/30$ and $30/30$ figures stack
-incremental conversions ($+6$, $+4$) rather than represent
-independent $3$- or $4$-setup runs on all $30$ cases. Our pipeline
-currently implements $1$- and $2$-setup variants; the corresponding
-cascaded $3$/$4$-setup rows are deferred to future work. At
-$1$~setup our pipeline already converts $15/30$ versus the
-predecessor's $11/30$; at $2$~setups we hold $15/30$ rather than
-match the predecessor's $20/30$, because our two-setup joint runs
-a truth-blind first-observation WRMS guard that rejects joint
-updates which would regress setup~$1$ (\S\ref{sec:inv-joint}). This
-is a documented trade-off: the guard pays a panel-level conversion
-cost in exchange for never overwriting a recovered single-setup
-estimate---the behaviour needed when the inverse is used as a
-per-batch instrument rather than a per-showcase study. Even under
-the guard, the joint update tightens the consistency parameter
-($\mathrm{relE}\,\eta$ $0.187\to 0.160$, $14\%$ relative
-improvement) while keeping $n$ and $\sigma_Y$ within sampling
-noise. The speed comparison is separated into manual processing and
-CMA-ES inverse time in \S\ref{sec:timebudget}.}
+``$\le 0.1$'' counts cases with $E_{\mathrm{rel}}\le 0.1$
+(Eq.~\ref{eq:erel}). The three $\mathrm{relE}$ columns are
+per-parameter medians $|\hat\theta-\theta^{\!\star}|/\theta^{\!\star}$.
+Italic rows are predecessor pass rates from~\citet{hamamichi2023nonnewtonian}
+on its own size-matched $30$-case panel; the $3$- and $4$-setup
+predecessor rows are cascaded rather than independent all-case runs.}
 \label{tab:setup-ablation}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
@@ -1745,7 +1731,7 @@ diagnostic.
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\columnwidth]{figs/results/flowcurve_representatives.png}
+    \includegraphics[width=\columnwidth,height=0.42\textheight,keepaspectratio]{figs/results/flowcurve_representatives.png}
     \caption{Recovered flow curves $\hat\tau(\dot\gamma)$ (blue)
     versus ground truth (black) on five diagnostic synthetic replay
     categories: accurate recovery, large replay error,
@@ -1758,6 +1744,7 @@ diagnostic.
     \label{fig:flowcurve-syn}
 \end{figure}
 
+\FloatBarrier
 \subsection{Validation Against Parallel-Plate Rheometers}
 \label{sec:rheometer}
 
@@ -1829,51 +1816,43 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
     % Row 1: 3 panels
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_chuno_single_vs_joint.png}{(a) Chuno: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_chuno_single_vs_joint.png}{(a) Chuno: rheometer + single + joint flow curves.}\\
         {\footnotesize (a) Chuno (Japanese thickened sauce)}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_okonomi_single_vs_joint.png}{(b) Okonomiyaki: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_okonomi_single_vs_joint.png}{(b) Okonomiyaki: rheometer + single + joint flow curves.}\\
         {\footnotesize (b) Okonomiyaki (cabbage pancake sauce)}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_milk_single_vs_joint.png}{(c) Moisturising milk: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_milk_single_vs_joint.png}{(c) Moisturising milk: rheometer + single + joint flow curves.}\\
         {\footnotesize (c) Moisturising milk}
-    \end{minipage}\\[6pt]
+    \end{minipage}\\[4pt]
     % Row 2: 3 panels
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_lotion_single_vs_joint.png}{(d) Lotion: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_lotion_single_vs_joint.png}{(d) Lotion: rheometer + single + joint flow curves.}\\
         {\footnotesize (d) Lotion}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_tonkatsu_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_tonkatsu_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer + single + joint flow curves.}\\
         {\footnotesize (e) Japanese pork-cutlet sauce}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[3.6cm]{\linewidth}{figs/real_world/y8q_sweetbean_single_vs_joint.png}{(f) Sweet bean paste: rheometer + single + joint flow curves.}\\
+        \figureorplaceholder[2.9cm]{\linewidth}{figs/real_world/y8q_sweetbean_single_vs_joint.png}{(f) Sweet bean paste: rheometer + single + joint flow curves.}\\
         {\footnotesize (f) Sweet bean paste}
     \end{minipage}
     \caption{Recovered Herschel--Bulkley flow curves on the
-    Hamamichi rheometer-reference panel, in the layout
-    of~\citet{hamamichi2023nonnewtonian} Fig.~$13$.  Dotted black:
-    parallel-plate rheometer sweep on the same batch.  Red:
-    single-setup recovery.  Blue: two-setup joint recovery.  The
-    panel deliberately shows the full six-material outcome rather
-    than only successful examples.  Several materials track the
-    rheometer sweep over the dam-break-supported shear-rate window;
-    others expose the same limitation seen in the synthetic replay
-    diagnostics, where the observation constrains the visible
-    dam-break flow more tightly than it constrains the individual
-    Herschel--Bulkley triple.  We therefore interpret the panel at
-    the flow-curve level, following the predecessor, and treat
-    material-wise parameter differences along the
-    $\sigma_Y$/$\eta$ ridge as diagnostics rather than hidden
-    failures.}
+    six Hamamichi rheometer-reference materials, following the layout
+    of~\citet{hamamichi2023nonnewtonian} Fig.~$13$. Dotted black:
+    parallel-plate rheometer sweep. Red: single-setup recovery. Blue:
+    two-setup joint recovery. The full panel is shown as a diagnostic:
+    close overlays mark agreement inside the dam-break shear-rate
+    support, while separated curves expose remaining ridge or real--sim
+    gap effects.}
     \Description{Two-by-three grid of log-log flow-curve overlays.
     Each panel shows a rotational-rheometer sweep alongside the
     single-setup and joint-setup flow curves recovered by our
@@ -1883,24 +1862,16 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
 
 \begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=\textwidth]{figs/real_world/snapdiff_okonomi_setup2.png}
-    \caption{Frame-by-frame silhouette diagnostic on Okonomiyaki at
-    setup-$2$ ($W=7.0$\,cm, $H=7.0$\,cm), the largest dam-break
-    geometry on the panel.  Top three rows: captured video, MPM
-    forward at the recovered $\hat{\boldsymbol{\theta}}$, MPM
-    forward at the rheometer-fitted
-    $\boldsymbol{\theta}^{\!\star}$.  Bottom three rows: pixel
-    differences (amplified $\times 5$): real$-$MPM$(\hat\theta)$,
-    real$-$MPM$(\theta^{\!\star})$, and MPM$(\hat\theta)\,-\,$%
-    MPM$(\theta^{\!\star})$.  The bottom row is consistently
-    smaller than the upper two, even though
-    $\hat{\boldsymbol{\theta}}=(0.78, 21.4, 98.0)$ and
-    $\boldsymbol{\theta}^{\!\star}=(0.50, 67.0, 87.2)$ differ
-    substantially in $n$ and $\eta$: the two triples sit on the
-    $(\eta,\sigma_Y)$-ridge of \S\ref{sec:inv-sy} and predict
-    visually identical dam-break trajectories inside the captured
-    window, so the residual real$-$MPM gap is the dominant source
-    of disagreement, not our parameter-recovery error.}
+    \includegraphics[width=0.88\textwidth]{figs/real_world/snapdiff_okonomi_setup2.png}
+    \caption{Frame-by-frame silhouette diagnostic on Okonomiyaki setup-$2$
+    ($W=7.0$\,cm, $H=7.0$\,cm). The top rows compare the captured
+    video, MPM replay at the recovered $\hat{\boldsymbol{\theta}}$, and
+    MPM replay at the rheometer-fitted $\boldsymbol{\theta}^{\!\star}$;
+    the lower rows show amplified pixel differences. The
+    MPM$(\hat\theta)$--MPM$(\theta^{\!\star})$ difference is smaller
+    than either real--MPM residual, illustrating that visually similar
+    dam-break trajectories can lie along the HB ridge while the
+    real--sim gap dominates the remaining silhouette error.}
     \Description{One silhouette diagnostic panel for Okonomiyaki
     setup-2: three rows of forward simulations (real, recovered
     theta, rheometer-truth theta) followed by three rows of pixel
@@ -1932,6 +1903,7 @@ Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.
 
+\FloatBarrier
 \subsection{Parameter Freshness for Time-Varying Materials}
 \label{sec:freshness}
 
@@ -2018,7 +1990,7 @@ three-point cadence regardless of inverse quality.
 
 \begin{figure}[!htbp]
     \centering
-    \figureorplaceholder[6cm]{\columnwidth}{figs/freshness/fresh_A1_identifiability.pdf}{Placeholder F-FRESH-A1:
+    \figureorplaceholder[3.8cm]{\columnwidth}{figs/freshness/fresh_A1_identifiability.pdf}{Placeholder F-FRESH-A1:
     Identifiability scatter. Left panel: $\hat T_k$ vs $T_k$
     log-log scatter for $T_k\in\{10,20,30,60,120\}$\,min, with
     identity line and the $T_k=\infty$ control plotted on the right
@@ -2074,7 +2046,7 @@ boundary candidly is part of the claim.
 
 \begin{figure*}[!htbp]
     \centering
-    \widefigureorplaceholder[5cm]{\textwidth}{figs/freshness/fresh_B1_staleness.pdf}{Placeholder F-FRESH-B1:
+    \widefigureorplaceholder[3.6cm]{\textwidth}{figs/freshness/fresh_B1_staleness.pdf}{Placeholder F-FRESH-B1:
     Three-panel staleness counterfactual (fast / medium / slow $T_k$
     scenarios). In each panel, the ground-truth flow curve
     $\tau(\dot\gamma)$ at $t=0$ is plotted in black; the cloud of
@@ -2199,7 +2171,7 @@ chunky conditions where rheometer references are unavailable.
 
 \begin{figure*}[!htbp]
     \centering
-    \widefigureorplaceholder[5cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
+    \widefigureorplaceholder[3.6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
       seven-panel $\sigma_Y(t)$ figure (one per Tab.~\ref{tab:fresh-mats} row).
       Each panel shows the three recovered $\hat{\sigma}_{Y}(t_i)$
       estimates at $t\in\{0,20,40\}$\,min with Laplace 95\% CI bars
@@ -2247,7 +2219,7 @@ Pancake mix $70\%$      & ---  & --- & ---  & ---  & ---  \\
 
 \begin{figure}[!htbp]
     \centering
-    \figureorplaceholder[4.5cm]{\columnwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
+    \figureorplaceholder[3.2cm]{\columnwidth}{figs/freshness/material_demos.pdf}{Placeholder F-FRESH-DEMOS:
       representative stills from the calibrated dam-break videos.
       Rows: selected smooth and chunky conditions. Columns:
       $t \in \{0,20,40\}$\,min. Each cell shows the observed frame
@@ -2301,7 +2273,7 @@ flow-curve space.
 
 \begin{figure}[!htbp]
     \centering
-    \figureorplaceholder[6cm]{\columnwidth}{figs/freshness/fresh_D1_real_staleness.pdf}{Placeholder F-FRESH-D1:
+    \figureorplaceholder[3.8cm]{\columnwidth}{figs/freshness/fresh_D1_real_staleness.pdf}{Placeholder F-FRESH-D1:
     Real-material staleness on katakuriko $5\%$. Flow-curve overlay
     in log-log: black is the reference same-batch $t=0$/$t=0$ joint;
     blue is the same-batch $t=0$/$t=40$ delayed joint; red is the
@@ -2382,6 +2354,7 @@ wall-clock in our pipeline, rather than a comparable manual preprocessing
 budget followed by hours of MPM-in-loop inversion. The practical effect is
 not only lower latency, but access to freshness and multi-setup
 measurements inside a single user session.
+\FloatBarrier
 \section{Discussion and Conclusion}
 \label{sec:discussion}
 
