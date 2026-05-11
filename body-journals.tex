@@ -1634,21 +1634,12 @@ $R^2$            & 0.9995 & 0.9996 & 0.9995 & 0.9994 & 0.9993 & 0.9992 & 0.9990 
 \end{table}
 
 \paragraph{Per-sub regression quality.}
-Among the $1{,}484$ sub-experts that received at least five held-out
-MPM rows, the median per-sub $R^2$ is
-$0.998$ (Fig.~\ref{fig:expert-r2}). The lower $5\,\%$ tail of subs
-sits at $R^2 = 0.965$; these are subs near the partition boundaries
-or with the smallest training-set sizes (the smallest sub holds
-$63$ MPM samples), but even on those subs the held-out per-sub MAE
-stays under $0.5$\,cm. The upper $95\,\%$ tail of subs reaches the
-floating-point ceiling at $R^2 \approx 1.000$; these are well-supported
-subs in the dense interior of the parameter box. The single worst
-sub-expert has $R^2 = 0.705$ on $25$ test rows; this and the next
-handful of low-$R^2$ subs are recently infilled local cells whose
-training set has not yet been densified to the same level as the
-production interior, and which the inverse-time top-$1$ rerank
-(\S\ref{sec:surr-top1}) avoids except for explicitly near-boundary
-queries.
+Across the $1{,}484$ sub-experts with at least five held-out rows, the
+median per-sub $R^2$ is $0.998$ and the lower $5\,\%$ tail remains at
+$0.965$. Even these boundary or low-sample subs stay below
+$0.5$\,cm held-out MAE; the few lower outliers are recently infilled
+local cells that the inverse-time rerank avoids except for explicitly
+near-boundary queries.
 
 \begin{figure}[!htbp]
     \centering
@@ -1665,25 +1656,6 @@ queries.
     samples; the cloud follows the identity line within line width
     across the full range for each of the eight flow-front frames.}
     \label{fig:parity}
-\end{figure}
-
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width=\columnwidth]{figs/moe_r2_boxplot.png}
-    \caption{Per-sub-expert $R^2$ distribution across the $1{,}484$
-    sub-experts with $\ge 5$ held-out test rows, grouped by the $25$
-    geometry sub-banks. Median $R^2 = 0.998$ (red dashed line),
-    $p_5 = 0.965$ (grey dotted line), upper-tail subs reach
-    $R^2 \approx 1.000$. The lowest outliers come from recently
-    infilled cells in $g\in\{1,2,5\}$ whose training set has not yet
-    been densified to the same level as the production interior; the
-    inverse-time top-$1$ rerank avoids these except for explicitly
-    near-boundary queries.}
-    \Description{Box plot of coefficient-of-determination R-squared
-    values across 1484 sub-experts grouped by 25 geometry sub-banks;
-    the distribution is tight, centered above 0.99, with a small
-    number of outliers in recently-infilled cells.}
-    \label{fig:expert-r2}
 \end{figure}
 
 \paragraph{Posterior-uncertainty calibration.}
@@ -1776,29 +1748,11 @@ the real profile, described in \S\ref{sec:rheometer}, setup-$2$ instead
 keeps top-$10$ terminal-displacement candidates and uses conservative
 selection for camera noise and real--sim discrepancy.
 
-\begin{table}[!htbp]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{5pt}
-\caption{Held-out synthetic routing diagnostic on $100$ test
-observations before inverse optimisation. ``Hit'' means the routed
-candidate set contains the oracle sub-expert assigned to the held-out
-MPM row. The simulator-matched nearest-neighbour profile has the best
-synthetic recall.  Single-setup inverses use the final top-$1$ expert;
-two-setup inverses keep only a small discrete setup-$2$ candidate set
-rather than broad union boxes.}
-\label{tab:sim-routing-diagnostic}
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Rerank profile & Hit@1 & Hit@3 & Hit@10 \\
-\midrule
-\texttt{real\_robust} ($y_8$ evidence) & $21/100$ & $59/100$ & $96/100$ \\
-Full-trajectory median                 & $26/100$ & $68/100$ & $97/100$ \\
-\texttt{sim\_precision} (full NN)       & $61/100$ & $97/100$ & $100/100$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
+A held-out $100$-row routing diagnostic confirmed the profile choice:
+\texttt{sim\_precision} recovers the oracle sub-expert in $61/100$
+cases at top-$1$, $97/100$ at top-$3$, and $100/100$ at top-$10$,
+whereas the real-robust terminal-displacement score trades synthetic
+recall for camera-noise robustness.
 \paragraph{Hamamichi-matched synthetic panel.}
 The simulation-in-the-loop predecessor reports its main synthetic
 validation on $30$ cases ($6$ materials $\times\,5$ random initial
@@ -1869,31 +1823,14 @@ $2$ & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ \\
     \label{fig:flow-error-cdf}
 \end{figure}
 
-\paragraph{Flow-level replay and shear-rate coverage.}
-Following the spirit of the predecessor's simulated-flow and flow-curve
-diagnostics, we replay every recovered $\hat{\boldsymbol{\theta}}$ in
-MLS-MPM and compare the resulting trajectory against the simulator
-observation.  Figure~\ref{fig:replay-scatter} shows that parameter
-error and forward replay error are correlated but not identical:
-sliding along the HB ridge can move $\eta$ and $\sigma_Y$ while leaving
-the dam-break trajectory nearly unchanged.  We therefore also report
-flow-curve overlays and the actual $\dot\gamma$ ranges visited by
-diagnostic replay categories in Figs.~\ref{fig:flowcurve-syn} and
-\ref{fig:gamma-replay}.
-
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width=\columnwidth]{figs/results/erel_vs_flow_error.png}
-    \caption{Parameter error versus MLS-MPM replay flow-front error on
-    the $N=30$ synthetic panel.  The off-diagonal cases are the
-    expected HB-ridge behaviour: a parameter triple may miss the
-    normalised $E_{\mathrm{rel}}$ threshold while still reproducing the
-    dam-break flow front.}
-    \Description{Scatter plot of parameter relative error against MPM
-    replay flow-front error.}
-    \label{fig:replay-scatter}
-\end{figure}
-
+\paragraph{Flow-level replay.}
+Following the predecessor's simulated-flow diagnostics, we replay every
+recovered $\hat{\boldsymbol{\theta}}$ in MLS-MPM. Parameter error and
+forward replay error are correlated but not identical: sliding along the
+HB ridge can move $\eta$ and $\sigma_Y$ while leaving the dam-break
+trajectory nearly unchanged. We therefore report both the scalar replay
+CDF in Fig.~\ref{fig:flow-error-cdf} and representative flow-curve
+overlays in Fig.~\ref{fig:flowcurve-syn}.
 \paragraph{Recovered flow curves on synthetic samples.}
 Beyond the scalar parameter recovery of
 Table~\ref{tab:setup-ablation}, the recovered Herschel--Bulkley
@@ -1920,24 +1857,6 @@ diagnostic.
     diagnostic synthetic categories selected from the replay diagnostic.}
     \label{fig:flowcurve-syn}
 \end{figure}
-
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width=\columnwidth]{figs/results/gamma_representatives.png}
-    \caption{Particle-level shear-rate coverage during MLS-MPM replay
-    of the same diagnostic categories as Fig.~\ref{fig:flowcurve-syn}.
-    Vertical bars show the
-    $5$--$95$ percentile range of $\dot\gamma$ over particles and
-    frames; dots show the median.  Most replay trajectories spend
-    substantial mass inside the HB-fit window, explaining why flow
-    curves remain meaningful even when the parameter triple moves
-    along an identifiability ridge.}
-    \Description{Shear-rate percentile ranges for five diagnostic
-    MLS-MPM replay categories, with rheometer and HB-fit windows shaded.}
-    \label{fig:gamma-replay}
-\end{figure}
-
-
 
 \subsection{Validation Against Parallel-Plate Rheometers}
 \label{sec:rheometer}
@@ -2233,12 +2152,11 @@ are judged by within-batch consistency, visual replay, and
 concentration trends rather than by plate-rheometer data.
 
 \paragraph{Validation against independent anchors.}
-Table~\ref{tab:fresh-anchors} lists the anchors used by V3.1. The
-synthetic layer is the only one with known ground truth for the
-entire kinetic trajectory; the real layer is designed to test
-physical plausibility and experimental usefulness under the
-constraints that make freshness matter in the first place.
-
+The synthetic layer provides known kinetic ground truth; the real layer
+checks within-batch trajectories against repeat-batch drift, smooth-material
+24-hour rheometer plateaus, concentration scaling, and visual MPM replay.
+Together these anchors test physical plausibility without requiring a
+rheometer truth curve for every evolving or chunky material.
 \begin{figure*}[!htbp]
     \centering
     \widefigureorplaceholder[6cm]{\textwidth}{figs/freshness/sigmaY_kinetics_panel.pdf}{Placeholder F-FRESH-TRAJ:
@@ -2287,54 +2205,6 @@ constraints that make freshness matter in the first place.
     front with simulation under the recovered parameters.}
     \label{fig:fresh-demos}
 \end{figure*}
-
-\begin{table}[!htbp]
-\centering
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\caption{Validation anchors used by the V3.1 freshness protocol.
-The synthetic layer tests numerical recovery against known kinetic
-ground truth; the real layer tests within-batch usefulness, repeat
-batch drift, smooth-material rheometer plateaus, and visual replay.}
-\label{tab:fresh-anchors}
-\begin{tabular}{@{}lp{0.55\linewidth}@{}}
-\toprule
-Anchor & Description \\
-\midrule
-A. Synthetic kinetic control
-       & Prescribe $\boldsymbol{\theta}(t)$ in simulation, run the
-         same two-setup inverse used for real captures, and report
-         recovery error for $(T_k,\sigma_{Y,\infty})$. \\
-B. Within-batch real trajectory
-       & For each real condition, recover
-         $\hat{\sigma}_Y(t)$ at $t=\{0,20,40\}$\,min from one
-         prepared batch, avoiding cross-day preparation drift. \\
-C. Repeat-batch drift
-       & Repeat katakuriko $5\%$ as independent Batch~A and Batch~B;
-         compare recovered $(T_k,\sigma_{Y,\infty})$ to quantify
-         how much a staggered cross-batch protocol would mix
-         different materials. \\
-D. Rheometer plateau ($t=24$\,h)
-       & Parallel-plate measurement
-         \cite{macosko1994rheology} on smooth starch conditions;
-         compare against the fitted asymptote
-         $\sigma_{Y,\infty}$. \\
-E. Concentration scaling
-       & Check that paired concentrations follow the expected
-         $\sigma_{Y,\infty}\propto c^{\alpha}$ trend for starch
-         network build-up, with $\alpha$ in the broad literature
-         range $[2,5]$
-         \cite{hoover2001composition,roos1995phase}. \\
-F. Visual MPM($\hat{\boldsymbol{\theta}}$) replay
-       & MPM forward simulation under recovered
-         $\hat{\boldsymbol{\theta}}(t_i)$, rendered through the
-         calibrated camera and overlaid on the captured dam-break
-         video frame-by-frame
-         \cite{roache1998verification}. \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \paragraph{Why freshness is the headline contribution.}
 At $\sim 8$\,h per setup, a simulation-in-the-loop inverse can
 return at most one joint estimate after the material has already
@@ -2351,111 +2221,41 @@ inverse rheology on a batch that is still changing.
 \subsection{End-to-End Capture-to-Parameter Time Budget}
 \label{sec:timebudget}
 
-We close the evaluation by looking at \emph{total} time from raw
-phone video to a recovered Herschel--Bulkley triple. Two time sinks
-dominate: the manual capture-and-calibration workflow that takes an
-experimenter's attention, and the automated inverse that takes
-compute. Both are substantially shorter in our pipeline than in the
-direct predecessor's.
-
-\paragraph{Manual capture and calibration time.}
-Table~\ref{tab:calib-time} breaks the human-in-the-loop portion of
-the pipeline into its four steps. The predecessor's camera
-calibration goes through \texttt{fSpy} (manual vanishing-point
-fitting) followed by \texttt{Blender} (manual alignment and
-background render), which together consume nearly $16$\,min of
-attention per capture and are the dominant source of manual
-variance. Our two-stage ChArUco + OpenGL calibration
-(\S\ref{sec:calib}) replaces both steps with a single non-interactive
-invocation that completes in $1$\,min\,$12$\,s on a consumer laptop,
-saving an average of $14$\,min\,$43$\,s per capture. Video editing
-(\texttt{Premiere Pro} frame selection) and mask cleanup
-(\texttt{Photoshop}) are unchanged, because they operate on the raw
-footage and are orthogonal to the calibration method. End-to-end,
-the manual workflow drops from $25$\,min to $10$\,min per capture.
+We separate the speed comparison into the human-attention cost before
+inverse and the automated CMA-ES inverse cost. The predecessor's manual
+camera workflow uses \texttt{fSpy} plus \texttt{Blender} alignment, while
+our ChArUco + OpenGL calibration replaces that step with a single
+non-interactive solve. The inverse comparison isolates the compute stage:
+it excludes preparation, capture, segmentation, and calibration, matching
+the simulation-in-the-loop runtime reported for the predecessor.
 
 \begin{table}[!htbp]
 \centering
 \small
-\caption{Manual capture-and-calibration wall-clock per material.
-Step-by-step timings adopted from the workflow study
-of~\cite{hamamichi2023nonnewtonian}-style pipelines, measured on the
-same experimenter and hardware. The calibration row is the
-only step affected by our method.}
-\label{tab:calib-time}
-\begin{tabular}{@{}lrr@{}}
-\toprule
-Step & Predecessor (mm:ss) & Ours (mm:ss) \\
-\midrule
-Video trimming (\texttt{Premiere Pro})
-  & $2{:}27$ & $2{:}27$ \\
-Camera calibration
-  & \texttt{fSpy}  $4{:}28$ & ChArUco $1{:}12$ \\
-  & \texttt{Blender} $11{:}28$ & (automatic)  \\
-\,\quad \textit{calibration subtotal}
-  & \textbf{$15{:}56$} & \textbf{$1{:}12$} \\
-Mask cleanup (\texttt{Photoshop})
-  & $6{:}30$ & $6{:}30$ \\
-\midrule
-\textbf{Manual total} & \textbf{$24{:}53$} & \textbf{$10{:}10$} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\paragraph{Automated inverse time.}
-The compute-side comparison isolates the CMA-ES inverse stage only; it
-excludes material preparation, video capture, segmentation, and camera
-calibration. This is the fairest comparison because the predecessor's
-reported runtime is an MPM-in-the-loop inverse cost, not a full
-experiment-preparation cost. In the single-setup setting,
-Algorithm~\ref{alg:invert} takes a median of $12$\,s per material on a
-single consumer GPU. The corresponding simulation-in-the-loop inverse
-reported by \citet{hamamichi2023nonnewtonian} takes roughly $8$\,h per
-material, because every CMA-ES candidate requires an MLS-MPM forward
-simulation. The single-setup CMA-ES stage is therefore accelerated by
-about $2.4\times 10^{3}$.
-
-For two setups, we compare the same inverse stage after both videos have
-already been processed. Our deployed real-material profile uses setup-$1$
-as a top-$1$ anchor and setup-$2$ as routed candidate-basin hypotheses;
-the six rheometer-reference materials in Table~\ref{tab:rheo-recovery}
-finish in $17$--$30$\,s per material. A two-setup MPM-in-the-loop
-baseline would require two independent CMA-ES inverse stages, about
-$16$\,h per material under the same $8$\,h-per-setup cost model. Taking
-$22$\,s as the typical two-setup surrogate inverse time, the two-setup
-CMA-ES stage is accelerated by about $2.6\times 10^{3}$.
-\begin{table}[!htbp]
-\centering
-\small
-\caption{Automated CMA-ES inverse time per material, separated from
-manual preparation and video processing. Predecessor timings are the
-reported MLS-MPM-in-the-loop inverse cost; our timings are surrogate
-CMA-ES wall-clock on one consumer GPU.}
-\label{tab:inverse-time}
+\caption{Per-material time budget split into manual processing and
+CMA-ES inverse. Manual rows are wall-clock user-attention time; inverse
+rows are compute time after observations are available.}
+\label{tab:time-budget}
 \begin{tabular}{@{}lccc@{}}
 \toprule
-Inverse stage & Predecessor & Ours & Speedup \\
+Stage & Predecessor & Ours & Gain \\
 \midrule
-Single setup & $\sim 8$\,h & $12$\,s & $2.4\times10^{3}$ \\
-Two setup & $\sim 16$\,h & $17$--$30$\,s & $2.6\times10^{3}$ \\
+Video trim & $2{:}27$ & $2{:}27$ & -- \\
+Camera calibration & $15{:}56$ & $1{:}12$ & $13.3\times$ \\
+Mask cleanup & $6{:}30$ & $6{:}30$ & -- \\
+\textbf{Manual total} & \textbf{$24{:}53$} & \textbf{$10{:}10$} & \textbf{$2.4\times$} \\
+\midrule
+Single-setup inverse & $\sim 8$\,h & $12$\,s & $2.4\times10^{3}$ \\
+Two-setup inverse & $\sim 16$\,h & $17$--$30$\,s & $2.6\times10^{3}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{End-to-end.}
-Combining the two components, our per-material pipeline finishes in
-roughly $10$--$11$\,min of wall-clock (manual $\sim\!10$\,min
-$+$ automated $\le 1$\,min), versus roughly $25$\,min of manual
-processing followed by additional hours of MPM-in-loop inversion under
-the predecessor---a difference of more than an order of magnitude in
-both the human-attention budget and the compute budget. More
-importantly, the automated portion completes within the time window
-of a single user session, which is what makes the freshness,
-fieldable-capture, and multi-setup capabilities of
-\S\ref{sec:freshness}--\ref{sec:rheometer} practically accessible
-rather than nominal.
-
-
+Thus a per-material run finishes in roughly $10$--$11$\,min of
+wall-clock in our pipeline, rather than a comparable manual preprocessing
+budget followed by hours of MPM-in-loop inversion. The practical effect is
+not only lower latency, but access to freshness and multi-setup
+measurements inside a single user session.
 \section{Discussion and Conclusion}
 \label{sec:discussion}
 

@@ -265,52 +265,7 @@ non-Newtonian fluids, video-based estimation,
 surrogate-accelerated inverse, camera calibration}
 
 
-% --- Teaser figure --------------------------------------------------
-% The acmart \begin{teaserfigure}...\end{teaserfigure} environment
-% places a wide hero figure between the title/author block and the
-% abstract on the first page. Placeholder content is rendered while
-% \figplaceholdertrue is set in the preamble; replace with the final
-% \includegraphics{figs/teaser.pdf} for the camera-ready.
-\begin{teaserfigure}
-\centering
-\widefigureorplaceholder[5.5cm]{\textwidth}{figs/teaser.pdf}{Placeholder TEASER (5 panels):
-    \emph{(a)} smartphone capturing a dam-break flow alongside a
-    printed ChArUco board next to the rectangular container;
-    \emph{(b)} automatic two-stage camera calibration $\to$ recovered
-    pose $(\mathbf{K}_{0}, R^{*}, \mathbf{t}^{*})$;
-    \emph{(c)} silhouette-based flow-front extraction at eight
-    uniformly spaced frames $\to$ observation vector
-    $\mathbf{y}_{\mathrm{obs}}\!\in\!\mathbb{R}_{\ge 0}^{8}$;
-    \emph{(d)} learned mixture-of-Gaussian-process surrogate replaces
-    MPM in the inverse loop, returning
-    $\hat{\boldsymbol{\theta}}{=}(\hat{\sigma}_{Y},\hat{\eta},\hat{n})$
-    in $\sim 12$\,s on a single consumer GPU
-    (vs.\ $\sim 8$\,h per setup with simulation-in-the-loop);
-    \emph{(e)} recovered parameters re-simulated in a new dam-break
-    geometry and in a scene-level MPM application.
-    To be replaced with a rendered figs/teaser.pdf.}
-\caption{Our pipeline turns a smartphone dam-break video into the
-Herschel--Bulkley triple $(\sigma_{Y}, \eta, n)$ in seconds.
-\emph{(a)}~The user captures a dam-break alongside a printed ChArUco
-board. \emph{(b)}~An automatic two-stage camera calibration recovers
-the camera pose. \emph{(c)}~A silhouette-based flow-front trace is
-extracted at eight uniformly-spaced frames to form
-$\mathbf{y}_{\mathrm{obs}}$. \emph{(d)}~A learned
-mixture-of-Gaussian-process surrogate replaces MPM inside a
-derivative-free optimiser, returning $\hat{\boldsymbol{\theta}}$ in
-roughly twelve seconds---versus the $\sim\!8$\,hour per-setup cost
-of the simulation-in-the-loop predecessor~\cite{hamamichi2023nonnewtonian}.
-\emph{(e)}~The recovered parameters reproduce the captured material
-under different dam-break geometries and in scene-level MPM
-simulations.}
-\Description{Five-panel teaser showing the full pipeline: smartphone
-dam-break capture with a ChArUco board, automatic camera
-calibration, silhouette-based flow-front extraction at eight frames,
-surrogate-accelerated inversion in seconds rather than hours, and
-re-simulation of the recovered material in new geometries.}
-\label{fig:teaser}
-\end{teaserfigure}
-
+% Teaser omitted in this draft to avoid duplicating the method overview.
 
 \maketitle
 
