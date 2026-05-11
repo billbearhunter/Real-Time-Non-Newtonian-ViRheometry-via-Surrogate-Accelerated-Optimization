@@ -28,15 +28,16 @@ payoffs that we evaluate in this paper:
     cooking cooldown---an hour-scale inversion returns a parameter
     describing a past state. The inferred value is stale by the time
     it is delivered.
-    \item \emph{Practical repeated real-fluid validation.} Comparing
-    multiple rheometer-referenced materials or repeated setups requires
-    running the inverse many times. At hours per setup, such panels are
-    limited to offline showcase studies; at seconds per setup, they fit
-    inside an ordinary measurement session.
+    \item \emph{Practical real-fluid validation and characterisation.}
+    Comparing multiple rheometer-referenced anchors, repeated setups,
+    or rheometer-infeasible material panels requires running the
+    inverse many times. At hours per setup, such panels are limited to
+    offline showcase studies; at seconds per setup, they fit inside an
+    ordinary measurement session.
 \end{itemize}
 
 We propose a surrogate-accelerated framework that compresses the
-inverse from hours to seconds per setup, making these two payoffs
+inverse from hours to seconds per setup, making these uses
 available within a practical workflow. The inverse core couples the
 first two components below, and the full capture-to-parameter system
 adds the third.
@@ -1360,14 +1361,16 @@ is performed on top of this bank.
 
 We evaluate the hierarchical mixture-of-GP surrogate (HMoGP) and the
 identifiability-aware inverse
-against five questions: (1) how faithfully does the surrogate
+against six questions: (1) how faithfully does the surrogate
 approximate the MPM forward model, (2) how accurately does the full
 inverse recover $\boldsymbol{\theta} = (\sigma_Y, \eta, n)$ on
 held-out samples, (3) what wall-clock reduction does the surrogate
 deliver relative to simulation-in-the-loop inversion, and (4) does
 the fast inverse remain consistent with independent rheometer
 measurements on the Hamamichi materials for which such references are
-available, and (5) can seconds-scale inversion recover a
+available, (5) does it remain useful in the rheometer-infeasible
+materials that motivate video rheometry, and (6) can seconds-scale
+inversion recover a
 time-varying yield-stress trajectory from repeated within-batch
 dam-break measurements?
 
@@ -1382,6 +1385,9 @@ synthetic benchmark of $30$ materials drawn from within the training
 box, each rendered via MPM at three container sizes (total $90$
 clips). \emph{$T_{\mathrm{real}}$} contains the six Hamamichi materials for
 which parallel-plate rheometer sweeps are available.
+\emph{$T_{\mathrm{infeasible}}$} contains the visibly particulate or
+chunky materials of \S\ref{sec:chunky}, for which controlled-gap
+rheometer sweeps are unavailable by design.
 \emph{$T_{\mathrm{fresh}}$} follows the freshness protocol of
 \S\ref{sec:freshness}:
 synthetic prescribed kinetic trajectories for ground-truth recovery,
@@ -1765,6 +1771,18 @@ an independent setup-$2$ single inverse.  We then overlay the recovered
 Herschel--Bulkley flow curve against the rheometer reference over the
 shear-rate range probed by the dam-break replay.
 
+This panel is an anchor rather than the final application regime of
+the method. The predecessor spends full MPM simulations inside the
+optimizer and can afford a more exhaustive search over
+ridge-equivalent parameter triples; our surrogate inverse instead
+targets the information that a dam-break observation supports under
+an interactive time budget. We therefore use the six rheometer
+materials to check that the recovered \emph{flow curves} and replays
+remain in the right accuracy regime, not to claim case-by-case
+identity with the predecessor's parameter triples. The materials for
+which video rheometry has no instrumental counterpart are evaluated
+separately in \S\ref{sec:chunky}.
+
 Following the convention of the predecessor's Table~$1$ and
 Fig.~$13$~\cite{hamamichi2023nonnewtonian}, the headline comparison
 is the flow-curve overlay against the parallel-plate rheometer
@@ -1905,6 +1923,73 @@ fluid and the idealized HB-MPM forward model.
 Per-parameter uncertainty along the ridge is reported by the
 local Laplace--Hessian $95\%$ interval (\S\ref{sec:inv-cma})
 rather than hidden by a hand-chosen prior.
+
+\subsection{Characterising Rheometer-Infeasible Materials}
+\label{sec:chunky}
+
+The intended application regime is not the smooth subset of
+\S\ref{sec:rheometer}, where a parallel-plate reference happens to be
+available, but materials for which such a reference is unavailable:
+chunky sauces, particulate suspensions, and mixed pastes whose
+inclusions are comparable to or larger than the rheometer gap. For
+these samples there is no meaningful parameter-triple ground truth
+from an instrument. The validation target therefore changes from
+``match a rheometer sweep'' to ``predict the observed dam-break
+motion and the qualitative free-surface behaviour under the recovered
+HB model.''
+
+We evaluate this regime by running the same capture, calibration,
+routing, and inverse pipeline on a panel of rheometer-infeasible
+materials and then replaying the recovered
+$\hat{\boldsymbol{\theta}}$ through MPM in the calibrated camera.
+The section reports two diagnostics. First, sim--real silhouette
+overlays quantify whether the recovered parameters reproduce the
+observed free-surface extent over the eight-frame dam-break
+trajectory. Second, side-by-side stills compare characteristic
+phenomena---surface curling in high-yield pastes, avalanche-like
+lump motion in particulate emulsions, and impact dips in thinner
+sauces---against the corresponding MPM replay. This is the target
+use case of the paper: \S\ref{sec:rheometer} anchors the surrogate
+inverse against materials with independent rheometer references,
+whereas this section asks whether the same seconds-scale inverse
+remains useful when no such instrument reference exists.
+
+\begin{figure*}[!htbp]
+    \centering
+    \widefigureorplaceholder[4.8cm]{\textwidth}{figs/real_world/rheometer_infeasible_replay.pdf}{Placeholder F-INFEASIBLE-REPLAY:
+    representative rheometer-infeasible materials. Each row shows a
+    captured dam-break frame, the MPM replay under the recovered
+    $\hat{\boldsymbol{\theta}}$, and an amplified silhouette
+    difference or IoU annotation.}
+    \caption{Sim--real replay diagnostics on materials outside the
+    reach of controlled-gap rheometry. Each sample is evaluated by
+    replaying the recovered Herschel--Bulkley parameters in MPM and
+    comparing the calibrated silhouette against the source video,
+    because no parallel-plate reference is available.}
+    \Description{A multi-row figure comparing captured dam-break
+    frames, MPM replays, and silhouette differences for visibly
+    particulate or chunky fluids that cannot be measured by a
+    controlled-gap rheometer.}
+    \label{fig:chunky-replay}
+\end{figure*}
+
+\begin{figure*}[!htbp]
+    \centering
+    \widefigureorplaceholder[4.8cm]{\textwidth}{figs/real_world/rheometer_infeasible_phenomena.pdf}{Placeholder F-INFEASIBLE-PHENOMENA:
+    side-by-side captured and replayed stills for three qualitative
+    free-surface behaviours: curling in high-yield paste,
+    avalanche/lump motion in particulate emulsion, and impact dip in
+    a thinner sauce.}
+    \caption{Qualitative free-surface phenomena on
+    rheometer-infeasible materials. The comparison asks whether the
+    parameters recovered from a short dam-break video reproduce the
+    visible flow behaviour that motivated the measurement, rather than
+    whether they match an unavailable rheometer sweep.}
+    \Description{A side-by-side grid of captured and simulated
+    dam-break stills showing qualitative free-surface behaviours on
+    materials with visible inclusions or mixed textures.}
+    \label{fig:chunky-phenomena}
+\end{figure*}
 
 \subsection{Parameter Freshness for Time-Varying Materials}
 \label{sec:freshness}
@@ -2358,15 +2443,16 @@ measurements inside a single user session.
 
 The immediate effect of our pipeline is a three-orders-of-magnitude
 reduction in per-video inverse cost. The seconds-scale inverse
-targets two payoffs evaluated in the results: \emph{freshness} for
-time-varying fluids (\S\ref{sec:freshness}) and fast
-\emph{rheometer-referenced validation} on the Hamamichi materials for
-which parallel-plate sweeps are available (\S\ref{sec:rheometer}).
-The first is a temporal improvement that turns ``hours to return a
-past state'' into ``seconds to return the current state.'' The
-second checks that replacing MPM-in-the-loop by a routed GP surrogate
-does not detach the recovered flow curves from independent
-instrumental rheology.
+supports three roles evaluated in the results. First,
+\S\ref{sec:rheometer} uses rheometer-feasible Hamamichi materials as
+an independent anchor, checking that replacing MPM-in-the-loop by a
+routed GP surrogate does not detach the recovered flow curves from
+instrumental rheology. Second, \S\ref{sec:chunky} moves to the target
+rheometer-infeasible regime, where sim--real replay and qualitative
+free-surface behaviour replace unavailable parallel-plate sweeps as
+the validation target. Third, \S\ref{sec:freshness} uses the same
+seconds-scale inverse for time-varying materials, turning ``hours to
+return a past state'' into ``seconds to return the current state.''
 
 \subsection{A Reusable Surrogate as a Community Asset}
 \label{sec:asset}
@@ -2450,10 +2536,11 @@ a replay-consistency-guarded two-setup joint inversion that
 preserves the single-setup recovery---both made practical by the
 surrogate.
 
-Beyond runtime reduction, the seconds-scale inverse makes two
-capabilities practical: fresh parameter estimates for time-varying
-fluids and fast real-fluid validation against the Hamamichi materials
-with parallel-plate rheometer references. We release the trained
+Beyond runtime reduction, the seconds-scale inverse makes three
+capabilities practical: fast rheometer-referenced anchoring on
+standard materials, replay-based characterisation of
+rheometer-infeasible fluids, and fresh parameter estimates for
+time-varying materials. We release the trained
 surrogate, the $295{,}419$-simulation MPM training corpus, and the
 inverse code as a reusable community artefact on which subsequent
 video-rheometry research can build without paying the simulation
