@@ -1265,6 +1265,9 @@ Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
 \section{Training Data and Frozen Configuration}
 \label{sec:data}
 
+% TODO[reviewer-fix]: corpus + sub-expert counts must match the values
+% used in §7.1 (corpus / holdout) and §7.2 (Tab. fidelity caption).
+% Currently 1,396 vs 1,491 vs 1,484 across the paper.
 All reported production results use a single frozen surrogate bank
 trained once and re-used across every reported experiment. The bank
 contains $25$ geometry-conditioned sub-banks holding $1{,}396$
@@ -1347,6 +1350,11 @@ time-varying yield-stress trajectory from repeated within-batch
 dam-break measurements?
 
 \paragraph{Datasets.}
+% TODO[reviewer-fix]: corpus / holdout numbers conflict across sections.
+%   §6 + Tab. 2 + §7.2 say: 425,831 routed rows, 42,583 held-out (10%);
+%   §7.1 + Acknowledgements say: 295,419 corpus, 22,209 held-out (~7.5%).
+%   Resolve to ONE canonical pair before submission, or explicitly state
+%   "295,419 unique simulations <-> 425,831 routed assignment rows".
 We use four evaluation sets. \emph{$T_{\mathrm{sim}}$} contains
 $22{,}209$ MPM samples held out from the $295{,}419$-row training
 corpus, sampled stratified over
@@ -1454,6 +1462,11 @@ subs.
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
+% TODO[reviewer-fix]: sub-expert count conflicts across sections.
+%   Tab. 2 says 1,396 total; this caption says 1,491 visited; line below
+%   says 1,484 with >=5 held-out rows; holdout sample count here is
+%   42,583 vs 22,209 in §7.1. Reconcile to one canonical pair (probably
+%   1,491 = post-infill total, 1,396 = pre-infill, but pick and propagate).
 \caption{Surrogate forward fidelity on $T_{\mathrm{sim}}$
 ($N=42{,}583$ held-out MPM rows, all $1{,}491$ sub-experts visited).
 Per-dim numbers are computed on the residual $\hat y_d - y_d$ across
@@ -2139,9 +2152,10 @@ $\sigma_Y$-identifiability ridge intact under a vanilla CMA-ES: the
 optimiser would slide to $\sigma_Y \to 0$ while inflating $\eta$ to
 match the observation. Conversely, the identifiability-aware inverse
 of \S\ref{sec:inverse} requires an accurate surrogate to be evaluated
-$300$ times per video within seconds; running the same inverse
-against a coarse surrogate would reintroduce surrogate bias as a new
-source of error. The hierarchical MoGP-rBCM surrogate and the
+at the $\mathcal{O}(10^{3})$ candidates issued by a multi-restart
+CMA-ES run within seconds (Tab.~\ref{tab:hyper});
+running the same inverse against a coarse surrogate would
+reintroduce surrogate bias as a new source of error. The hierarchical MoGP-rBCM surrogate and the
 GP-aware inverse---which keeps CMA-ES inside the routed expert's
 training support and reads the residual ridge through restart
 dispersion and the local Laplace--Hessian interval rather than
@@ -2221,13 +2235,16 @@ materials in which $\eta\,\dot\gamma^{\,n} \gg \sigma_Y$ across the
 entire dam-break shear-rate range, the flow front encodes
 essentially no information about $\sigma_Y$, and any inverse---ours
 included---returns an estimate determined by the prior and the
-training distribution rather than by the data. Among the $10$
-held-out samples of Table~\ref{tab:setup-ablation}, one such material
-($\sigma_Y^{\mathrm{true}} \approx 0.39$\,Pa in a low-$\eta$ regime)
-pushes the $\sigma_Y$ \emph{mean} to $7.0$ while the nine remaining
-samples sit at median $0.298$. This is a task-level bound, not a
-method bound; the appropriate mitigation is the multi-setup protocol
-of \S\ref{sec:mainresults}.
+training distribution rather than by the data. The $N=30$ held-out
+panel of Table~\ref{tab:setup-ablation} contains low-$\sigma_Y$
+samples in this regime; their estimates are dominated by the prior
+rather than by the data, and contribute disproportionately to the
+$\sigma_Y$ mean relative to its median. This is a task-level bound,
+not a method bound; the appropriate mitigation is the multi-setup
+protocol of \S\ref{sec:mainresults}.
+% TODO[reviewer-fix]: replace with concrete outlier count + (mean, median)
+% of sigma_Y recomputed on the current N=30 panel; old text had stale
+% 1+9=10 arithmetic from the earlier N=10 version of Table 4.
 
 \subsection{Dependence on Training-Set Coverage}
 The surrogate is trustworthy only inside the input box on which it
@@ -2257,14 +2274,14 @@ Camera calibration uses a printed ChArUco marker board; markerless
 calibration from natural scene content is possible in principle but
 not demonstrated here.
 
-\subsection{Real-Time as a Direction}
+\subsection{Toward Interactive-Rate Inversion}
 Our median wall-clock is $12$\,s per video on a single consumer
-GPU---seconds-scale but not millisecond-scale. The ``real-time'' of
-our title should be read as \emph{fast enough to fit within a single
-user interaction} rather than strict continuous-time inversion.
-Reducing latency further through surrogate distillation, query-time
+GPU---seconds-scale but not millisecond-scale. The ``fast'' of our
+title denotes \emph{fast enough to fit within a single user
+interaction}; strict continuous-time inversion is a further open
+direction, reachable through surrogate distillation, query-time
 adaptive $K_{\mathrm{geo}}$ selection, or amortised cross-material
-inverse is an open direction.
+inverse.
 
 
 % --- Acknowledgements -------------------------------------------------
