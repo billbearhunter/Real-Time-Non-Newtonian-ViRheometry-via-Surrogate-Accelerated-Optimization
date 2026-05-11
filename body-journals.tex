@@ -1293,12 +1293,15 @@ $\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and $W,H\in[2,7]$ cm. No
 material-specific retraining or per-experiment hyperparameter sweep
 is performed on top of this bank.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
+\begingroup
 \centering
-\small
 \caption{Frozen configuration used throughout the evaluation.}
 \label{tab:hyper}
-\begin{tabular}{@{}p{0.36\linewidth}p{0.58\linewidth}@{}}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{0.86}
+\begin{tabular}{@{}p{0.34\linewidth}p{0.60\linewidth}@{}}
 \toprule
 \textit{Training data} & \\
 \quad unique training MPM simulations & $295{,}419$ \\
@@ -1344,6 +1347,7 @@ is performed on top of this bank.
 \quad CI reporting                  & numerical Hessian / Laplace 95\% CI \\
 \bottomrule
 \end{tabular}
+\endgroup
 \end{table}
 
 
@@ -1691,9 +1695,9 @@ Ours, 2 setups & $15/30$ ($50.0\%$) & $0.071$ & $\mathbf{0.160}$ & $0.268$ \\
 \end{tabular}
 \end{table}
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
     \centering
-    \includegraphics[width=\columnwidth]{figs/results/flow_error_cdf.png}
+    \includegraphics[width=0.88\columnwidth,height=0.22\textheight,keepaspectratio]{figs/results/flow_error_cdf.png}
     \caption{Parameter recovery and MLS-MPM replay error on the
     Hamamichi-matched $N=30$ synthetic panel.  The parameter threshold
     $E_{\mathrm{rel}}=0.1$ follows~\citet{hamamichi2023nonnewtonian}.
@@ -1858,9 +1862,9 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
     \label{fig:flow-real}
 \end{figure*}
 
-\begin{figure*}[!htbp]
+\begin{figure*}[!t]
     \centering
-    \includegraphics[width=0.88\textwidth]{figs/real_world/snapdiff_okonomi_setup2.png}
+    \includegraphics[width=0.72\textwidth,height=0.38\textheight,keepaspectratio]{figs/real_world/snapdiff_okonomi_setup2.png}
     \caption{Frame-by-frame silhouette diagnostic on Okonomiyaki setup-$2$
     ($W=7.0$\,cm, $H=7.0$\,cm). The top rows compare the captured
     video, MPM replay at the recovered $\hat{\boldsymbol{\theta}}$, and
