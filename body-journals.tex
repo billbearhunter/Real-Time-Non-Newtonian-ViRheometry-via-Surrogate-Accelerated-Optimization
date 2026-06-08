@@ -24,8 +24,8 @@ relation cheap enough for interactive inverse queries, ambiguity
 diagnostics, and repeated freshness checks.
 
 The method therefore consists of two core algorithmic components and a
-validation program. We propose a surrogate-accelerated framework that
-compresses the inverse from hours to seconds per experimental setup: in the evaluated
+validation program. We present a surrogate-accelerated framework that
+reduces the inverse from hours to seconds per experimental setup: in the evaluated
 implementation, a $512$-candidate inverse scoring and plausible-set
 summary pass takes $3.63$\,s per case/setup, and one surrogate
 candidate/setup evaluation takes $7.09$\,ms. We validate forward
@@ -1813,7 +1813,7 @@ the inverse objective, reducing overconfident use of the GP mean when
 ranking candidates.
 
 
-\subsection{Synthetic Validation at Scale}
+\subsection{Validation via 3D Emulations}
 \label{sec:mainresults}
 
 Following the validation protocol
@@ -1983,7 +1983,7 @@ the HB ridge. We therefore treat synthetic flow-curve overlays as a
 supplementary diagnostic and keep the main synthetic evidence focused
 on retained-set survival, rank, shrinkage, and tail behaviour.
 
-\subsection{Validation Against Parallel-Plate Rheometers}
+\subsection{Validation via 3D Real-World Experiments}
 \label{sec:rheometer}
 
 The real-fluid validation is restricted to the six Hamamichi
@@ -2235,7 +2235,7 @@ the ridge should be reported by plausible-set diameter, setup-wise
 consistency, and optional local curvature diagnostics
 (\S\ref{sec:inv-ranking}) rather than hidden by a hand-chosen prior.
 
-\subsection{Parameter Freshness for Time-Varying Materials}
+\subsection{Application to Same-Session Freshness Checks}
 \label{sec:freshness}
 
 The predecessor's sequential two-setup protocol chooses setup~2 after
@@ -2314,7 +2314,7 @@ identifiability study for the chosen kinetic model. The validated claim
 is narrower: seconds-scale inverse makes same-session held-out setup
 validation practical.
 
-\subsection{Validated Compute-Stage Time Budget}
+\subsection{Compute-Stage Time Budget}
 \label{sec:timebudget}
 
 We time the automated inverse stage replaced by the GP surrogate,
@@ -2452,53 +2452,57 @@ a physics-grounded inverse, not a replacement for the physical model.
 \section{Limitations and Future Work}
 \label{sec:limitations}
 
-The most important limitation is selection, not forward fidelity. The
-GP bank is accurate on held-out MPM data, and the retained sets usually
-contain a near-truth candidate in synthetic tests, but the lowest-score
-candidate is still unreliable. This means that the present method
-should be used as an ambiguity-aware inverse: it can report plausible
-basins and test whether additional setups shrink them, but it should
-not be interpreted as a fully automatic unique-parameter estimator.
-Future work should therefore focus on selector validation under
-held-out MPM replay, less aggressive plausibility gates, and scoring
-rules that are trained or calibrated specifically to rank near-truth
-candidates ahead of surrogate-favoured false basins.
+There are several limitations in our work. First, the present inverse
+does not guarantee that the lowest-score candidate is the true material
+parameter. The GP bank is accurate on held-out MPM data, and the
+retained sets usually contain a near-truth candidate in the synthetic
+tests, but the rank-$1$ candidate is still unreliable. Thus the current
+output should be read as an ambiguity-aware estimate: the method can
+report plausible basins and test whether additional setups reduce them,
+but it is not yet a fully automatic unique-parameter estimator. Future
+work should improve this selector by validating it against held-out MPM
+replays, relaxing overly aggressive plausibility gates, and calibrating
+scores so that near-truth candidates are ranked ahead of false basins
+that happen to fit the surrogate.
 
-The second limitation is coverage. The current surrogate is validated
-inside the cleaned fixed-density training box,
-$W,H\in[2,7]$\,cm and the sampled HB parameter ranges. The synthetic
-tail audit shows weaker retention at the extremes of $\eta$ and
-$\sigma_Y$, so extrapolating beyond the sampled box or relying on sparse
-tail leaves would be unjustified. A natural extension is targeted MPM
-sampling in the low-/high-$\eta$ and high-$\sigma_Y$ regions where the
-retained-set test fails most often, followed by the same forward,
-BAE, and inverse audits rather than only a new aggregate $R^2$.
+Second, the range of setups and material parameters implicitly defines
+the range where the estimate is reliable. The surrogate has been
+validated for $W,H\in[2,7]$\,cm, fixed density $\rho=1.0$, and the
+sampled Herschel--Bulkley parameter box. The synthetic tail audit shows
+weaker retention near the extremes of $\eta$ and $\sigma_Y$, and the
+real-material gamma-dot audit only checks the measured validation
+setups rather than all feasible setups. It would be useful to
+quantitatively investigate this shear-rate and parameter-space
+coverage, and to add targeted MPM samples in the low-/high-$\eta$ and
+high-$\sigma_Y$ regions where the retained-set test fails most often.
 
-The third limitation is physical model discrepancy. The real-material
-panel compares against rheometer-reference flow curves and binary-mask
-replays, but those observations include camera calibration,
-segmentation, wall/contact effects, and real--sim mismatch. The current
-MPM model represents HB rheology, gravity, and boundary contact, but it
-does not model surface tension, thixotropy, elastic overshoot,
+Third, the simulator and the real experiment are not identical. Thin
+materials that spread very quickly may require surface tension and more
+accurate gate-opening dynamics, while materials that barely flow may
+not provide enough motion to identify all three HB parameters. The
+real-material panel also includes camera calibration, segmentation,
+wall/contact effects, and real--sim mismatch. The current MPM model
+does not include surface tension, thixotropy, elastic overshoot,
 viscoelastic memory, evaporation, or time-dependent ageing. The
-freshness experiment should therefore be read as a same-session
-held-out setup diagnostic enabled by seconds-scale inverse, not as an
-identified kinetic material model. Extending the method to ageing or
-thixotropic materials would require time-indexed captures, a chosen
-constitutive evolution model, and a separate identifiability analysis.
+freshness experiment should therefore be read as same-session
+held-out setup validation enabled by seconds-scale inverse, not as a
+fitted kinetic material model.
 
-Finally, the setup and shear-rate analyses are diagnostic rather than
-globally optimal. The measured real-validation setup pairs excite
-shear-rate supports within the rheometer interval, but we did not sweep
-all feasible $(W,H)$ pairs to maximise shear-rate coverage or guarantee
-the most informative next setup. A future setup-policy study should
-combine the predecessor's Hessian/ridge logic with surrogate
-uncertainty and an explicit gamma-dot coverage objective, then evaluate
-it by retained-set shrinkage and near-truth survival. The implementation
-is also seconds-scale rather than millisecond-scale; this is sufficient
-for interactive repeated measurements, but a production system would
-benefit from batched GP evaluation, compiled candidate scoring, and
-GPU-resident retrieval.
+For future work, it would be beneficial to build a more complete
+measurement device and application workflow. Automating the setting of
+the dam-break dimensions, the opening of the front panel, camera
+calibration, segmentation, setup proposal, inverse inference,
+uncertainty reporting, held-out replay validation, and flow-curve
+export would reduce the manual workload and make the method easier to
+use as a practical video-rheometry tool. It would also be interesting
+to extend the surrogate-inverse protocol beyond the Herschel--Bulkley
+model, for example to elastic, thixotropic, shear-thickening, or other
+constitutive relations. Such an extension would require new simulator
+data, surrogate calibration, and identifiability tests rather than only
+changing the stress law. Finally, differentiable simulation or
+differentiable rendering could be used in future systems to handle more
+general flows or to estimate setup Hessians directly, while the present
+work keeps the online inverse fast by using an offline GP surrogate.
 
 
 % --- Acknowledgements -------------------------------------------------
