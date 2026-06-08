@@ -1780,8 +1780,8 @@ Global/fallback BAE
     $\boldsymbol{\theta}$ is scored under the routed local GP,
     leaf-level BAE variance, and observation-noise floor. The dashed
     lines and right panel report empirical score quantiles used as
-    conservative plausibility gates; at $95\%$, the RMS, second-frame,
-    and max-frame implausibility thresholds are
+    conservative plausibility gates; at $95\%$, the RMS,
+    second-largest-frame, and max-frame implausibility thresholds are
     $2.06$, $2.84$, and $3.13$, respectively.}
     \Description{Two-panel forward uncertainty calibration plot. The
     left panel shows histograms of true-theta RMS, second-largest-frame,
@@ -1793,8 +1793,8 @@ Global/fallback BAE
 Tab.~\ref{tab:fidelity} therefore establishes that the local GP bank
 reproduces MPM forward outputs to sub-cm accuracy on held-out test
 data. The BAE variance then carries the residual surrogate error into
-the inverse objective, which is essential for avoiding overconfident
-false-basin ranking.
+the inverse objective, reducing overconfident use of the GP mean when
+ranking candidates.
 
 
 \subsection{Synthetic Validation at Scale}
@@ -1840,15 +1840,17 @@ that set is, how many separate basins remain, and whether the
 best-scored point lies in a false basin.
 
 The predecessor evaluates synthetic materials with known parameters,
-declares $E_{\mathrm{rel}}\le0.1$ as good enough, and uses additional
-setups to disambiguate failures. We keep the same two principles:
-synthetic observations must have known ground truth, and later setups
-must be interpreted as disambiguation evidence rather than as a
-separate physical model. Replacing MPM by a GP surrogate adds a new
-question: whether the score selects the correct basin, or merely
+declares $E_{\mathrm{rel}}\le0.1$ as good enough, and applies the
+setup-selection loop case by case.  Starting from one dam-break setup,
+the inverse returns a current estimate; if the case is still ambiguous,
+the Hessian-based proposer chooses the next setup intended to cut
+across the local ridge.  The inverse is then rerun jointly on setups
+$1/2$, then on setups $1/2/3$, and finally on setups $1/2/3/4$.
+We keep this causal structure, but replacing MPM by a GP surrogate adds
+a new question: whether the score selects the correct basin, or merely
 retains it while ranking a surrogate-favoured false basin higher. The
 tables below therefore separate plausible-set coverage, ranking
-accuracy, retained-set size, and setup separability rather than
+accuracy, retained-set size, and sequential shrinkage rather than
 compressing them into a single point-estimate pass rate.
 
 All synthetic panels in this section use the same clean GP forward,
@@ -1906,36 +1908,39 @@ single $\boldsymbol{\theta}$. This is the main limitation of the current
 surrogate inverse and is reported directly rather than hidden by choosing
 a different selector.
 
-\paragraph{Setup-policy separation diagnostic.}
-The main pipeline uses the inherited Hessian-orthogonal setup policy,
-but the current GP evidence supports it only as a separability
-diagnostic.  We therefore evaluate setup proposals by asking whether a
-candidate setup would make retained representatives produce more
-distinct predicted trajectories.  Tab.~\ref{tab:setup-separation}
-reports the median tenth-percentile standardized pairwise separation
-over eight retained-representative cases; larger values indicate that
-even close pairs of representatives are easier to tell apart under the
-proposed setup.  The diagnostic confirms that setup choice changes
-candidate separability, but it does not establish a new recovery claim:
-the retained-set results in Tab.~\ref{tab:retained-contract} remain the
-main synthetic inverse evidence.
+\paragraph{Causal four-setup audit.}
+To mirror the predecessor's sequential protocol more directly, we also
+run a $30$-case causal audit.  Setup~1 is fixed, the setup~1 inverse
+produces a retained set, and the Hessian-orthogonal proposer selects
+setup~2 from that current ambiguity. The joint setup~1/2 inverse then
+selects setup~3, and the joint setup~1/2/3 inverse selects setup~4.
+Tab.~\ref{tab:hessian-seq30} reports each accumulated prefix. The
+retained fraction shrinks from $0.580$ after one setup to $0.258$
+after four setups, matching the intended disambiguation direction.
+However, near-truth retention also drops from $96.7\%$ to $90.0\%$,
+and rank-1 recovery remains poor. Thus the GP surrogate currently
+reproduces the \emph{workflow} of the multi-setup protocol, but its
+validated claim is retained-set disambiguation rather than
+predecessor-style automatic point recovery.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Setup-policy separation diagnostic on eight retained-set
-cases.  Entries are medians of the tenth-percentile standardized
-pairwise trajectory separation; higher values mean stronger predicted
-disambiguation among retained representatives.}
-\label{tab:setup-separation}
-\begin{tabular}{@{}lcccc@{}}
+\caption{Causal Hessian sequential audit on $30$ held-out synthetic
+cases.  Each row uses the accumulated setups selected up to that stage.
+``Retained close'' asks whether the plausible set still contains a
+near-truth candidate; ``Rank-1 close'' asks whether the best-scored
+candidate is near truth.}
+\label{tab:hessian-seq30}
+\begin{tabular}{@{}ccccc@{}}
 \toprule
-Policy & setup 1 & setup 2 & setup 3 & setup 4 \\
+Setups & Retained close & Rank-1 close & Plaus. frac. p50 & Basin p50 \\
 \midrule
-Fixed setup sequence & $0.134$ & $0.226$ & $0.202$ & $0.251$ \\
-Hessian-orthogonal & $0.144$ & $0.183$ & $0.205$ & $0.162$ \\
-GP-OED separation diagnostic & $0.169$ & $0.235$ & $0.218$ & $0.208$ \\
+1 & $96.7\%$ & $3.3\%$ & $0.580$ & $25.5$ \\
+2 & $100.0\%$ & $3.3\%$ & $0.457$ & $29.0$ \\
+3 & $93.3\%$ & $3.3\%$ & $0.350$ & $25.5$ \\
+4 & $90.0\%$ & $0.0\%$ & $0.258$ & $23.0$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1945,8 +1950,14 @@ Because $\eta$ and $\sigma_Y$ span several orders of magnitude, the
 synthetic validation also records where cases fall in the logarithmic
 parameter box.  This audit is necessary because range-normalized
 errors can hide failures at the small- and large-value tails.  The
-current contract reports retained-set coverage over the full held-out
-panel; it is not used to make a separate tail-specific recovery claim.
+four-setup sequential audit, middle-$\eta$ cases retain a near-truth
+candidate in $14/14$ cases, high-$\eta$ cases in $8/9$, and low-$\eta$
+cases in $5/7$. For $\sigma_Y$, the high tail is sparse but
+problematic: $2/3$ high-$\sigma_Y$ cases retain a near-truth candidate,
+while all $5/5$ low-$\sigma_Y$ cases do. The two cases extreme in both
+$\eta$ and $\sigma_Y$ retain the near-truth basin in only $1/2$ cases.
+These tail diagnostics prevent the aggregate retained-close rate from
+hiding failures at the edges of the rheological parameter box.
 
 \paragraph{Flow-level replay.}
 The retained-set tables evaluate whether a near-truth parameter remains
