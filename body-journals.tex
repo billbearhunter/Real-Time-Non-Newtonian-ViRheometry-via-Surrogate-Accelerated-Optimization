@@ -697,8 +697,9 @@ cases diagnosable by inspecting the selected expert's training box.
 \paragraph{Local Gaussian-Process Experts.}
 \label{sec:surr-experts}
 Each local expert is a tuple of eight independent exact GP regressors
-sharing the same expert-local scaled $5$-D input. The implementation
-uses a linear mean and a Mat\'ern-$5/2$ automatic-relevance-determination
+sharing the same expert-local scaled $5$-D input, following standard GP
+regression notation~\cite{rasmussen2006gaussian}. The implementation uses
+a linear mean and a Mat\'ern-$5/2$ automatic-relevance-determination
 (ARD) kernel with an added linear kernel,
 $k_s=k_{5/2}+k_{\mathrm{lin}}$. The Mat\'ern component is
 \begin{equation}
@@ -874,9 +875,11 @@ We record a support penalty
     +
     \left\|\max(\mathbf{z}-\mathbf{z}_{\max},0)\right\|_2^2 .
 \end{equation}
-This term is a ranking and diagnostic signal. It prevents a low
-trajectory residual in an extrapolative region from being mistaken for
-a well-supported material estimate.
+This term is a ranking and diagnostic signal, in the spirit of
+history-matching implausibility checks that rule out unsupported
+parameter regions rather than forcing a single fit~\cite{vernon2010galaxy}.
+It prevents a low trajectory residual in an extrapolative region from
+being mistaken for a well-supported material estimate.
 
 \paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
 \label{sec:inv-sy}
@@ -958,11 +961,11 @@ single compatible basin or has small diameter in $z$-space. Otherwise
 the inverse reports an ambiguous plausible set and requests additional
 setup evidence. In the reported experiments, $\mathcal{C}$ is the
 explicit retrieval/local-proposal archive described above and is ranked
-by the same GP/BAE score that a CMA-ES search could optimise. Thus the
-method should not be read as a claim that CMA-ES is inferior; the core
-change is that the expensive forward call has been amortised and the
-inverse decision is reported through explicit residual, uncertainty,
-support, and retained-set components.
+by the same GP/BAE score that a CMA-ES search~\cite{hansen2016cma} could
+optimise. Thus the method should not be read as a claim that CMA-ES is
+inferior; the core change is that the expensive forward call has been
+amortised and the inverse decision is reported through explicit residual,
+uncertainty, support, and retained-set components.
 
 \paragraph{Joint Multi-Setup Inverse.}
 \label{sec:inv-joint}
@@ -1087,26 +1090,27 @@ $\mathbf{P}_{w}$ to pixels via
           0     & 0     & 1
         \end{pmatrix}.
 \end{equation}
-Rather than optimising $(K, R, \mathbf{t})$ as $11$ free scalars, we
-exploit the fact that our rig is level and the camera looks at a
-fixed target, and parameterise the whole camera by a compact
-$6$-vector
+Rather than optimising $(K, R, \mathbf{t})$ as $11$ free scalars in the
+ChArUco initialisation, we exploit the fact that our rig is level and
+the camera looks at a fixed target, and parameterise the initial camera
+by a compact look-at vector
 \begin{equation}
 \label{eq:theta-cam}
     \boldsymbol{\theta}_{\mathrm{cam}}
     \;=\;
-    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,
+    (l_{x},\,l_{z},\,\theta_{E},\,\phi_{E},\,\psi_E,\,
     \mathrm{fov},\,d_{\mathrm{eye}}),
 \end{equation}
 where $\mathbf{l} = (l_{x}, 0, l_{z})^{\!\top}$ is the look-at point
 on the rig floor, $(\theta_{E}, \phi_{E})$ are the polar and
-azimuthal angles of the eye direction, $d_{\mathrm{eye}}$ is the
-eye--target distance, and $\mathrm{fov}$ is the vertical field of
-view. The camera roll is held fixed by construction (the rig is
-level and the renderer enforces a horizontal $\mathbf{C}_{x}$ axis,
-Eq.~\eqref{eq:basis}). The eye position and
-an orthonormal camera basis are then reconstructed deterministically
-from $\boldsymbol{\theta}_{\mathrm{cam}}$:
+azimuthal angles of the eye direction, $\psi_E$ is an XML-compatible
+roll slot, $d_{\mathrm{eye}}$ is the eye--target distance, and
+$\mathrm{fov}$ is the vertical field of view. In the Stage-1 projection
+used for ChArUco reprojection, roll is held fixed by construction (the
+rig is level and the renderer enforces a horizontal $\mathbf{C}_{x}$
+axis, Eq.~\eqref{eq:basis}). The eye position and an orthonormal camera
+basis are then reconstructed deterministically from
+$\boldsymbol{\theta}_{\mathrm{cam}}$:
 \begin{equation}
 \label{eq:eye}
     \mathbf{E}(\boldsymbol{\theta}_{\mathrm{cam}})
@@ -1191,78 +1195,69 @@ Nelder--Mead~\cite{nelder1965simplex}, returning
 $\mathbf{K}_{0}$ (from $\mathrm{fov}$ and image size) and an initial
 extrinsic $(R_{0}, \mathbf{t}_{0})$.
 
-\paragraph{Stage 2: silhouette-guided extrinsic refinement.}
+\paragraph{Stage 2: silhouette-guided pose refinement.}
 Stage~1 is typically accurate to a few pixels but the ChArUco board
-is not rigidly coupled to the container; Stage~2 fixes
-$\mathbf{K}_{0}$ and refines only the extrinsic so that the rendered
-container silhouette aligns with the reference frame $I_{0}$ at dam
-release, in two phases.
-
-\emph{Phase~A (smooth chamfer).}
-The Canny edge set~\cite{canny1986computational} of $I_{0}$ yields a
-target-edge pixel set $E$, from which we precompute an exact
-Euclidean distance
-transform~\cite{maurer2003linear,borgefors1986distance}
+is not rigidly coupled to the container; Stage~2 therefore uses the
+container silhouette in the dam-release frame $I_0$. The implementation
+first converts the Stage-1 look-at solution into a pinhole intrinsic
+matrix $\mathbf{K}_0$ and pose $(R_0,\mathbf{t}_0)$. It then projects the
+known rectangular container, takes the convex hull of the visible
+projected vertices, and snaps those vertices to nearest pixels on the
+target outer contour. This gives a sparse set of 3-D/2-D
+correspondences
 \begin{equation}
-\label{eq:edt}
-    D_{E}(p) \;=\;
-    \min_{q \in E}\,\|\,p - q\,\|_{2}
-    \qquad \text{for each pixel } p \in \Omega.
+\label{eq:pnp-corr}
+    \{(\mathbf{X}_m,\mathbf{u}_m)\}_{m=1}^{M},
+    \qquad
+    \mathbf{u}_m
+    =
+    \arg\min_{\mathbf{u}\in\partial T}
+    \|\mathbf{u}-\pi(\mathbf{X}_m;\boldsymbol{\theta}_{\mathrm{cam}})\|_2 ,
 \end{equation}
-For candidate extrinsics $(R, \mathbf{t})$, let $P_{f}(R, \mathbf{t})$
-denote the projected edge pixels of the $f$-th visible cube face
-and $\mathcal{F}$ the set of visible faces. The per-face-normalised
-weighted chamfer cost is
+where $\partial T$ is the foreground contour of the thresholded
+reference frame. These correspondences initialise the standard
+perspective-$n$-point solve: EPnP~\cite{lepetit2009epnp} provides a
+closed-form pose estimate, then OpenCV's Levenberg--Marquardt PnP
+refinement~\cite{levenberg1944method,marquardt1963algorithm} minimises
+pixel reprojection error,
 \begin{equation}
-\label{eq:chamfer}
-    \mathcal{L}_{\mathrm{cham}}(R, \mathbf{t})
-    \;=\;
-    \frac{1}{|\mathcal{F}|}
-    \sum_{f \in \mathcal{F}}
-    \frac{\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)\, D_{E}(p)}
-         {\sum_{p \in P_{f}(R,\mathbf{t})}\, w(p)},
+\label{eq:pnp-lm}
+    (R_1,\mathbf{t}_1)
+    =
+    \arg\min_{R,\mathbf{t}}
+    \sum_{m=1}^{M}
+    \|\mathbf{u}_m-\pi_{\mathbf{K}_0}(\mathbf{X}_m;R,\mathbf{t})\|_2^2 .
 \end{equation}
-with $D_{E}(p)$ bilinearly interpolated from the EDT and
-$w(p)$ a product of three side-emphasis weights
-$w_{\mathrm{left}}(p_{x})$, $w_{\mathrm{top}}(p_{y})$, and
-$w_{\mathrm{bottom}}(p_{y})$.
-Per-face normalisation prevents long edges (e.g.\ the bottom wall)
-from dominating short ones. We minimise $\mathcal{L}_{\mathrm{cham}}$
-with L-BFGS-B~\cite{byrd1995limited,zhu1997algorithm} over the six
-DoF of a Rodrigues rotation vector~\cite{rodrigues1840lois} and a
-translation, box-clamped to $\pm 2.5^{\circ}$ and $\pm 2$\,cm around
-the Stage-$1$ prior $(\mathbf{r}_{0}, \mathbf{t}_{0})$.
-
-\emph{Phase~B (non-smooth IoU).}
-Starting from the Phase-$A$ solution, we maximise a weighted Jaccard
-similarity / pixel-IoU~\cite{jaccard1912distribution} between the
-rendered silhouette $M(R, \mathbf{t})$ and the target foreground $T$,
+The final implemented refinement is a dense silhouette least-squares
+polish~\cite{bates1988nonlinear}. The projected container silhouette is
+sampled uniformly along its boundary, matched to the target contour by
+nearest neighbours, and augmented with a left-boundary profile term that
+reduces the visible one-sided bias caused by release-frame occlusion and
+shadows. The optimisation variable is a small bounded update to rotation,
+translation, focal length, and principal point,
 \begin{equation}
-\label{eq:iou}
-    \mathrm{IoU}_{w}(R, \mathbf{t})
-    \;=\;
-    \frac{\sum_{p}\, w(p)\,[\,M(p)\wedge T(p)\,]}
-         {\sum_{p}\, w(p)\,[\,M(p)\vee T(p)\,]},
+\label{eq:dense-refine}
+    (\mathbf{K}^{*},R^{*},\mathbf{t}^{*})
+    =
+    \arg\min_{\Delta}
+    \rho_{\mathrm{soft}\text{-}\ell_1}
+    \!\left(
+      \mathbf{r}_{\mathrm{sil}}(\Delta),
+      \mathbf{r}_{\mathrm{profile}}(\Delta),
+      \mathbf{r}_{\mathrm{reg}}(\Delta)
+    \right),
 \end{equation}
-with an adaptive Nelder--Mead~\cite{gao2012implementing} simplex of
-size $0.15^{\circ}/1.5$\,mm. Because $\mathrm{IoU}_{w}$ is
-discretised on the pixel grid it is non-differentiable; the
-L-BFGS-B phase on the smooth chamfer cost provides the warm start
-needed to avoid the combinatorial local minima of
-Eq.~\eqref{eq:iou}.
-
-\paragraph{Safety clamp.}
-If $\|\mathbf{r}^{*} - \mathbf{r}_{0}\|$ or
-$\|\mathbf{t}^{*} - \mathbf{t}_{0}\|$ exceed the safety thresholds
-($3^{\circ}$ or $3$\,cm; loosened past the Phase-A box so the
-unbounded Phase-B can move beyond it for mild excursions), we fall
-back to the ChArUco extrinsic, guarding against strong local minima
-when the ChArUco board placement is sloppy.
+where $\mathbf{r}_{\mathrm{sil}}$ contains symmetric nearest-neighbour
+silhouette residuals, $\mathbf{r}_{\mathrm{profile}}$ aligns the
+leftmost contour profile over scanlines, and $\mathbf{r}_{\mathrm{reg}}$
+keeps the dense correction close to the ChArUco/PnP pose. The calibrated
+camera is written to \texttt{camera\_params.xml}; the subsequent
+flow-front extraction reads this XML and the setup manifest directly.
 
 \paragraph{Flow-front extraction.}
 Each subsequent frame $I_{1}, \dots, I_{8}$ captured at
 $t_{1}, \dots, t_{8}$
-is binarised by hue-saturation-value (HSV) intensity thresholding
+is binarised by grayscale intensity thresholding
 (threshold $128$, black
 foreground by default) followed by morphological opening and closing
 on a $3\times 3$ kernel~\cite{gonzalez2018digital}; only the largest
@@ -1296,24 +1291,23 @@ $\partial\Omega_{i}$ onto $\mathbf{v}$ relative to that front wall,
           \bigl(\mathbf{P}_{w}(\tau^{\star}(\mathbf{u}))\bigr)_{xz}\Bigr]
     \;-\; x^{\mathrm{front}}_{\mathrm{box}}.
 \end{equation}
-Finally, residual binarisation noise can introduce occasional
-backward jumps across frames; we guard against this with a monotone
-pass $x_{i} \leftarrow \max(x_{i}, x_{i-1})$ (equivalent to
-Eq.~\eqref{eq:mono} applied in physical space), producing the
-observation
+Finally, the extraction script exposes an optional monotone guard
+$x_{i} \leftarrow \max(x_{i}, x_{i-1})$ for cases where residual
+binarisation noise introduces a backward jump. The stored observation
+used by the inverse is
 $\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8})
-\in \mathbb{R}_{\ge 0}^{8}$ that the inverse of
-Algorithm~\ref{alg:invert} consumes.
+\in \mathbb{R}_{\ge 0}^{8}$; this is the vector consumed by
+Algorithm~\ref{alg:invert}.
 
 \begin{algorithm}[!htbp]
 \caption{Two-stage camera calibration.}
 \label{alg:calib}
 \KwIn{Background photo $I_{\mathrm{bg}}$ with ChArUco board;
   reference frame $I_{0}$ at dam release; container $(W,H)$;
-  image size $(W,H)$; Phase-A box bounds $(2.5^{\circ},2\,\mathrm{cm})$;
-  safety thresholds $(3^{\circ},3\,\mathrm{cm})$;
+  image size $(W_{\mathrm{px}},H_{\mathrm{px}})$;
   Huber $\delta{=}2$\,px.}
-\KwOut{Calibrated $(\mathbf{K}_{0},R^{*},\mathbf{t}^{*})$.}
+\KwOut{Calibrated $(\mathbf{K}^{*},R^{*},\mathbf{t}^{*})$ and
+  \texttt{camera\_params.xml}.}
 \BlankLine
 
 \tcp*[h]{Stage 1: ChArUco prior.}
@@ -1327,28 +1321,19 @@ Extract $(\mathbf{K}_{0},R_{0},\mathbf{t}_{0})$ from
   $\hat{\boldsymbol{\theta}}_{\mathrm{cam}}$
   (Eqs.~\eqref{eq:eye}--\eqref{eq:scale})\;
 
-\tcp*[h]{Stage 2: silhouette-guided refinement (fix $\mathbf{K}_{0}$).}
-Compute Canny edge set $E$ on $I_{0}$ and EDT $D_{E}$
-  (Eq.~\eqref{eq:edt})\;
-\emph{Phase A:} L-BFGS-B on chamfer cost
-  $\mathcal{L}_{\mathrm{cham}}$ (Eq.~\eqref{eq:chamfer}) over
-  $(\mathbf{r},\mathbf{t})$, box-clamped to
-  $\pm\Delta_{\mathrm{rot}}^{\mathrm{box}}/\pm\Delta_{t}^{\mathrm{box}}$
-  around $(\mathbf{r}_{0},\mathbf{t}_{0})$~\cite{byrd1995limited,
-  zhu1997algorithm}\;
-\emph{Phase B:} adaptive Nelder--Mead on $-\mathrm{IoU}_{w}$
-  (Eq.~\eqref{eq:iou}) starting at the Phase-A solution; simplex
-  radius $(0.15^{\circ},1.5\,\mathrm{mm})$\;
+\tcp*[h]{Stage 2: silhouette-guided refinement from the Stage-1 camera.}
+Extract the outer contour of the thresholded container mask in $I_0$\;
+Project the rectangular container from the Stage-1 camera and snap visible
+  silhouette vertices to nearest target-contour pixels
+  (Eq.~\eqref{eq:pnp-corr})\;
+Run EPnP followed by Levenberg--Marquardt PnP refinement to obtain
+  $(R_1,\mathbf{t}_1)$ (Eq.~\eqref{eq:pnp-lm})~\cite{lepetit2009epnp}\;
+Run bounded dense silhouette least-squares refinement over
+  $(R,\mathbf{t},f,c_x,c_y)$ with symmetric contour residuals,
+  left-profile residuals, and regularisation (Eq.~\eqref{eq:dense-refine})\;
+Write the resulting camera XML and use it for flow-front extraction\;
 
-\tcp*[h]{Safety clamp.}
-\If{$\|\mathbf{r}^{*}{-}\mathbf{r}_{0}\|{>}\Delta_{\mathrm{rot}}^{\mathrm{safe}}$
-  \textnormal{or}
-  $\|\mathbf{t}^{*}{-}\mathbf{t}_{0}\|{>}\Delta_{t}^{\mathrm{safe}}$}{
-  Revert $(\mathbf{r}^{*},\mathbf{t}^{*}){\leftarrow}
-    (\mathbf{r}_{0},\mathbf{t}_{0})$\;
-}
-
-\Return{$(\mathbf{K}_{0},R(\mathbf{r}^{*}),\mathbf{t}^{*})$.}
+\Return{$(\mathbf{K}^{*},R^{*},\mathbf{t}^{*})$.}
 \end{algorithm}
 
 
