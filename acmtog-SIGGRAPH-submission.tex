@@ -1,6 +1,7 @@
 \documentclass[acmtog,anonymous,review]{acmart}
 % \documentclass[acmtog,review]{acmart}
-\acmSubmissionID{1234}
+% Replace with the assigned paper ID after completing the online form.
+\acmSubmissionID{paper ID}
 
 \usepackage{booktabs} % For formal tables
 
@@ -141,7 +142,7 @@
 % Document starts
 \begin{document}
 % Title portion
-\title{Fast Non-Newtonian ViRheometry via Mixture-of-GP Surrogates}
+\title{Fast Non-Newtonian ViRheometry via Local Gaussian-Process Surrogates}
 
 % Authors (suppressed automatically by acmart [anonymous] flag during
 % review; will render in the camera-ready when the [anonymous] option
@@ -172,39 +173,43 @@
 \renewcommand\shortauthors{Xiong, Y. et al.}
 
 \begin{abstract}
-We estimate the three Herschel--Bulkley parameters
-(yield stress $\sigma_Y$, power-law index $n$, consistency parameter
-$\eta$) of complex fluids---pastes, chunky sauces, granular
-slurries---for which conventional rheometers cannot provide useful
-measurements, by matching dam-break video footage against
-physics-based simulation, following the protocol
-of~\cite{hamamichi2023nonnewtonian}. The inverse is accurate but
-slow: each estimation requires hundreds of in-loop
-material-point-method evaluations and therefore takes around eight
-hours of GPU time per setup, so the method serves as a research
-tool rather than a routine measurement.
+We estimate Herschel--Bulkley (HB) parameters
+$(n,\eta,\sigma_Y)$ from dam-break video observations by replacing
+simulation-in-the-loop inversion with a local Gaussian-process (GP)
+surrogate trained on curated simulation data. The predecessor protocol of
+\cite{hamamichi2023nonnewtonian} repeatedly evaluates a
+material point method (MPM) forward simulator inside a derivative-free
+optimizer, taking around eight hours per setup. We instead train a
+$2{,}775$-expert local GP bank on $407{,}480$ cleaned MPM rows with
+fixed density $\rho=1.0$ to emulate
+$(n,\eta,\sigma_Y,W,H)\mapsto(x_{01},\ldots,x_{08})$, and propagate
+GP posterior variance, local Bayesian approximation error (BAE), and
+observation noise into the inverse objective.
 
-We compress this inverse from around eight hours to under a minute
-per setup by replacing the in-loop simulator with a mixture of
-Gaussian-process experts fitted to a corpus of MPM dam-break
-simulations. We further replace the manual camera-calibration
-workflow that precedes the inverse with an algorithmic two-stage
-pipeline based on ChArUco markers and silhouette-edge refinement.
+The resulting inverse is surrogate-only: it generates or optimizes a
+candidate pool under the GP+BAE score and returns either a supported
+point estimate or an ambiguous plausible set when a single dam-break
+observation does not justify a unique parameter triple. On the
+held-out forward test split the GP bank achieves sub-cm trajectory
+error, with overall MAE $0.05296$\,cm and $x_{08}$ MAE
+$0.08790$\,cm. On a $64$-case synthetic inverse validation, the
+plausible set contains a near-truth representative in $98.4$--$100.0\%$
+of cases, while forced rank-$1$ selection remains low
+($6.3$--$14.1\%$), motivating ambiguity reporting rather than
+overconfident single-theta output.
 
-We validate our method against the predecessor's simulation-in-the-loop
-benchmark and against parallel-plate rheometer measurements on real
-materials the rheometers can handle. The surrogate inverse preserves
-dam-break replay and flow-curve agreement in the regimes supported by
-the observation, while running at three orders of magnitude lower
-latency. The seconds-scale
-inversion enables two uses inaccessible at hours-per-setup cost:
-\emph{(i)}~\emph{fresh parameters for time-varying fluids}, in which
-the inversion returns the material's current state rather than a
-stale snapshot from hours earlier; and
-\emph{(ii)}~\emph{practical real-fluid validation and
-characterisation}, in which rheometer-referenced anchors,
-rheometer-infeasible material panels, and multi-setup sessions fit
-inside a single user interaction rather than an offline showcase.
+We further report setup-selection diagnostics, speed measurements,
+real-material diagnostics, and setup-level held-out validation for
+same-session repeated captures. The
+unoptimised Python implementation scores a $512$-candidate inverse pass
+with plausible-set summaries in $3.63$\,s per case/setup, and one
+surrogate candidate/setup evaluation is
+$190$--$618\times$ faster than measured one-shot MPM replays. These
+results support a fast GP-surrogate inverse with explicit uncertainty
+and plausible-set validation. Rheometer-infeasible materials are
+evaluated by dam-break replay diagnostics, and time-varying materials
+are evaluated at the held-out setup level rather than as a fitted
+kinetic ageing law.
 \end{abstract}
 
 
@@ -270,8 +275,9 @@ inside a single user interaction rather than an offline showcase.
 
 
 \keywords{Material parameter estimation, Herschel--Bulkley,
-non-Newtonian fluids, video-based estimation,
-surrogate-accelerated inverse, camera calibration}
+non-Newtonian fluids, video-based estimation, Gaussian-process
+surrogates, set-valued inverse estimation, Bayesian approximation
+error, uncertainty calibration}
 
 
 % Teaser omitted in this draft to avoid duplicating the method overview.
