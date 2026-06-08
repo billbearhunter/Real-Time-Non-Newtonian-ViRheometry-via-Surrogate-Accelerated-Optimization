@@ -23,8 +23,9 @@ change the dam-break physics model, but to make the same forward
 relation cheap enough for interactive inverse queries, ambiguity
 diagnostics, and repeated freshness checks.
 
-We propose a surrogate-accelerated framework that compresses the
-inverse from hours to seconds per experimental setup: in the evaluated
+The method therefore consists of two core algorithmic components and a
+validation program. We propose a surrogate-accelerated framework that
+compresses the inverse from hours to seconds per experimental setup: in the evaluated
 implementation, a $512$-candidate inverse scoring and plausible-set
 summary pass takes $3.63$\,s per case/setup, and one surrogate
 candidate/setup evaluation takes $7.09$\,ms. We validate forward
@@ -42,7 +43,9 @@ We replace repeated MPM calls by a pre-trained bank of local
 Gaussian-process models. The surrogate maps
 $(n,\eta,\sigma_Y,W,H)$ to the eight dam-break flow-front positions
 $(x_{01},\ldots,x_{08})$ and provides both a prediction and an
-uncertainty estimate for inverse estimation.
+uncertainty estimate for inverse estimation. The eight outputs are used
+directly; we do not compress them with principal component analysis
+(PCA).
 
 \emph{(ii) Uncertainty-aware inverse reporting.}
 Because a single dam-break trajectory can leave multiple plausible
@@ -58,6 +61,8 @@ practical. We use two short-time setups for inverse estimation and hold
 out a third setup from the same session for flow-front and binary-mask
 replay. This tests repeated-capture consistency rather than fitting a
 kinetic law for material ageing.
+This is a validation of repeated-capture consistency, not a claim that
+the paper has fitted a full kinetic law.
 
 Hamamichi et al.~\cite{hamamichi2023nonnewtonian} established
 non-Newtonian video rheometry as a viable inverse-estimation method
@@ -68,6 +73,9 @@ work inherits their dam-break protocol, observation-matching inverse,
 and multi-setup formulation, but replaces repeated MPM calls with a GP
 surrogate and explicit surrogate-error model. The result is the same
 physical inverse problem evaluated at seconds-scale latency.
+Multi-setup disambiguation and setup selection remain inherited acquisition protocols,
+and they are framed here rather than as a new physical disambiguation
+principle.
 
 \section{Related Work}
 
@@ -893,10 +901,10 @@ evaluates all candidates under the same GP/BAE score, and then applies
 the plausible-set gates below.
 This archive is not claimed to be a superior optimiser. Its purpose is
 to exploit the cheap GP evaluations to expose the score landscape:
-CMA-ES could use the same GP/BAE objective, while the archive lets us
-report which basins were covered, retained, or falsely ranked. The
-validation below shows that candidate coverage is easier than final
-ranking.
+CMA-ES, least-squares refinement, or Bayesian optimisation could use the
+same GP/BAE objective, while the archive lets us report which basins
+were covered, retained, or falsely ranked. The validation below shows
+that candidate coverage is easier than final ranking.
 The frame weights form the fixed non-decreasing schedule
 \[
 \boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0).
@@ -906,12 +914,12 @@ real captures and MPM replays are most likely to disagree for reasons
 unrelated to the Herschel--Bulkley parameters, including finite-time gate
 withdrawal, release-timing jitter, segmentation uncertainty, and
 unmodelled free-surface or surface-tension transients. The weights
-therefore reduce real--simulation-gap sensitivity during routing and
-anchor retrieval, and the same schedule is used in the promoted
-log-front inverse score below. This is a deliberate robustness choice,
-not a hidden prior on $\boldsymbol{\theta}$: all retained-set decisions
-still expose the residual, uncertainty, and support components
-separately. The routing schedule is listed in
+therefore reduce real--simulation-gap sensitivity during expert routing
+and candidate anchors only; the final retained-set score uses the unweighted
+whitened residual energy described below. This is a deliberate
+robustness choice, not a hidden prior on $\boldsymbol{\theta}$: all
+retained-set decisions still expose the residual, uncertainty, and
+support components separately. The routing schedule is listed in
 \S\ref{sec:data} (Tab.~\ref{tab:hyper}).
 
 \paragraph{Support and Extrapolation Diagnostics.}
@@ -1022,8 +1030,10 @@ the trajectory under an unexplained low-variance assumption, while the
 nuisance term absorbs small global offset and drift errors that are
 expected from release timing and silhouette extraction. For ranking and
 retention we keep the score decomposed into explicit diagnostics:
-trajectory residual, GP variance, BAE variance, observation noise,
-nuisance-adjusted log score, and support penalty. This decomposition is
+trajectory residual, GP epistemic variance, the local BAE residual
+variance, and an observation-noise floor, with Gaussian negative log
+likelihood and max-frame implausibility as diagnostics. This
+decomposition is
 important because the
 experiments reported here show that the hard failure mode is not candidate
 generation alone, but overconfident ranking of false basins.
@@ -1252,7 +1262,8 @@ extraction; the full pipeline is summarised in
 Algorithm~\ref{alg:calib}. This section specifies the observation
 preprocessing used by the real-material diagnostics; the validated
 contribution of this paper remains the GP-surrogate inverse and its
-error-aware reporting.
+error-aware reporting. The camera procedure is not the main
+contribution evaluated in this paper.
 
 \paragraph{Stage 1: ChArUco prior.}
 A printed ChArUco
@@ -1551,6 +1562,11 @@ practical claim, and real-material and freshness studies are diagnostic
 domain validations. This separation prevents point-estimate,
 simulation-in-the-loop, and GP-surrogate evidence from being mixed into
 one aggregate score.
+``Main'' rows are used as primary claims; ``ablation'' and
+``diagnostic'' rows are reported only to explain failure modes or claim
+boundaries; residual correction is kept as an optional diagnostic, and
+the setup policy is evaluated as an ablation unless it follows the
+predecessor's acquisition protocol.
 
 \paragraph{Datasets.}
 We separate evaluation sets by the question being asked.
@@ -1879,8 +1895,9 @@ counts cases whose plausible set contains a near-truth representative
 ($E_z\le0.25$); ``selected close'' counts cases where the best-scored
 single candidate is already near truth. ``Best $E_z$'' is the smallest
 $E_z$ inside the plausible set and therefore measures candidate
-coverage, not automatic ranking accuracy. Plausible fraction and basin
-count diagnose ambiguity rather than point accuracy.}
+coverage; it is not the same as automatic ranking accuracy. Plausible
+fraction and basin count diagnose ambiguity, not automatic ranking
+accuracy.}
 \label{tab:retained-contract}
 \begin{tabular}{@{}cccccccc@{}}
 \toprule
@@ -1949,7 +1966,7 @@ Setups & Retained close & Rank-1 close & Plaus. frac. p50 & Basin p50 \\
 Because $\eta$ and $\sigma_Y$ span several orders of magnitude, the
 synthetic validation also records where cases fall in the logarithmic
 parameter box.  This audit is necessary because range-normalized
-errors can hide failures at the small- and large-value tails.  The
+errors can hide failures at the small- and large-value tails. In the
 four-setup sequential audit, middle-$\eta$ cases retain a near-truth
 candidate in $14/14$ cases, high-$\eta$ cases in $8/9$, and low-$\eta$
 cases in $5/7$. For $\sigma_Y$, the high tail is sparse but
@@ -2308,8 +2325,11 @@ $3.63$\,s per case/setup in the unoptimised Python implementation.
 A single surrogate candidate/setup evaluation took $7.09$\,ms,
 which is $190$--$618\times$ faster than the measured one-shot MPM
 replay references used in the same timing study. Tab.~\ref{tab:time-budget}
-reports the compute-stage breakdown; operator-dependent capture timing
-is not used as a headline result.
+reports the compute-stage breakdown. The multi-setup entries are the
+measured per-case/setup average scaled by the number of accumulated
+setups, not a separately optimised stopwatch implementation for each
+row; operator-dependent capture timing is not used as a headline
+result.
 
 \begin{table}[!htbp]
 \centering
@@ -2364,37 +2384,121 @@ uses the GP surrogate to make such disambiguation tests cheap enough
 to run as routine plausible-set validation rather than as rare
 simulation-in-the-loop studies.
 
-Two lessons follow from the experiments. First, forward accuracy and
-inverse selection must be validated separately: a GP bank can reproduce
-MPM trajectories well while still giving overconfident scores to false
-basins. This motivates the explicit
-$\Sigma_{\mathrm{GP}}+\Sigma_{\mathrm{BAE}}+\Sigma_{\mathrm{obs}}$
-error budget and the retained-set report used throughout the paper.
-Second, the main practical gain is amortisation. The expensive MPM
-corpus is paid for once, while inverse queries, multi-setup ambiguity
-checks, real-material replay diagnostics, and freshness hold-out tests
-run at seconds scale on the trained surrogate. The surrogate is
-therefore an accelerator for a physics-grounded inverse, not a
-replacement for the physical model.
+The validation results clarify both what the surrogate solves and what
+it does not solve. The forward emulator is accurate enough for fast
+candidate evaluation: on $40{,}748$ held-out MPM rows it achieves
+overall MAE $0.05296$\,cm, RMSE $0.10605$\,cm, and
+$R^2=0.9996376$, with final-frame $x_{08}$ MAE $0.08790$\,cm and
+$x_{08}$ absolute-error p95 $0.28993$\,cm. The BAE audit places the
+remaining final-frame residual scale at standard deviation
+$0.13782$\,cm and p95 $0.28195$\,cm. These numbers support replacing
+MPM by the GP bank inside the inverse score, provided that the residual
+variance is carried into the likelihood. They do not imply that the
+lowest-score inverse candidate is automatically correct.
+
+The synthetic inverse results expose that distinction. In the
+$64$-case stress test, the plausible set contains a near-truth candidate
+in $98.4$--$100.0\%$ of cases from one to four setups, and the median
+best-plausible $E_z$ improves from $0.099$ to $0.078$. Thus candidate
+coverage is strong. However, the best-scored candidate is near truth in
+only $7.8\%$, $6.3\%$, $10.9\%$, and $14.1\%$ of the one-, two-,
+three-, and four-setup cases. The causal $30$-case audit shows the same
+pattern in the predecessor-style sequential protocol: the median
+plausible fraction shrinks from $0.580$ after one setup to $0.258$
+after four setups, but retained-close also drops from $96.7\%$ to
+$90.0\%$ and rank-1 close remains $0$--$3.3\%$. Therefore the GP
+surrogate reproduces the intended disambiguation workflow and shrinks
+the candidate set, but the current score is still unreliable as an
+automatic selector. The paper's inverse claim is accordingly
+retained-set recovery and ambiguity reduction, not unique parameter
+recovery.
+
+The tail audit explains why this distinction matters. Middle-$\eta$
+cases retain a near-truth candidate in $14/14$ cases, while low-$\eta$
+and high-$\eta$ cases retain it in $5/7$ and $8/9$ cases; high
+$\sigma_Y$ is sparser but weaker at $2/3$, and the two cases extreme in
+both $\eta$ and $\sigma_Y$ retain the near-truth basin in only $1/2$
+cases. These failures would be hidden by reporting only aggregate
+forward $R^2$ or a single mean inverse error. They instead indicate
+where additional MPM data, less aggressive plausibility gates, or
+stronger setup evidence would be needed.
+
+The real-material and freshness panels are interpreted as diagnostic
+domain validations rather than synthetic-truth tests. For the six
+rheometer-reference materials, the reported representatives give
+$E_{\mathrm{flow}}$ values from $0.200$ to $0.740$ and binary replay
+statistics with mean per-case silhouette IoU $0.886$ over twelve
+material/setup cases, but these numbers include camera, segmentation,
+and real--sim discrepancy. The gamma-dot audit shows that the measured
+validation setups excite p5--p95 shear-rate supports inside the
+$0.1$--$1000\,\mathrm{s}^{-1}$ rheometer interval, so the flow-curve
+comparison is not extrapolated far outside the measured shear-rate
+range; it does not prove maximal setup coverage. The freshness panel
+shows that a two-setup estimate can replay a third same-session setup
+with median $x_{08}$ error $0.203$\,cm, median front error
+$0.293$\,cm, mean mask IoU $0.912$, and image XOR fraction $0.0051$.
+This supports a repeated-capture protocol enabled by speed, not a
+kinetic ageing model.
+
+The main practical gain is amortisation. The expensive MPM corpus is
+paid for once, while inverse queries, multi-setup ambiguity checks,
+real-material replay diagnostics, and freshness hold-out tests run at
+seconds scale on the trained surrogate: $3.6$\,s for one setup,
+$14.5$\,s for four setups, and $21.8$\,s for six setups under the
+reported implementation. The surrogate is therefore an accelerator for
+a physics-grounded inverse, not a replacement for the physical model.
 
 
-\section{Limitations}
+\section{Limitations and Future Work}
 \label{sec:limitations}
 
-The method inherits three unavoidable limits. First, no inverse can
-recover yield-stress information that the dam-break observation does
-not contain; when $\eta\dot\gamma^n$ dominates over $\sigma_Y$ across
-the excited shear-rate range, the correct output is an ambiguous
-retained set or an additional setup request, not a forced point
-estimate. Second, the surrogate is trustworthy only inside the
-training box: $W,H\in[2,7]$\,cm and the sampled HB parameter ranges;
-out-of-distribution materials require new MPM data rather than
-extrapolation. Third, the learned surrogate cannot fix missing physics
-in the simulator. The current forward model includes HB rheology,
-gravity, and no-slip boundaries, but not surface tension, thixotropy,
-elastic overshoot, or viscoelastic memory. The reported runtime is also
-seconds-scale rather than millisecond-scale: fast enough for
-interactive repeated measurements, but not a continuous-time estimator.
+The most important limitation is selection, not forward fidelity. The
+GP bank is accurate on held-out MPM data, and the retained sets usually
+contain a near-truth candidate in synthetic tests, but the lowest-score
+candidate is still unreliable. This means that the present method
+should be used as an ambiguity-aware inverse: it can report plausible
+basins and test whether additional setups shrink them, but it should
+not be interpreted as a fully automatic unique-parameter estimator.
+Future work should therefore focus on selector validation under
+held-out MPM replay, less aggressive plausibility gates, and scoring
+rules that are trained or calibrated specifically to rank near-truth
+candidates ahead of surrogate-favoured false basins.
+
+The second limitation is coverage. The current surrogate is validated
+inside the cleaned fixed-density training box,
+$W,H\in[2,7]$\,cm and the sampled HB parameter ranges. The synthetic
+tail audit shows weaker retention at the extremes of $\eta$ and
+$\sigma_Y$, so extrapolating beyond the sampled box or relying on sparse
+tail leaves would be unjustified. A natural extension is targeted MPM
+sampling in the low-/high-$\eta$ and high-$\sigma_Y$ regions where the
+retained-set test fails most often, followed by the same forward,
+BAE, and inverse audits rather than only a new aggregate $R^2$.
+
+The third limitation is physical model discrepancy. The real-material
+panel compares against rheometer-reference flow curves and binary-mask
+replays, but those observations include camera calibration,
+segmentation, wall/contact effects, and real--sim mismatch. The current
+MPM model represents HB rheology, gravity, and boundary contact, but it
+does not model surface tension, thixotropy, elastic overshoot,
+viscoelastic memory, evaporation, or time-dependent ageing. The
+freshness experiment should therefore be read as a same-session
+held-out setup diagnostic enabled by seconds-scale inverse, not as an
+identified kinetic material model. Extending the method to ageing or
+thixotropic materials would require time-indexed captures, a chosen
+constitutive evolution model, and a separate identifiability analysis.
+
+Finally, the setup and shear-rate analyses are diagnostic rather than
+globally optimal. The measured real-validation setup pairs excite
+shear-rate supports within the rheometer interval, but we did not sweep
+all feasible $(W,H)$ pairs to maximise shear-rate coverage or guarantee
+the most informative next setup. A future setup-policy study should
+combine the predecessor's Hessian/ridge logic with surrogate
+uncertainty and an explicit gamma-dot coverage objective, then evaluate
+it by retained-set shrinkage and near-truth survival. The implementation
+is also seconds-scale rather than millisecond-scale; this is sufficient
+for interactive repeated measurements, but a production system would
+benefit from batched GP evaluation, compiled candidate scoring, and
+GPU-resident retrieval.
 
 
 % --- Acknowledgements -------------------------------------------------
