@@ -1855,10 +1855,18 @@ distance for all setup counts. The evaluated set contains case
 summaries and plausible representatives for every evaluated case.
 Tab.~\ref{tab:retained-contract} summarises the main result. The
 plausible set contains a near-truth representative in
-$98.4$--$100.0\%$ of cases, while the best-scored single candidate is
-close in only $6.3$--$14.1\%$ of cases. The method therefore supports
-a plausible-set inverse claim at this stage, not an overconfident
-single-parameter-triple claim.
+$98.4$--$100.0\%$ of cases under the log-space $E_z$ criterion, while
+the best-scored single candidate is close in only $6.3$--$14.1\%$ of
+cases. To align this result with the predecessor's synthetic protocol,
+Tab.~\ref{tab:erel-synthetic} also reports the same rank-$1$ and
+best-retained candidates under the Hamamichi-normalised
+$E_{\mathrm{rel}}$ criterion. Under that more permissive range-normalised
+metric, rank-$1$ point recovery is $37.5$--$51.6\%$, and the retained
+set contains an $E_{\mathrm{rel}}\le0.1$ candidate in all evaluated
+cases. The method therefore supports a plausible-set inverse claim at
+this stage, while the automatic selection of a unique
+single-parameter triple remains metric-dependent and not yet reliable
+under the stricter log-scale criterion.
 
 \begin{table*}[!htbp]
 \centering
@@ -1886,14 +1894,43 @@ Setups & Cases & Plausible close & Selected close
 \end{tabular}
 \end{table*}
 
+\begin{table*}[!htbp]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{The same $64$-case synthetic panel evaluated with the
+predecessor-style range-normalised parameter distance
+$E_{\mathrm{rel}}$ from Eq.~\eqref{eq:erel}. ``Rank-1 pass'' uses the
+best-scored single candidate and the Hamamichi threshold
+$E_{\mathrm{rel}}\le0.1$; ``best retained'' reports the closest
+candidate inside the retained plausible set. These numbers are reported
+alongside Tab.~\ref{tab:retained-contract} because $E_{\mathrm{rel}}$
+matches the predecessor's point-recovery protocol, whereas $E_z$
+penalises order-of-magnitude mistakes in $\eta$ and $\sigma_Y$ more
+strongly.}
+\label{tab:erel-synthetic}
+\begin{tabular}{@{}ccccccc@{}}
+\toprule
+Setups & Cases & Rank-1 pass & Rank-1 $E_{\mathrm{rel}}$ p50
+& Rank-1 $E_{\mathrm{rel}}$ p90
+& Best-retained pass & Best-retained $E_{\mathrm{rel}}$ p50 / p90 \\
+\midrule
+1 & $64$ & $37.5\%$ & $0.167$ & $0.443$ & $100.0\%$ & $0.008$ / $0.026$ \\
+2 & $64$ & $42.2\%$ & $0.128$ & $0.530$ & $100.0\%$ & $0.006$ / $0.020$ \\
+3 & $64$ & $51.6\%$ & $0.096$ & $0.528$ & $100.0\%$ & $0.005$ / $0.023$ \\
+4 & $64$ & $50.0\%$ & $0.101$ & $0.508$ & $100.0\%$ & $0.004$ / $0.026$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
 This separation between plausible-set recovery and selected-point recovery is the
 central inverse diagnosis. The forward emulator is accurate at the
 reported held-out MPM level, and the GP/BAE variance makes candidate
 scoring explicitly error-aware, but this does not by itself solve
 ranking: the objective can still prefer a surrogate-favoured false
 basin inside a physically plausible ridge. The best plausible candidate
-is close in normalized log-parameter
-space, but the median plausible basin count remains large, so the
+is close under both the predecessor-normalised and log-parameter
+distances, but the median plausible basin count remains large, so the
 pipeline should report ambiguity rather than collapse the posterior to a
 single $\boldsymbol{\theta}$. This is the main limitation of the current
 surrogate inverse and is reported directly rather than hidden by choosing
@@ -2374,9 +2411,14 @@ The synthetic inverse results expose that distinction. In the
 $64$-case stress test, the plausible set contains a near-truth candidate
 in $98.4$--$100.0\%$ of cases from one to four setups, and the median
 best-plausible $E_z$ improves from $0.099$ to $0.078$. Thus candidate
-coverage is strong. However, the best-scored candidate is near truth in
-only $7.8\%$, $6.3\%$, $10.9\%$, and $14.1\%$ of the one-, two-,
-three-, and four-setup cases. The causal $30$-case audit shows the same
+coverage is strong. Under the stricter log-parameter criterion, however,
+the best-scored candidate is near truth in only $7.8\%$, $6.3\%$,
+$10.9\%$, and $14.1\%$ of the one-, two-, three-, and four-setup cases.
+Under the predecessor's range-normalised $E_{\mathrm{rel}}\le0.1$
+criterion, the same rank-$1$ candidates pass in $37.5\%$, $42.2\%$,
+$51.6\%$, and $50.0\%$ of cases, while the best retained candidate
+passes in $100.0\%$ of cases for every setup count. The causal
+$30$-case audit shows the same
 pattern in the predecessor-style sequential protocol: the median
 plausible fraction shrinks from $0.580$ after one setup to $0.258$
 after four setups, but retained-close also drops from $96.7\%$ to
