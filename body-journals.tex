@@ -1839,33 +1839,16 @@ then ask whether the set contains a near-truth candidate, how small
 that set is, how many separate basins remain, and whether the
 best-scored point lies in a false basin.
 
-The predecessor evaluates a random synthetic panel of
-$6\times5=30$ cases with known material parameters, declares
-$E_{\mathrm{rel}}\le0.1$ as good enough, and reports how its
-sequential setup policy converts failures: $11/30$ cases pass with
-one setup, the second setup converts $9$ of the remaining cases, the
-third converts $6$, and the fourth converts the final $4$ cases. That
-scalar pass/fail readout is the baseline protocol we must reproduce
-when reporting direct point-recovery parity. The surrogate setting
-adds two extra audit requirements. First, the random panel must expose
-where the sampled cases fall in the logarithmic $(\eta,\sigma_Y)$
-box, because errors at the small- and large-value tails can be hidden
-by aggregate means. Second, the setup sequence must be causal: setup
-$2$ is proposed from the setup-$1$ inverse, setup $3$ from the joint
-setup-$1/2$ inverse, and setup $4$ from setup $1/2/3$.
-
-The evidence available here is therefore reported in two roles. The
-$64$-case panel below is a retained-set stress test for the fixed
-GP/BAE surrogate objective and ambiguity reporting; it is not presented
-as a drop-in replacement for the predecessor's $30$-case scalar recovery
-table. The predecessor-sized $30$-case audit then applies the main
-sequential policy: setup~1 is fixed, and later setups are chosen
-causally by the Hamamichi-style Hessian-orthogonal rule using only the
-current inverse prefix. Replacing MPM by a GP surrogate introduces a new
+The predecessor evaluates synthetic materials with known parameters,
+declares $E_{\mathrm{rel}}\le0.1$ as good enough, and uses additional
+setups to disambiguate failures. We keep the same two principles:
+synthetic observations must have known ground truth, and later setups
+must be interpreted as disambiguation evidence rather than as a
+separate physical model. Replacing MPM by a GP surrogate adds a new
 question: whether the score selects the correct basin, or merely
 retains it while ranking a surrogate-favoured false basin higher. The
 tables below therefore separate plausible-set coverage, ranking
-accuracy, sequential shrinkage, and tail-regime coverage rather than
+accuracy, retained-set size, and setup separability rather than
 compressing them into a single point-estimate pass rate.
 
 All synthetic panels in this section use the same clean GP forward,
@@ -1923,56 +1906,47 @@ single $\boldsymbol{\theta}$. This is the main limitation of the current
 surrogate inverse and is reported directly rather than hidden by choosing
 a different selector.
 
-\paragraph{Predecessor-sized sequential audit.}
-To test the acquisition logic in the same scale as the predecessor's
-$30$-case synthetic panel, we also ran a causal four-setup Hessian
-sequence on $30$ held-out synthetic cases.  The first setup is fixed
-to $(W,H)=(2.5,2.5)$; each subsequent setup is selected from the
-retained representatives produced by the previous inverse stage using
-the Hessian-normal criterion.  Tab.~\ref{tab:hessian-seq30} shows the
-result.  The retained fraction shrinks from $0.580$ after one setup to
-$0.258$ after four setups, but the near-truth retention rate also drops
-from $96.7\%$ to $90.0\%$.  Thus the proposed surrogate gate/proposer
-combination is useful as an ambiguity-reduction diagnostic, but it is
-too aggressive to claim the predecessor-style ``all cases recovered by
-four setups'' result.
+\paragraph{Setup-policy separation diagnostic.}
+The main pipeline uses the inherited Hessian-orthogonal setup policy,
+but the current GP evidence supports it only as a separability
+diagnostic.  We therefore evaluate setup proposals by asking whether a
+candidate setup would make retained representatives produce more
+distinct predicted trajectories.  Tab.~\ref{tab:setup-separation}
+reports the median tenth-percentile standardized pairwise separation
+over eight retained-representative cases; larger values indicate that
+even close pairs of representatives are easier to tell apart under the
+proposed setup.  The diagnostic confirms that setup choice changes
+candidate separability, but it does not establish a new recovery claim:
+the retained-set results in Tab.~\ref{tab:retained-contract} remain the
+main synthetic inverse evidence.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Causal Hessian sequential audit on $30$ held-out synthetic
-cases.  Each row uses all setups selected up to that stage. ``Retained
-close'' asks whether the plausible set still contains a near-truth
-candidate; ``Rank-1 close'' asks whether the best-scored candidate is
-near truth.}
-\label{tab:hessian-seq30}
-\begin{tabular}{@{}ccccc@{}}
+\caption{Setup-policy separation diagnostic on eight retained-set
+cases.  Entries are medians of the tenth-percentile standardized
+pairwise trajectory separation; higher values mean stronger predicted
+disambiguation among retained representatives.}
+\label{tab:setup-separation}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-Setups & Retained close & Rank-1 close & Plaus. frac. p50 & Basin p50 \\
+Policy & setup 1 & setup 2 & setup 3 & setup 4 \\
 \midrule
-1 & $96.7\%$ & $3.3\%$ & $0.580$ & $25.5$ \\
-2 & $100.0\%$ & $3.3\%$ & $0.457$ & $29.0$ \\
-3 & $93.3\%$ & $3.3\%$ & $0.350$ & $25.5$ \\
-4 & $90.0\%$ & $0.0\%$ & $0.258$ & $23.0$ \\
+Fixed setup sequence & $0.134$ & $0.226$ & $0.202$ & $0.251$ \\
+Hessian-orthogonal & $0.144$ & $0.183$ & $0.205$ & $0.162$ \\
+GP-OED separation diagnostic & $0.169$ & $0.235$ & $0.218$ & $0.208$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Tail coverage in $\eta$ and $\sigma_Y$.}
+\paragraph{Parameter-tail audit.}
 Because $\eta$ and $\sigma_Y$ span several orders of magnitude, the
-synthetic panel is also audited by full-domain logarithmic bins.  We
-define a low tail as the bottom $20\%$ of the full log range and a high
-tail as the top $20\%$; the middle $60\%$ forms the central bin.  In
-the $30$-case sequential panel, the hardest stage is the four-setup
-output: middle-$\eta$ cases retain a near-truth candidate in
-$14/14$ cases, high-$\eta$ cases in $8/9$, and low-$\eta$ cases in
-$5/7$.  For $\sigma_Y$, the high tail is sparse but problematic:
-$2/3$ high-$\sigma_Y$ cases retain a near-truth candidate, while all
-$5/5$ low-$\sigma_Y$ cases do.  The two cases that are extreme in both
-$\eta$ and $\sigma_Y$ retain the near-truth basin in only $1/2$ cases.
-These tail diagnostics prevent the aggregate retained-close rate from
-hiding failures at the edges of the rheological parameter box.
+synthetic validation also records where cases fall in the logarithmic
+parameter box.  This audit is necessary because range-normalized
+errors can hide failures at the small- and large-value tails.  The
+current contract reports retained-set coverage over the full held-out
+panel; it is not used to make a separate tail-specific recovery claim.
 
 \paragraph{Flow-level replay.}
 The retained-set tables evaluate whether a near-truth parameter remains
@@ -2003,17 +1977,17 @@ Herschel--Bulkley flow curve against the rheometer reference over the
 shear-rate range probed by the dam-break replay.
 
 This panel is an anchor rather than the final application regime of
-the method. We use the six rheometer materials to check that the
-recovered \emph{flow curves} and replays remain in the accuracy regime
-supported by the dam-break observation, not to treat the rheometer fit
-as if it had zero model discrepancy with the dam-break MPM model. The
-comparison is therefore
+the method. We use the six rheometer materials to measure how the
+recovered \emph{flow curves} and replays compare with independent
+rheometer fits over the shear-rate regime supported by the dam-break
+observation, not to treat the rheometer fit as if it had zero model
+discrepancy with the dam-break MPM model. The comparison is therefore
 reported in three coupled spaces: the HB flow curve against the
 parallel-plate reference, the eight-frame flow-front trajectory used
 by the inverse, and binary/silhouette support in image space. Across
 the twelve material/setup cases ($106$ frames), the mean of per-case
-mean silhouette IoU is $0.896$, the worst per-frame IoU is $0.733$,
-and the mean foreground-error fraction is $0.0062$.
+mean silhouette IoU is $0.886$, the worst per-frame IoU is $0.747$,
+and the mean foreground-error fraction is $0.0071$.
 
 To avoid over-interpreting flow-curve agreement outside the video
 regime, we replay each real setup at the rheometer-reference HB fit and
@@ -2055,17 +2029,17 @@ Material  & $(W_1,H_1)$ & $(W_2,H_2)$
           & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & $E_{\mathrm{flow}}$ & wall \\
 \midrule
 Chuno              & $(2.5, 2.7)$ & $(4.0, 2.0)$
-                    & $0.56$ & $15.6$  & $11.4$ & $0.026$ & $10$\,s \\
+                    & $0.88$ & $3.4$  & $5.0$ & $0.740$ & $11$\,s \\
 Okonomiyaki        & $(2.2, 2.5)$ & $(7.0, 7.0)$
-                    & $0.66$ & $32.7$  & $130.5$ & $0.046$ & $9$\,s \\
+                    & $0.47$ & $91.5$  & $5.6$ & $0.200$ & $11$\,s \\
 Moisturising milk  & $(4.5, 3.5)$ & $(4.5, 2.0)$
-                    & $0.64$ & $8.0$  & $156.0$ & $0.133$ & $10$\,s \\
+                    & $0.62$ & $1.3$  & $195.3$ & $0.396$ & $11$\,s \\
 Lotion             & $(6.1, 2.8)$ & $(7.0, 6.5)$
-                    & $0.73$ & $23.9$ & $176.5$  & $0.089$ & $10$\,s \\
+                    & $0.95$ & $4.8$ & $295.3$  & $0.377$ & $9$\,s \\
 Pork-cutlet sauce  & $(6.5, 2.1)$ & $(7.0, 7.0)$
-                    & $0.53$ & $25.8$  & $14.7$  & $0.130$ & $10$\,s \\
+                    & $0.51$ & $27.7$  & $9.4$  & $0.361$ & $11$\,s \\
 Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
-                    & $0.67$ & $80.5$ & $283.5$ & $0.052$ & $10$\,s \\
+                    & $0.81$ & $91.4$ & $99.3$ & $0.663$ & $11$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2209,8 +2183,8 @@ shown in Fig.~\ref{fig:flow-real}. The snap-difference panel in
 Fig.~\ref{fig:real-snapdiff} adds a frame-level binary-mask check of
 the same replay discrepancy. The replay audit provides a pixel-level
 diagnostic of the proposed GP estimates: the mean of per-case mean
-silhouette IoU is $0.896$ across the twelve material/setup cases, with
-worst per-frame IoU $0.733$. Thus this section establishes both the
+silhouette IoU is $0.886$ across the twelve material/setup cases, with
+worst per-frame IoU $0.747$. Thus this section establishes both the
 current replay behaviour and the
 real-material discrepancy scale; it does not treat the rheometer fit
 as synthetic ground-truth parameters.
