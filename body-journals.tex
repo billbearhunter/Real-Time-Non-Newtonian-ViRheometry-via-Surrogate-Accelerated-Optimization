@@ -1630,7 +1630,7 @@ Here $\oslash$ denotes elementwise division and the bounds are the
 parameter box in \S\ref{sec:data}: $n\in[0.3,1.0]$,
 $\eta\in[10^{-3},300]$, and $\sigma_Y\in[10^{-3},400]$. When a
 plausible set is returned, we report the best-plausible $E_z$ as a
-separate oracle diagnostic for candidate coverage; it is not the same
+separate coverage diagnostic; it is not the same
 quantity as the automatically selected best-scored candidate. For comparisons against
 parallel-plate reference sweeps (\S\ref{sec:rheometer}) we further
 report the integrated log-stress error over the experimentally valid
@@ -1855,14 +1855,14 @@ compressing them into a single point-estimate pass rate.
 
 All synthetic panels in this section use the same clean GP forward,
 BAE/error-aware objective, candidate generator, calibration gates, and
-fixed random seed.
+fixed evaluation configuration.
 
 \paragraph{Sixty-four-case plausible-set stress test.}
 We next evaluate the surrogate inverse on $64$ held-out synthetic
   cases. This panel uses a 512-candidate retrieval pool, the GP+BAE
   score, empirical calibration gates, and the same normalised parameter
-distance for all setup counts. The validator script reports
-case summaries, plausible representatives, and no missing files.
+distance for all setup counts. The evaluated set contains case
+summaries and plausible representatives for every evaluated case.
 Tab.~\ref{tab:retained-contract} summarises the main result. The
 plausible set contains a near-truth representative in
 $98.4$--$100.0\%$ of cases, while the best-scored single candidate is
@@ -2008,6 +2008,11 @@ Tab.~\ref{tab:gammadot-real} and histograms in Fig.~\ref{fig:gammadot-real}
 lie inside the measured rheometer interval
 $0.1$--$1000\,\mathrm{s}^{-1}$, so flow-curve comparisons are read only
 over the overlap of rheometer and dam-break support.
+The setup pairs in this audit are the measured real-material validation
+setups used by the inverse, not pairs selected to maximise
+$\dot\gamma$ coverage. This check therefore bounds the shear-rate
+regime of the reported real validation; a separate candidate-setup
+sweep would be required to claim maximal shear-rate coverage.
 
 Tab.~\ref{tab:rheo-recovery} lists the two-setup diagnostic outputs
 from the GP bank trained on the cleaned $\rho=1.0$ corpus.
@@ -2018,11 +2023,17 @@ snap-difference layout used by the video-rheometry predecessor: real
 foregrounds, MPM foregrounds, and amplified pairwise differences are
 shown across the observed frames. The accompanying MPM-rendered silhouette replay audit
 compares the rendered foreground masks to the segmented real frames for
-the same twelve material/setup cases. The final real-material decision
-contract does not force all representatives into supported point
-estimates: only compact retained sets are promoted to point estimates,
-whereas ambiguous ridges remain retained-set diagnostics requiring
-additional setup evidence.
+the same twelve material/setup cases.
+
+The numerical $\hat{\boldsymbol{\theta}}$ values in
+Tab.~\ref{tab:rheo-recovery} are reporting representatives, not a claim
+that every real material has a unique recovered parameter triple. When
+the retained set is single-basin or compact in $z$-space, the reported
+value is the best plausible candidate under the GP/BAE ranking rule of
+\S\ref{sec:inv-ranking}. When the retained set remains extended along a
+ridge, the same rule selects one representative for plotting and replay,
+while the ridge width is treated as uncertainty rather than collapsed by
+a hand-chosen prior.
 
 \begin{table}[!htbp]
 \centering
@@ -2060,21 +2071,24 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \caption{Dam-break shear-rate support under the rheometer-reference HB
-parameters, pooled over all particles, frames, and the two real setups.
-All p5--p95 supports lie within the measured rheometer interval
-$0.1$--$1000\,\mathrm{s}^{-1}$.}
+parameters, pooled over all particles, frames, and the measured
+real-validation setup pair for each material. All p5--p95 supports lie
+within the measured rheometer interval
+$0.1$--$1000\,\mathrm{s}^{-1}$. This is a diagnostic of the validation
+regime, not a claim of maximal shear-rate coverage over all possible
+setups.}
 \label{tab:gammadot-real}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
 Material & $\dot\gamma_{p5}$ & $\dot\gamma_{p50}$ &
-$\dot\gamma_{p95}$ & setup spread \\
+$\dot\gamma_{p95}$ \\
 \midrule
-Chuno              & $1.70$ & $11.54$ & $35.99$ & $0.19$ \\
-Okonomiyaki        & $0.30$ & $4.88$  & $35.63$ & $0.62$ \\
-Moisturising milk  & $0.18$ & $4.58$  & $26.34$ & $0.48$ \\
-Lotion             & $0.17$ & $5.16$  & $33.98$ & $0.55$ \\
-Pork-cutlet sauce  & $0.36$ & $7.88$  & $63.89$ & $0.71$ \\
-Sweet bean paste   & $0.11$ & $1.95$  & $6.99$  & $0.19$ \\
+Chuno              & $1.70$ & $11.54$ & $35.99$ \\
+Okonomiyaki        & $0.30$ & $4.88$  & $35.63$ \\
+Moisturising milk  & $0.18$ & $4.58$  & $26.34$ \\
+Lotion             & $0.17$ & $5.16$  & $33.98$ \\
+Pork-cutlet sauce  & $0.36$ & $7.88$  & $63.89$ \\
+Sweet bean paste   & $0.11$ & $1.95$  & $6.99$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2144,7 +2158,7 @@ Sweet bean paste   & $0.11$ & $1.95$  & $6.99$  & $0.19$ \\
     single-setup recovery, and blue the two-setup joint recovery. The
     panel follows the same three-curve plotting convention as the
     predecessor real-material flow-curve figures, but the red and blue
-    curves are regenerated from the current GP retained-set
+    curves are regenerated from the reported GP retained-set
     inverse outputs; no rheometer-fitted HB curve is added as a
     separate coloured line.
     The panel is interpreted together with the
@@ -2160,7 +2174,7 @@ Sweet bean paste   & $0.11$ & $1.95$  & $6.99$  & $0.19$ \\
     \centering
     \includegraphics[width=0.88\textwidth]{figs/real_world/snapdiff_chuno_joint_current_gp.png}
     \caption{Binary snap-difference replay diagnostic in the
-    predecessor layout, regenerated with the current GP inverse result.
+    predecessor layout, regenerated with the reported GP inverse result.
     The example shows the Chuno second setup under the same two-setup
     GP estimate used by the Chuno joint flow curve in
     Fig.~\ref{fig:flow-real}. The first rows show the segmented real
@@ -2174,7 +2188,7 @@ Sweet bean paste   & $0.11$ & $1.95$  & $6.99$  & $0.19$ \\
     the aggregate silhouette statistics are reported over all twelve
     real material/setup cases.}
     \Description{Eight-frame binary-mask replay panel for the Chuno
-    second setup, with observed masks, current two-setup GP-estimate
+    second setup, with observed masks, reported two-setup GP-estimate
     replay masks, rheometer-reference replay masks, and amplified
     black-background white-difference rows.}
     \label{fig:real-snapdiff}
@@ -2193,10 +2207,10 @@ Herschel--Bulkley ridge dominates. The flow-curve overlays are
 shown in Fig.~\ref{fig:flow-real}. The snap-difference panel in
 Fig.~\ref{fig:real-snapdiff} adds a frame-level binary-mask check of
 the same replay discrepancy. The replay audit provides a pixel-level
-diagnostic of the proposed GP estimates: the mean of per-case mean
+diagnostic of the reported GP estimates: the mean of per-case mean
 silhouette IoU is $0.886$ across the twelve material/setup cases, with
 worst per-frame IoU $0.747$. Thus this section establishes both the
-current replay behaviour and the
+reported replay behaviour and the
 real-material discrepancy scale; it does not treat the rheometer fit
 as synthetic ground-truth parameters.
 Per-parameter uncertainty along
@@ -2207,25 +2221,35 @@ consistency, and optional local curvature diagnostics
 \subsection{Parameter Freshness for Time-Varying Materials}
 \label{sec:freshness}
 
-Hamamichi's sequential two-setup protocol chooses setup~2 after the
-setup~1 inverse returns; with simulation-in-the-loop optimisation this
-creates an hours-scale gap between captures. For self-prepared or
-ageing materials, that gap can mix observations from different material
-states. Our seconds-scale inverse removes this computational wait. We
-validate the consequence at setup level: for six short-time material
-groups, three setups are captured in one session, two are used for
-inverse estimation, and the unused third setup is held out for
-flow-front and binary-mask replay. This is a repeated-capture
-consistency test, not a fitted kinetic ageing model.
+The predecessor's sequential two-setup protocol chooses setup~2 after
+the setup~1 inverse returns. With simulation-in-the-loop optimisation,
+this can create an hours-scale computational gap between captures. For
+self-prepared or ageing materials, such a gap can mix observations from
+different material states. The practical role of a seconds-scale
+surrogate inverse is therefore not only lower runtime, but also the
+ability to evaluate multiple setups while the material is still in the
+same short-time state.
+
+We test this consequence as a held-out setup diagnostic. For each
+short-time material group, three setups are captured in one session;
+two setups are used to estimate a parameter representative, and the
+unused third setup is held out for flow-front and binary-mask replay.
+Unlike the rheometer panel in \S\ref{sec:rheometer}, these materials do
+not provide independent flow-curve ground truth. The validation target
+is therefore same-session predictive consistency: a parameter inferred
+from two setups should replay the third setup's flow front and
+segmented foreground reasonably well. This is not a fitted kinetic
+ageing model.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Freshness held-out setup diagnostic.  Each case uses two
-short-time setups for inverse and evaluates the unused third setup.
-Flow-front errors are reported in centimetres; binary-mask metrics
-compare the held-out segmented frame to the predicted support mask.}
+\caption{Freshness held-out setup diagnostic. Each case uses two
+short-time setups for inverse and evaluates the unused third setup from
+the same capture session. Flow-front errors are reported in
+centimetres; binary-mask metrics compare the held-out segmented frame
+to the predicted support mask.}
 \label{tab:fresh-holdout}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
@@ -2239,25 +2263,26 @@ Image XOR fraction & $6$ & $48$ & $0.0051$ & -- & -- \\
 \end{tabular}
 \end{table}
 
-One Oats held-out pair contains flow-front predictions but no
-\texttt{snapdiff\_pred} binary-mask files in the current packet, so it is
-included in the flow-front rows and excluded from the mask rows.  The
-largest mask discrepancy occurs on EggFoam at late frames
+The evaluated freshness set contains seven held-out flow-front cases
+from six material groups. One Oats held-out pair contains flow-front predictions
+but no \texttt{snapdiff\_pred} binary-mask files, so it is included in
+the flow-front rows and excluded from the mask rows. The largest mask
+discrepancy occurs on EggFoam at late frames
 ($\mathrm{IoU}=0.705$ at frame~8), which is therefore the case to
-inspect before promoting the freshness packet from a setup-level
-diagnostic to a kinetic-material result.
+inspect before interpreting the setup-level diagnostic as evidence for
+time-evolving material behaviour.
 
 \begin{figure*}[!htbp]
     \centering
     \includegraphics[width=0.72\textwidth]{figs/real_world/freshness_holdout_binary_diff_panel.png}
-    \caption{Held-out binary-mask freshness diagnostic on six
-    short-time material cases. Each row uses two setups for inverse and
-    visualises the unused held-out setup at frame~8. Columns show the
-    observed segmented foreground, the predicted foreground support,
-    and the XOR difference. The Oats pair without
-    \texttt{snapdiff\_pred} files is excluded from this visual panel
-    but remains in the flow-front metric rows of
-    Tab.~\ref{tab:fresh-holdout}.}
+\caption{Held-out binary-mask freshness diagnostic on six
+short-time material cases. Each row uses two setups for inverse and
+visualises the unused held-out setup at frame~8. Columns show the
+observed segmented foreground, the predicted foreground support,
+and the XOR difference. The Oats pair without
+\texttt{snapdiff\_pred} files is excluded from this visual panel
+but remains in the flow-front metric rows of
+Tab.~\ref{tab:fresh-holdout}.}
     \Description{Six-row binary-mask comparison panel for the
     freshness held-out setup experiment, with observed masks,
     predicted masks, and XOR differences.}
@@ -2265,8 +2290,8 @@ diagnostic to a kinetic-material result.
 \end{figure*}
 
 \paragraph{Claim boundary.}
-This experiment shows that a two-setup state can be checked against a
-third same-session setup. It does not estimate a material-ageing law;
+This experiment shows that a two-setup estimate can be checked against
+a third same-session setup. It does not estimate a material-ageing law;
 that would require repeated time-indexed inverses and a separate
 identifiability study for the chosen kinetic model. The validated claim
 is narrower: seconds-scale inverse makes same-session held-out setup
@@ -2282,7 +2307,7 @@ $1393.6$\,s for $64$ cases evaluated up to $6$ setups, or
 $3.63$\,s per case/setup in the unoptimised Python implementation.
 A single surrogate candidate/setup evaluation took $7.09$\,ms,
 which is $190$--$618\times$ faster than the measured one-shot MPM
-replay references used in the same report. Tab.~\ref{tab:time-budget}
+replay references used in the same timing study. Tab.~\ref{tab:time-budget}
 reports the compute-stage breakdown; operator-dependent capture timing
 is not used as a headline result.
 
@@ -2292,7 +2317,7 @@ is not used as a headline result.
 \caption{Validated compute-stage time budget after observations are
 available. The predecessor inverse entries are the reported
 simulation-in-the-loop runtimes from~\citet{hamamichi2023nonnewtonian};
-our entries are from the proposed GP-surrogate speed artifact.}
+our entries are measured from the reported GP-surrogate implementation.}
 \label{tab:time-budget}
 \begin{tabular}{@{}lccc@{}}
 \toprule
