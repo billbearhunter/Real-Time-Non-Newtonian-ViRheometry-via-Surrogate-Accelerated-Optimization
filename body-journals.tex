@@ -510,7 +510,7 @@ $\mathcal{C}\subset\Theta$ with an error-aware surrogate score,
     =
     \left\{
     \mathbf{z}\in\mathcal{C}\;:\;
-    \mathcal{L}_{\mathrm{GP+BAE}}(\mathbf{z};W,H,\mathbf{y}_{\mathrm{obs}})
+    \mathcal{L}_{\log}(\mathbf{z};W,H,\mathbf{y}_{\mathrm{obs}})
     \le
     \mathcal{L}_{\star}+\epsilon_L,\right.\\
     \left.
@@ -528,7 +528,7 @@ independence gives the joint score
     \mathcal{L}_{1:J}(\mathbf{z})
     =
     \sum_{j=1}^{J}
-    \mathcal{L}_{\mathrm{GP+BAE}}^{(j)}(\mathbf{z})
+    \mathcal{L}_{\log}^{(j)}(\mathbf{z})
     +
     \lambda_{\mathrm{sup}}
     \frac{1}{J}\sum_{j=1}^{J}q_{\mathrm{sup}}^{(j)}(\mathbf{z}).
@@ -559,8 +559,8 @@ Local heterogeneity
   & observation-conditioned expert selection and support diagnostics
   & \S\ref{sec:surrogate}, \S\ref{sec:inverse} \\
 Scale and model uncertainty
-  & front-position residual score using GP variance, BAE variance, and
-    observation noise
+  & log-front residual score using GP variance, BAE variance,
+    observation noise, and nuisance offset/trend terms
   & \S\ref{sec:inv-loss} \\
 Ridge diagnosis
   & plausible candidate sets, multi-setup shrinkage, and optional local
@@ -618,10 +618,12 @@ regions before any inverse experiment is run. The partition is selected
 to keep a large number of small local models while bounding local
 trajectory heterogeneity: in the reported bank, the maximum within-leaf
 $x_{08}$ quantile span is below $3$ cm, yielding $2{,}775$ final
-experts. The median expert has $71$ assigned training rows, the
-smallest retained expert has $10$, and the largest has $4{,}191$.
-Each expert then fits expert-local input and output scalers and trains
-eight exact GP heads, one for each flow-front frame. Validation rows
+experts. The training assignment has min/median/max
+$5/57/3{,}362$ rows per expert. For numerical cost, GP fitting uses at
+most $800$ training rows per expert, so the actual fitted train-row
+count is min/median/max $5/57/800$. Each expert then fits
+expert-local input and output scalers and trains eight exact GP heads,
+one for each flow-front frame. Validation rows
 assigned to the same local region estimate the diagonal Bayesian
 approximation-error (BAE) variance~\cite{kaipio2005statistical}; small
 regions without external validation rows use an internal holdout for
@@ -905,10 +907,11 @@ unrelated to the Herschel--Bulkley parameters, including finite-time gate
 withdrawal, release-timing jitter, segmentation uncertainty, and
 unmodelled free-surface or surface-tension transients. The weights
 therefore reduce real--simulation-gap sensitivity during routing and
-anchor retrieval. They do not alter the final inverse loss: the
-validation run reported in \S\ref{sec:mainresults} ranks candidates by
-unweighted whitened residual energy under the GP/BAE variance. The
-routing schedule is listed in
+anchor retrieval, and the same schedule is used in the promoted
+log-front inverse score below. This is a deliberate robustness choice,
+not a hidden prior on $\boldsymbol{\theta}$: all retained-set decisions
+still expose the residual, uncertainty, and support components
+separately. The routing schedule is listed in
 \S\ref{sec:data} (Tab.~\ref{tab:hyper}).
 
 \paragraph{Support and Extrapolation Diagnostics.}
@@ -954,9 +957,9 @@ rather than a forced point estimate.
 For a candidate $\mathbf{z}$, the selected GP provides both
 $\hat{y}_d(\mathbf{z})$ and predictive standard deviation
 $\sigma_{\mathrm{GP},d}(\mathbf{z})$. The inverse compares the predicted
-and observed front positions in physical trajectory units and combines
-the GP epistemic variance, the local BAE residual variance, and an
-observation-noise floor. The per-frame variance is
+and observed front positions through a log-front residual, while the
+uncertainty still comes from the physical GP/BAE variance. The physical
+per-frame variance is
 \begin{equation}
 \label{eq:gp-var}
     v_d(\mathbf{z})
@@ -966,34 +969,69 @@ observation-noise floor. The per-frame variance is
     \sigma_{\mathrm{BAE},k^\star,d}^{2}
     + \sigma_{\mathrm{obs}}^2 .
 \end{equation}
-The final validation run ranks candidates by the unweighted whitened
-residual energy
+It is converted to log-front variance by
+\begin{equation}
+\label{eq:log-var}
+    s_d^2(\mathbf{z})
+    =
+    \frac{v_d(\mathbf{z})}{\max(\hat y_d(\mathbf{z}),\epsilon)^2}
+    +
+    \sigma_{\log,\mathrm{obs}}^2 ,
+    \qquad \sigma_{\log,\mathrm{obs}}=0.20 .
+\end{equation}
+To reduce one-sided real--simulation offsets without forcing them into
+the material parameters, the objective removes a regularised affine
+nuisance term over frame time. Let
+\(\delta_d=\log\hat y_d-\log y_{\mathrm{obs},d}\),
+\(\mathbf{x}_d=(1,t_d)\), and \(t_d\) be linearly spaced from $-1$
+to $1$. The nuisance coefficients are
+\begin{equation}
+\label{eq:nuisance-fit}
+    \boldsymbol{\gamma}^{\star}
+    =
+    \arg\min_{\boldsymbol{\gamma}}
+    \sum_{d=1}^{8}
+    \frac{\alpha_d^2(\delta_d-\mathbf{x}_d^\top
+    \boldsymbol{\gamma})^2}{s_d^2}
+    +
+    \frac{\gamma_0^2}{0.25^2}
+    +
+    \frac{\gamma_1^2}{0.20^2}.
+\end{equation}
+The promoted inverse score is then the GP-aware log-nuisance loss
 \begin{equation}
 \label{eq:obs-loss}
 \begin{aligned}
-    \mathcal{L}_{\mathrm{GP}}(\mathbf{z})
+    \mathcal{L}_{\log}(\mathbf{z})
     &=
+    \frac{1}{8}
+    \left[
+    \frac{1}{2}
     \sum_{d=1}^{8}
-      \frac{r_d(\mathbf{z})^2}{v_d(\mathbf{z})},\\
-    r_d&=y_{\mathrm{obs},d}-\hat{y}_d.
+      \frac{\alpha_d^2(\delta_d-\mathbf{x}_d^\top
+      \boldsymbol{\gamma}^{\star})^2}{s_d^2}
+      +
+      \frac{1}{2}\sum_{d=1}^{8}\log s_d^2
+      \right].
 \end{aligned}
 \end{equation}
-The implementation also records the Gaussian negative log likelihood
-and max-frame implausibility as diagnostics, but the promoted
-$64$-case validation uses the residual-energy score and calibrated
-implausibility gates. The variance denominator prevents a candidate
-from winning merely because it matches the trajectory under an
-unexplained low-variance assumption. For ranking and retention we keep
-the score decomposed into explicit diagnostics: trajectory residual, GP
-variance, BAE variance, observation noise, and support penalty. This
-decomposition is important because the
+The implementation also records weighted relative RMSE, max-frame
+implausibility, and per-frame uncertainty diagnostics. The variance
+denominator prevents a candidate from winning merely because it matches
+the trajectory under an unexplained low-variance assumption, while the
+nuisance term absorbs small global offset and drift errors that are
+expected from release timing and silhouette extraction. For ranking and
+retention we keep the score decomposed into explicit diagnostics:
+trajectory residual, GP variance, BAE variance, observation noise,
+nuisance-adjusted log score, and support penalty. This decomposition is
+important because the
 experiments reported here show that the hard failure mode is not candidate
 generation alone, but overconfident ranking of false basins.
 
 \paragraph{Candidate Ranking and Plausible Sets.}
 \label{sec:inv-ranking}
 Let $\mathcal{C}$ be the post-search candidate pool and let
-$J_i=\mathcal{L}_{\mathrm{GP}}(\mathbf{z}_i)$,
+$J_i=\mathcal{L}_{\log}(\mathbf{z}_i)$,
 $a_i$ be the routing-weighted anchor residual used only as a secondary
 retention diagnostic, and $q_i$ the support diagnostic. The point
 estimate, when supported, is the best plausible candidate under a
@@ -1037,7 +1075,7 @@ $\boldsymbol{\theta}$. The joint score is
     \mathcal{L}_{1:J}(\mathbf{z})
     =
     \sum_{j=1}^{J}
-    \mathcal{L}_{\mathrm{GP}}^{(j)}(\mathbf{z})
+    \mathcal{L}_{\log}^{(j)}(\mathbf{z})
     + \lambda_{\mathrm{sup}}\,
       \frac{1}{J}\sum_{j=1}^{J} q_{\mathrm{sup}}^{(j)}(\mathbf{z}).
 \end{equation}
@@ -1083,10 +1121,11 @@ closed-form, Fisher-information-based proposer of
 representative plausible candidate $\hat{\boldsymbol{\theta}}$, they
 approximate the dam break by plane-Poiseuille flow and derive an
 analytical loss-Hessian $\mathbf{H}(\hat{\boldsymbol{\theta}};W,H)$.
-Let $\mathbf{q}_1$ be the unit eigenvector associated with the
-smallest eigenvalue of the first setup's Hessian---the direction in
-$\boldsymbol{\theta}$-space along which the current setup carries the
-least information. The Hessian-orthogonal proposer selects
+Let $\mathbf{q}_1$ be the unit principal normal associated with the
+largest eigenvalue of the first setup's Hessian, after rescaling the
+parameter axes to the search box. This vector is normal to the local
+low-loss ridge: two setups with nearly parallel normals leave nearly
+the same ambiguity. The Hessian-orthogonal proposer selects
 \begin{equation}
 \label{eq:proposer}
     (W_2^\star,H_2^\star)
@@ -1155,8 +1194,9 @@ evaluation.}
 \quad local experts                 & $2{,}775$ final experts;
                                       $2{,}735$ with external validation,
                                       $40$ internal-holdout fallback \\
-\quad expert row counts             & min / median / max =
-                                      $10$ / $71$ / $4{,}191$ \\
+\quad train rows per expert         & assigned min / median / max =
+                                      $5$ / $57$ / $3{,}362$;
+                                      fitted max $=800$ \\
 \quad $x_{08}$ within-leaf span      & median / p95 / max =
                                       $0.761$ / $2.323$ / $2.997$ cm \\
 \midrule
@@ -1186,10 +1226,12 @@ evaluation.}
                                       ridge-ambiguous \\
 \midrule
 \textit{Likelihood / UQ} & \\
-\quad loss                          & trajectory residual with GP variance,
-                                      BAE variance, and observation noise \\
+\quad loss                          & log-front residual with GP variance,
+                                      BAE variance, observation noise,
+                                      and nuisance offset/trend \\
 \quad routing weights $\boldsymbol{\alpha}$ & $(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$;
-                                      not used in the final validation score \\
+                                      used in routing and the log-front
+                                      nuisance score \\
 \quad default forward covariance    & $\Sigma_{\mathrm{GP}}+
                                        \mathrm{diag}(\Sigma_{\mathrm{BAE,leaf}})
                                        +\Sigma_{\mathrm{obs}}$ \\
