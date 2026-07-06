@@ -627,9 +627,8 @@ to keep a large number of small local models while bounding local
 trajectory heterogeneity: in the reported bank, the maximum within-region
 $x_{08}$ quantile span is below $3$ cm, yielding $2{,}775$ final
 experts. The training assignment has min/median/max
-$5/57/3{,}362$ rows per expert. For numerical cost, GP fitting uses at
-most $800$ training rows per expert, so the actual fitted train-row
-count is min/median/max $5/57/800$. Each expert then fits
+$10/71/4{,}191$ rows per expert. For numerical cost, GP fitting uses at
+most $800$ training rows per expert. Each expert then fits
 expert-local input and output scalers and trains eight exact GP heads,
 one for each flow-front frame. Validation rows
 assigned to the same local region estimate the diagonal Bayesian
@@ -710,6 +709,8 @@ the uncertainty model
 The BAE term is estimated from validation residuals and propagates
 surrogate approximation error into the inverse objective. No additional
 learned residual corrector is used in the reported forward map.
+In this manuscript, residual correction is kept as an optional diagnostic
+rather than as part of the clean GP forward.
 
 \paragraph{Observation-Conditioned Expert Selection.}
 \label{sec:surr-3layer}
@@ -747,18 +748,18 @@ The frame weights
 \[
 \boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)
 \]
-are used only for expert selection and candidate seeding. Their
-purpose is to reduce expert-selection sensitivity to the real--simulation gap in
-the earliest frames: finite-time gate withdrawal, release-timing jitter,
-segmentation uncertainty, and unmodelled free-surface or surface-tension
-transients can move the first few fronts without indicating a different
+are used for expert routing and candidate anchors only. Their
+purpose is to reduce sensitivity to the earliest release transients:
+finite-time gate withdrawal, release-timing jitter, segmentation
+uncertainty, and unmodelled free-surface or surface-tension effects can
+move the first few fronts without indicating a different
 Herschel--Bulkley material. Later front positions provide more stable
 runout evidence and therefore receive larger weights. The selector first
 keeps a short list of low-$e_s$ experts and then chooses the primary
 expert by terminal-front support and the evidence score. The same rule is
-used for real and simulator-generated observations; remaining
-real--simulation differences are handled by the observation-noise and BAE
-terms rather than by a separate expert-selection formula. Selecting an expert from observed
+used for every observation, and the retained-set score below is computed
+from the fixed GP/BAE/observation-noise budget rather than from a
+separate observation-specific expert-selection formula. Selecting an expert from observed
 $(W,H,\mathbf{y}_{\mathrm{obs}})$ rather than the unknown
 $\boldsymbol{\theta}$ avoids a circular gate and makes out-of-support
 cases diagnosable by inspecting the selected expert's training box.
@@ -911,11 +912,10 @@ The frame weights form the fixed non-decreasing schedule
 \boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0).
 \]
 By construction, the early frames of the dam-break sequence are where
-real captures and MPM replays are most likely to disagree for reasons
-unrelated to the Herschel--Bulkley parameters, including finite-time gate
-withdrawal, release-timing jitter, segmentation uncertainty, and
-unmodelled free-surface or surface-tension transients. The weights
-therefore reduce real--simulation-gap sensitivity during expert selection
+release timing, segmentation, gate withdrawal, and unresolved
+free-surface or surface-tension transients are most likely to perturb the
+front position without changing the Herschel--Bulkley parameters. The weights
+therefore reduce transient sensitivity during expert selection
 and candidate seeding only; the final retained-set score uses the unweighted
 whitened residual energy described below. This is a deliberate
 robustness choice, not a hidden prior on $\boldsymbol{\theta}$: all
@@ -1046,6 +1046,25 @@ inferior; the core change is that the expensive forward call has been
 amortised and the inverse decision is reported through explicit residual,
 uncertainty, support, and retained-set components.
 
+\paragraph{No-Leakage Boundary.}
+\label{sec:no-leakage-boundary}
+The main inverse method stops at the retained-set decision above. All
+candidate scores, support gates, and setup proposals are computed from
+the MPM-trained GP surrogate, MPM-heldout BAE statistics, and fixed
+observation-noise assumptions. Measurements from parallel-plate
+rheometers, real replay errors, binary-mask or silhouette diagnostics,
+freshness hold-out results, material names, and gamma-dot audits are not
+used to select candidates, set thresholds, choose a representative, or
+define a setup policy. They enter only after inference as validation and
+failure-analysis evidence. This separation follows the computer-model
+calibration literature: model discrepancy can be important for
+interpreting physical experiments, but if it is used as an unconstrained
+selector it can become confounded with the physical parameters
+~\cite{kennedy2001bayesian,bayarri2007framework,brynjarsdottir2014discrepancy,plumlee2017bayesian,liu2009modularization}.
+Consequently, any real-experiment discrepancy model or flow-curve/replay
+trade-off is treated as a diagnostic outside the main Method, not as the
+reported surrogate inverse.
+
 \paragraph{Joint Multi-Setup Inverse.}
 \label{sec:inv-joint}
 For observations of the same material at setups
@@ -1145,7 +1164,7 @@ reported main pipeline.
 All reported results use the single surrogate bank constructed in
 Sec.~\ref{sec:method-bank}. It is trained once on the cleaned
 $\rho=1.0$ trajectory corpus and then re-used across all inverse,
-setup-selection, real-material, and freshness experiments. No
+setup-selection, and validation experiments. No
 material-specific retraining or per-experiment hyperparameter sweep is
 performed on top of this bank. The global parameter box spans
 $n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
@@ -1178,7 +1197,7 @@ evaluation.}
                                       $2{,}735$ with external validation,
                                       $40$ using a training holdout \\
 \quad train rows per expert         & assigned min / median / max =
-                                      $5$ / $57$ / $3{,}362$;
+                                      $10$ / $71$ / $4{,}191$;
                                       fitted max $=800$ \\
 \quad $x_{08}$ within-region span    & median / p95 / max =
                                       $0.761$ / $2.323$ / $2.997$ cm \\
@@ -1213,7 +1232,7 @@ evaluation.}
                                       with GP variance, BAE variance, and
                                       observation noise \\
 \quad expert-selection weights $\boldsymbol{\alpha}$ & $(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$;
-                                      used for expert selection only \\
+                                      expert routing and candidate anchors only \\
 \quad default forward covariance    & $\Sigma_{\mathrm{GP}}+
                                        \mathrm{diag}(\Sigma_{\mathrm{BAE,expert}})
                                        +\Sigma_{\mathrm{obs}}$ \\
@@ -2023,74 +2042,133 @@ observation, not to treat the rheometer fit as if it had zero model
 discrepancy with the dam-break MPM model. The comparison is therefore
 reported in three coupled spaces: the HB flow curve against the
 parallel-plate reference, the eight-frame flow-front trajectory used
-by the inverse, and binary/silhouette support in image space. Across
-the twelve material/setup cases ($106$ frames), the mean of per-case
-mean silhouette IoU is $0.886$, the worst per-frame IoU is $0.747$,
-and the mean foreground-error fraction is $0.0071$.
+by the inverse, and binary/silhouette support in image space. The clean
+Method does not use the rheometer sweep, replay mask error, or material
+identity to choose a parameter. We therefore read this panel as a
+post-hoc validation of the surrogate inverse output and as a diagnostic
+of real/simulator mismatch, following validation practice that separates
+model-use decisions from the independent data used to assess them
+~\cite{bayarri2007framework,oberkampf2002verification,sargent2013verification}.
 
-To avoid over-interpreting flow-curve agreement outside the video
-regime, we replay each real setup at the rheometer-reference HB fit and
-record $\dot\gamma=\sqrt{2D:D}$ for all fluid particles over the eight
-observed frames. The dam-break p5--p95 supports in
-Tab.~\ref{tab:gammadot-real} and histograms in Fig.~\ref{fig:gammadot-real}
-lie inside the measured rheometer interval
-$0.1$--$1000\,\mathrm{s}^{-1}$, so flow-curve comparisons are read only
-over the overlap of rheometer and dam-break support.
-The setup pairs in this audit are the measured real-material validation
-setups used by the inverse, not pairs selected to maximise
-$\dot\gamma$ coverage. This check therefore bounds the shear-rate
-regime of the reported real validation; a separate candidate-setup
-sweep would be required to claim maximal shear-rate coverage.
+For completeness, we also keep the earlier real/simulator-gap branch as
+a labelled diagnostic rather than as the main Method. In that branch, a
+flow-curve-oriented diagnostic candidate has mean/worst
+$E_{\mathrm{flow}}=0.100/0.137$ over the six material pairs, while an
+image-replay diagnostic candidate has mean front and final-front replay
+errors $0.306/0.341$\,cm. These two diagnostics are intentionally not
+collapsed into a single material parameter: their disagreement estimates
+the scale of the real/simulator gap and the ambiguity left by the
+eight-front observation.
 
-Tab.~\ref{tab:rheo-recovery} lists the two-setup replay outputs
-from the local GP surrogate trained on the quality-controlled
+The same diagnostic branch includes several negative checks that prevent
+it from being promoted to the clean Method. Under a strict
+cross-application audit, only $2/6$ materials give the same compact
+candidate across the video and flow-curve diagnostics, and another
+$2/6$ are response-equivalent under the HB0.22 distance boundary. Chuno
+and sweet bean paste remain split cases. With budgets
+$0.22/0.30\,\mathrm{cm}/0.50\,\mathrm{cm}$ for flow-curve error, front
+error, and final-front error, no split candidate is jointly feasible:
+the nearest Chuno candidate has $0.316/0.415/0.774$, and the nearest
+sweet bean paste candidate has $0.278/0.245/0.440$. Local real-gap
+refocusing improves rheometer-flow residuals for those two materials to
+$0.061$ and $0.093$, but the refocused candidates fail replay
+validation. Interpolation between the flow-oriented and replay-oriented
+endpoints also gives no clean repair. These audits remain
+failure-analysis evidence and are not used to choose the clean inverse
+output.
+
+A rheometer flow curve and a dam-break video interrogate a material in
+different ways. The rheometer imposes controlled, approximately steady
+shear rates, whereas the dam-break experiment produces a transient,
+spatially heterogeneous free-surface flow. Agreement with a rheometer
+flow curve therefore should not be interpreted uniformly over the entire
+sweep; the relevant question is which shear-rate regimes are actually
+excited by the real validation setup
+~\citep{balmforth2007two,pashias1996fifty,ahmadi2022identification,muchiri2024identification}.
+
+To audit this regime, we replay each measured real-material setup using
+the HB fit obtained from the rheometer sweep as a reference material. We
+then record the equivalent shear rate
+$\dot\gamma_{\mathrm{eq}}=\sqrt{2D:D}$ for all fluid particles over the
+eight observed frames. This diagnostic is computed from the
+rheometer-reference material in the actual experimental geometries; it
+is not computed from the inverse candidate parameters. The histograms in
+Fig.~\ref{fig:gammadot-real} therefore characterize the shear-rate
+support of the real validation videos themselves.
+
+We interpret this support through the HB transition scale
+$\dot\gamma^\star=(\sigma_Y/\eta)^{1/n}$ from
+Eq.~\eqref{eq:gammastar}. Setup pairs that sample both the
+yield-sensitive and viscous/power-law-dominated regimes can provide
+complementary information about $\sigma_Y$ and $(\eta,n)$. In contrast,
+two setups whose shear-rate distributions remain in the same regime
+provide more redundant information and may leave a continuum of
+near-equivalent HB parameters.
+
+The dam-break p5--p95 supports in Tab.~\ref{tab:gammadot-real} all lie
+inside the measured rheometer interval $0.1$--$1000\,\mathrm{s}^{-1}$,
+but they occupy only a subset of that interval. Thus flow-curve
+agreement should be read most strongly over the overlap between the
+rheometer sweep and the dam-break shear-rate support. Agreement outside
+that support is a post-hoc HB extrapolation diagnostic rather than
+direct video-supported validation. The setup pairs in this audit are
+the measured real-material validation setups used by the inverse, not
+pairs selected to maximise $\dot\gamma$ coverage; a separate
+candidate-setup sweep would be required to claim maximal shear-rate
+coverage.
+
+Tab.~\ref{tab:rheo-recovery} lists a two-setup post-hoc flow-curve
+diagnostic from the local GP surrogate trained on the quality-controlled
 fixed-density MPM corpus.
 Fig.~\ref{fig:flow-real} shows the regenerated flow-curve overlays,
 and Fig.~\ref{fig:real-snapdiff}
-shows the corresponding binary-mask replay check in the predecessor-style
-snap-difference layout: real
-foregrounds, MPM foregrounds, and amplified pairwise differences are
-shown across the observed frames. The accompanying MPM-rendered silhouette replay audit
-compares the rendered foreground masks to the segmented real frames for
-the same twelve material/setup cases.
+shows the image-replay binary-mask check in the predecessor-style
+snap-difference layout: real foregrounds, MPM foregrounds, and
+amplified pairwise differences are shown across the observed frames.
+The flow-curve and snap-difference panels may use different diagnostic
+candidates because they answer different validation questions. This
+separation is intentional: it exposes the real/simulator gap instead of
+forcing one point estimate to optimise both the rheometer and image-space
+diagnostics. The accompanying contracted silhouette replay packet evaluates all twelve
+material/setup cases against the registered real foregrounds; its
+mean case-level IoU is $0.886$, with minimum frame-level IoU $0.747$.
 
 The numerical $\hat{\boldsymbol{\theta}}$ values in
-Tab.~\ref{tab:rheo-recovery} are reporting representatives, not a claim
-that every real material has a unique recovered parameter triple. When
-the retained set is single-basin or compact in $z$-space, the reported
-value is the best plausible candidate under the GP/BAE ranking rule of
-\S\ref{sec:inv-ranking}. When the retained set remains extended along a
-ridge, the same rule selects one representative for plotting and replay,
-while the ridge width is treated as uncertainty rather than collapsed by
-a hand-chosen prior.
+Tab.~\ref{tab:rheo-recovery} are diagnostic candidates used to draw the
+flow-curve validation panel, not a claim that every real material has a
+unique recovered parameter triple. The clean Method reports a unique
+theta only when the retained set is compact by the simulator-calibrated
+criteria of \S\ref{sec:inv-ranking}; otherwise the retained set remains
+the output and the real panels are interpreted as validation diagnostics.
 
 \begin{table}[!htbp]
 \centering
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\caption{Real-material two-setup replay results from the GP
-retained-set inverse. $E_{\mathrm{flow}}$ is the log-stress RMS
+\caption{Real-material two-setup flow-curve diagnostic. $E_{\mathrm{flow}}$ is the log-stress RMS
 distance to the rheometer sweep over
 $\dot\gamma\in[1,398]\,\mathrm{s}^{-1}$; visual agreement is shown in
-Fig.~\ref{fig:flow-real}.}
+Fig.~\ref{fig:flow-real}. These candidates are not used to define the
+clean inverse objective or thresholds; the flow error is a post-hoc
+validation metric.}
 \label{tab:rheo-recovery}
-\begin{tabular}{@{}lccccccc@{}}
+\begin{tabular}{@{}lcccccc@{}}
 \toprule
 Material  & $(W_1,H_1)$ & $(W_2,H_2)$
-          & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & $E_{\mathrm{flow}}$ & Time \\
+          & $\hat n$ & $\hat\eta$ & $\hat\sigma_Y$ & $E_{\mathrm{flow}}$ \\
 \midrule
 Chuno              & $(2.5, 2.7)$ & $(4.0, 2.0)$
-                    & $0.88$ & $3.4$  & $5.0$ & $0.740$ & $11$\,s \\
+                    & $0.75$ & $6.0$  & $21.9$ & $0.074$ \\
 Okonomiyaki        & $(2.2, 2.5)$ & $(7.0, 7.0)$
-                    & $0.47$ & $91.5$  & $5.6$ & $0.200$ & $11$\,s \\
+                    & $0.34$ & $144.1$  & $3.0$ & $0.046$ \\
 Moisturising milk  & $(4.5, 3.5)$ & $(4.5, 2.0)$
-                    & $0.62$ & $1.3$  & $195.3$ & $0.396$ & $11$\,s \\
+                    & $0.68$ & $18.2$  & $115.1$ & $0.135$ \\
 Lotion             & $(6.1, 2.8)$ & $(7.0, 6.5)$
-                    & $0.95$ & $4.8$ & $295.3$  & $0.377$ & $9$\,s \\
+                    & $0.94$ & $10.3$ & $172.8$ & $0.122$ \\
 Pork-cutlet sauce  & $(6.5, 2.1)$ & $(7.0, 7.0)$
-                    & $0.51$ & $27.7$  & $9.4$  & $0.361$ & $11$\,s \\
+                    & $0.47$ & $32.5$  & $41.3$  & $0.084$ \\
 Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
-                    & $0.81$ & $91.4$ & $99.3$ & $0.663$ & $11$\,s \\
+                    & $0.49$ & $225.1$ & $55.1$ & $0.137$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -2100,12 +2178,14 @@ Sweet bean paste   & $(4.8, 4.1)$ & $(2.5, 2.5)$
 \footnotesize
 \setlength{\tabcolsep}{4pt}
 \caption{Dam-break shear-rate support under the rheometer-reference HB
-parameters, pooled over all particles, frames, and the measured
-real-validation setup pair for each material. All p5--p95 supports lie
-within the measured rheometer interval
-$0.1$--$1000\,\mathrm{s}^{-1}$. This is a diagnostic of the validation
-regime, not a claim of maximal shear-rate coverage over all possible
-setups.}
+material model. For each real material, the two measured validation
+setups are replayed using the HB fit to the rheometer sweep, and
+$\dot\gamma_{\mathrm{eq}}=\sqrt{2D:D}$ is pooled over all fluid
+particles and observed frames. The p5, p50, and p95 values describe the
+shear-rate regimes actually probed by the real dam-break videos. These
+values bound the interpretation of the flow-curve overlays; they do not
+imply maximal setup coverage or validation of the entire rheometer
+sweep.}
 \label{tab:gammadot-real}
 \begin{tabular}{@{}lccc@{}}
 \toprule
@@ -2132,93 +2212,113 @@ Sweet bean paste   & $0.11$ & $1.95$  & $6.99$ \\
         \figureorplaceholder[2.45cm]{0.30\textwidth}{figs/real_world/real6_tonkatsu_gamma_dot_coverage.png}{(e) Japanese pork-cutlet sauce shear-rate histogram.} &
         \figureorplaceholder[2.45cm]{0.30\textwidth}{figs/real_world/real6_sweetbean_gamma_dot_coverage.png}{(f) Sweet bean paste shear-rate histogram.}
     \end{tabular}
-    \caption{Dam-break shear-rate coverage for the six
-    rheometer-reference materials. Histograms use
-    $\log_{10}\dot\gamma$ values from all fluid particles over the
-    eight observed frames, replayed at the rheometer-reference HB
-    parameters for the measured setup geometries. Vertical intervals
-    mark the rheometer-measured range and the HB-fit range used for
-    flow-curve comparison.}
+    \caption{Shear-rate coverage of the real validation setups.
+    Histograms show $\log_{10}\dot\gamma_{\mathrm{eq}}$ for the
+    rheometer-reference material replayed in the two setup geometries
+    used by the real experiments. Red denotes setup~1 and blue denotes
+    setup~2. The gray interval marks the rheometer-measured shear-rate
+    range, and dashed vertical lines mark the HB-fit interval used for
+    flow-curve comparison. These plots audit the shear-rate support of
+    the real videos; they are not histograms of the inverse candidate
+    parameters.}
     \Description{Six log-shear-rate histograms showing that the
-    dam-break support lies inside the rheometer-measured shear-rate
-    interval for the real-material validation panel.}
+    dam-break support for setup 1 and setup 2 lies inside the
+    rheometer-measured shear-rate interval for the real-material
+    validation panel.}
     \label{fig:gammadot-real}
 \end{figure*}
+
+The material-wise patterns in Fig.~\ref{fig:gammadot-real} explain why
+the measured setup pairs are not equally informative. Okonomiyaki,
+lotion, and pork-cutlet sauce show clear setup complementarity: one
+setup samples lower or transition shear rates, while the other shifts
+the response toward higher, more viscous-dominated rates. These cases
+are better positioned to reduce the coupling between yield-stress and
+viscous/power-law parameters. Moisturising milk also spans the
+transition regime, but its selected representative does not
+substantially improve the flow-curve diagnostic over the raw current
+candidate, showing that regime coverage is informative but not
+sufficient to guarantee a better point estimate.
+
+Chuno and sweet bean paste illustrate the limitations of the available
+real setups. For Chuno, both setups mainly probe shear rates above the
+transition scale, so the videos provide weaker independent information
+about the yield-dominated regime. For sweet bean paste, both setups
+remain concentrated in the low-to-transition range, with p95 support
+only about $7\,\mathrm{s}^{-1}$. Consequently, high-shear agreement in
+the sweet-bean-paste flow-curve overlay should be treated as model
+extrapolation rather than direct evidence from the dam-break videos.
 
 \begin{figure*}[!htbp]
     \centering
     % Row 1: 3 panels
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_chuno_flowcurve_single_vs_joint.png}{(a) Chuno: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_chuno_flowcurve_single_vs_joint.png}{(a) Chuno: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (a) Chuno (Japanese thickened sauce)}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_okonomiyaki_flowcurve_single_vs_joint.png}{(b) Okonomiyaki: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_okonomiyaki_flowcurve_single_vs_joint.png}{(b) Okonomiyaki: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (b) Okonomiyaki (cabbage pancake sauce)}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_moisturising_milk_flowcurve_single_vs_joint.png}{(c) Moisturising milk: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_moisturising_milk_flowcurve_single_vs_joint.png}{(c) Moisturising milk: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (c) Moisturising milk}
     \end{minipage}\\[4pt]
     % Row 2: 3 panels
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_lotion_flowcurve_single_vs_joint.png}{(d) Lotion: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_lotion_flowcurve_single_vs_joint.png}{(d) Lotion: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (d) Lotion}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_tonkatsu_flowcurve_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_tonkatsu_flowcurve_single_vs_joint.png}{(e) Japanese pork-cutlet sauce: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (e) Japanese pork-cutlet sauce}
     \end{minipage}\hfill
     \begin{minipage}[t]{0.32\textwidth}
         \centering
-        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_sweetbean_flowcurve_single_vs_joint.png}{(f) Sweet bean paste: rheometer, single, and joint flow curves.}\\
+        \figureorplaceholder[2.45cm]{\linewidth}{figs/real_world/real6_sweetbean_flowcurve_single_vs_joint.png}{(f) Sweet bean paste: rheometer, raw GP-score minimizer, and diagnostic candidate.}\\
         {\footnotesize (f) Sweet bean paste}
     \end{minipage}
     \caption{Herschel--Bulkley flow curves recovered by the local GP
-    surrogate on the six rheometer-reference materials, following the layout
-    of Fig.~13 in~\citet{hamamichi2023nonnewtonian}. Dotted black
-    denotes the measured parallel-plate rheometer sweep, red the
-    single-setup recovery, and blue the two-setup joint recovery. The
-    panel follows the same three-curve plotting convention as the
-    predecessor real-material flow-curve figures, but the red and blue
-    curves are regenerated from the reported GP retained-set
-    inverse outputs; no rheometer-fitted HB curve is added as a
-    separate coloured line.
-    The panel is interpreted together with the
-    shear-rate support in Tab.~\ref{tab:gammadot-real}.}
+    surrogate on the six rheometer-reference materials, following the
+    visual style of Fig.~13 in~\citet{hamamichi2023nonnewtonian}. Gray
+    points are the measured parallel-plate sweep, black is the HB fit
+    to that sweep, blue is the raw joint GP-score minimizer, and green
+    is the post-hoc diagnostic candidate listed in
+    Tab.~\ref{tab:rheo-recovery}. The green curves are validation
+    diagnostics, not selectors used by the clean Method. The panel is
+    interpreted together with the shear-rate support in
+    Tab.~\ref{tab:gammadot-real} and Fig.~\ref{fig:gammadot-real}:
+    agreement within the dam-break p5--p95 support is directly
+    video-supported, whereas agreement outside that support is a
+    post-hoc HB extrapolation diagnostic.}
     \Description{Two-by-three grid of log-log flow-curve overlays.
-    Each panel shows a rotational-rheometer sweep alongside the
-    single-setup and joint-setup flow curves recovered by our
-    inverse for one Hamamichi reference material.}
+    Each panel shows a rotational-rheometer sweep, its HB fit, the
+    raw joint GP-score minimizer, and a diagnostic candidate for
+    one Hamamichi reference material.}
     \label{fig:flow-real}
 \end{figure*}
 
 \begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figs/real_world/snapdiff_chuno_joint_current_gp.png}
+    \includegraphics[width=0.88\textwidth]{figs/real_world/real6_current_selected_snapdiff_panel_black.png}
     \caption{Binary snap-difference replay check in the
-    predecessor-style layout, regenerated with the reported GP inverse result.
-    The example shows the Chuno second setup under the same two-setup
-    GP estimate used by the Chuno joint flow curve in
-    Fig.~\ref{fig:flow-real}. The first rows show the segmented real
-    frames, the MPM replay at the GP estimate, and the MPM replay at
-    the rheometer-reference HB fit after conversion to the simulator
-    parameter convention used for the simple-shear flow-curve
-    calibration; the lower rows
-    show amplified XOR foreground differences as white pixels on a
-    black background. This figure is a visual diagnostic for
-    sim--real discrepancy and GP-vs-rheometer replay behaviour, while
-    the aggregate silhouette statistics are reported over all twelve
-    real material/setup cases.}
-    \Description{Eight-frame binary-mask replay panel for the Chuno
-    second setup, with observed masks, reported two-setup GP-estimate
-    replay masks, rheometer-reference replay masks, and amplified
-    black-background white-difference rows.}
+    predecessor-style layout, regenerated with the replay-diagnostic
+    GP candidate. Each row is one real
+    material/setup case at frame~8. Columns show the segmented real
+    foreground, the GP replay foreground, and the XOR foreground
+    difference as white pixels on a black background. This figure is a
+    visual diagnostic for sim--real discrepancy under the image-space
+    replay candidate; it is not a material-theta selector in
+    Tab.~\ref{tab:rheo-recovery}.}
+    \Description{Twelve-row binary-mask replay panel for the six real
+    materials and two setups per material, showing observed masks,
+    diagnostic GP replay masks, and black-background
+    white-difference rows at frame 8.}
     \label{fig:real-snapdiff}
 \end{figure*}
 
@@ -2235,12 +2335,25 @@ Herschel--Bulkley ridge dominates. The flow-curve overlays are
 shown in Fig.~\ref{fig:flow-real}. The snap-difference panel in
 Fig.~\ref{fig:real-snapdiff} adds a frame-level binary-mask check of
 the same replay discrepancy. The replay audit provides a pixel-level
-diagnostic of the reported GP estimates: the mean of per-case mean
-silhouette IoU is $0.886$ across the twelve material/setup cases, with
-worst per-frame IoU $0.747$. Thus this section establishes both the
-reported replay behaviour and the
-real-material discrepancy scale; it does not treat the rheometer fit
-as synthetic ground-truth parameters.
+diagnostic of the GP estimates after inference. The diagnostic
+flow-curve branch gives mean/worst
+$E_{\mathrm{flow}}=0.100/0.137$, while the image-space replay branch
+gives mean front/$x_8$ replay errors $0.306/0.341$\,cm. The contracted
+twelve-case silhouette replay audit gives mean case-level IoU $0.886$
+and minimum frame-level IoU $0.747$. These numbers are validation
+diagnostics: they show how different post-hoc candidates expose
+different parts of the real/simulator gap, and they are not fed back
+into the clean inverse objective, thresholds, retained-set rule, or setup
+policy. A separate bounded single-output sensitivity keeps one
+diagnostic candidate for $5/6$ materials, with mean front/$x_8$ replay
+errors $0.356/0.445$\,cm. The excluded $1/6$ material is sweet bean
+paste; it stays in the same response basin under the budget but is not a
+strict unique-theta case. A shared-nuisance diagnostic reduces the worst
+flow residual to $0.223$ but has larger replay residuals
+($0.688/0.875$\,cm). Thus this section establishes real-material
+validation behavior and the approximate discrepancy scale; it does not
+treat the rheometer fit as synthetic ground truth or promote a
+replay-only diagnostic to the material-parameter selector.
 Per-parameter uncertainty along
 the ridge should be reported by plausible-set diameter, setup-wise
 consistency, and optional local curvature diagnostics
@@ -2258,10 +2371,11 @@ surrogate inverse is therefore not only lower runtime, but also the
 ability to evaluate multiple setups while the material is still in the
 same short-time state.
 
-We test this consequence as a held-out setup diagnostic. For each
-short-time material group, three setups are captured in one session;
-two setups are used to estimate a parameter representative, and the
-unused third setup is held out for flow-front and binary-mask replay.
+We test this consequence as a \emph{Freshness held-out setup diagnostic}.
+For each short-time material group, three setups are captured in one
+session; two short-time dam-break captures are used for inverse
+estimation with the same clean surrogate interface, and the unused third capture from the same
+session is held out for flow-front and binary-mask replay.
 Unlike the rheometer panel in \S\ref{sec:rheometer}, these materials do
 not provide independent flow-curve ground truth. The validation target
 is therefore same-session predictive consistency: a parameter inferred
@@ -2283,22 +2397,24 @@ to the predicted support mask.}
 \toprule
 Metric & cases & frames & mean & median & worst \\
 \midrule
-$x_{08}$ abs. error & $7$ & -- & $0.566$ & $0.203$ & $2.054$ \\
-Median front abs. error & $7$ & -- & $0.375$ & $0.293$ & $0.853$ \\
-Case-mean mask IoU & $6$ & $48$ & $0.912$ & $0.927$ & $0.705$ \\
-Image XOR fraction & $6$ & $48$ & $0.0051$ & -- & -- \\
+$x_{08}$ abs. error & $6$ & -- & $0.548$ & $0.268$ & $2.139$ \\
+Median front abs. error & $6$ & -- & $0.297$ & $0.233$ & $0.712$ \\
+Case-mean mask IoU & $6$ & $48$ & $0.902$ & $0.921$ & $0.803$ \\
+Image XOR fraction & $6$ & $48$ & $0.0052$ & $0.0034$ & $0.0158$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The evaluated freshness set contains seven held-out flow-front cases
-from six material groups. One Oats held-out pair contains flow-front
-predictions but no binary-mask replay outputs, so it is included in the
-flow-front rows and excluded from the mask rows. The largest mask
-discrepancy occurs on EggFoam at late frames
-($\mathrm{IoU}=0.705$ at frame~8), which is therefore the case to
-inspect before interpreting the setup-level diagnostic as evidence for
-time-evolving material behaviour.
+The evaluated freshness set contains six material groups, each with a
+held-out third setup. The held-out validation packet has mean
+median-front error $0.297$\,cm, mean $x_{08}$ error $0.548$\,cm, and
+mask IoU/XOR $0.902/0.0052$. These values are reported only after
+inference and are not used to tune the inverse score, choose thresholds,
+or choose a representative. EggFoam is the largest residual case, with
+case-mean IoU $0.803$, foreground-error fraction $0.0158$, median front
+error $0.712$\,cm, and $x_{08}$ error $2.139$\,cm. We therefore read
+the result as a useful same-session predictive check with visible
+failure cases, not as a universal freshness parameter estimator.
 
 \begin{figure*}[!htbp]
     \centering
@@ -2307,10 +2423,10 @@ time-evolving material behaviour.
 short-time material cases. Each row uses two setups for inverse and
 visualises the unused held-out setup at frame~8. Columns show the
 observed segmented foreground, the predicted foreground support,
-and the XOR difference. The Oats pair without binary-mask replay
-outputs is excluded from this visual panel but remains in the
-flow-front metric rows of
-Tab.~\ref{tab:fresh-holdout}.}
+and the XOR difference; row labels report the frame~8 IoU and XOR
+fraction, while Tab.~\ref{tab:fresh-holdout} aggregates all replayed
+frames. All six cases in
+Tab.~\ref{tab:fresh-holdout} are included in this visual panel.}
     \Description{Six-row binary-mask comparison panel for the
     freshness held-out setup experiment, with observed masks,
     predicted masks, and XOR differences.}
@@ -2328,8 +2444,9 @@ validation practical.
 \subsection{Compute-Stage Time Budget}
 \label{sec:timebudget}
 
-We time the automated inverse stage replaced by the GP surrogate,
-excluding preparation, capture, segmentation, and camera calibration.
+We time the automated inverse compute stage replaced by the GP surrogate.
+The timing excludes preparation, capture, segmentation, and camera
+calibration.
 In the measured speed run, GP inverse primary scoring required
 $1393.6$\,s for $64$ cases evaluated up to $6$ setups, or
 $3.63$\,s per case/setup in the unoptimised Python implementation.
@@ -2339,8 +2456,9 @@ replay references used in the same timing study. Tab.~\ref{tab:time-budget}
 reports the compute-stage breakdown. The multi-setup entries are the
 measured per-case/setup average scaled by the number of accumulated
 setups, not a separately optimised stopwatch implementation for each
-row; operator-dependent capture timing is not used as a headline
-result.
+row; operator-dependent manual timings are not used as a headline
+validated result, and our entries are from the current GP-surrogate
+speed artifact.
 
 \begin{table}[!htbp]
 \centering
@@ -2441,20 +2559,35 @@ stronger setup evidence would be needed.
 
 The real-material and freshness panels are interpreted as diagnostic
 domain validations rather than synthetic-truth tests. For the six
-rheometer-reference materials, the reported representatives give
-$E_{\mathrm{flow}}$ values from $0.200$ to $0.740$ and binary replay
-statistics with mean per-case silhouette IoU $0.886$ over twelve
-material/setup cases, but these numbers include camera, segmentation,
-and real--sim discrepancy. The gamma-dot audit shows that the measured
+rheometer-reference materials, one post-hoc flow-curve diagnostic gives
+mean/worst $E_{\mathrm{flow}}=0.100/0.137$, while an image-space replay
+diagnostic gives mean front/$x_8$ replay errors of $0.306/0.341$\,cm.
+The contracted silhouette replay packet covers the twelve
+material/setup cases and gives mean case-level IoU $0.886$ with minimum
+frame-level IoU $0.747$. These summaries are not merged into one
+universal material theta because their objectives expose different parts
+of the real/simulator gap. Additional diagnostic audits show that the
+split is not only a discrete-search artifact: local continuous refocus
+can repair the rheometer-flow residuals for Chuno and sweet bean paste
+($0.061$ and $0.093$ log-RMS), but the refocused parameters fail replay
+validation; simple interpolation between the flow-oriented and
+image-oriented endpoints also yields no clean joint repair. These
+numbers include camera, segmentation, and real/simulator discrepancy, so
+they are not synthetic parameter errors and are not used to tune the
+clean inverse method. The gamma-dot audit shows that the measured
 validation setups excite p5--p95 shear-rate supports inside the
-$0.1$--$1000\,\mathrm{s}^{-1}$ rheometer interval, so the flow-curve
-comparison is not extrapolated far outside the measured shear-rate
-range; it does not prove maximal setup coverage. The freshness panel
-shows that a two-setup estimate can replay a third same-session setup
-with median $x_{08}$ error $0.203$\,cm, median front error
-$0.293$\,cm, mean mask IoU $0.912$, and image XOR fraction $0.0051$.
-This supports a repeated-capture protocol enabled by speed, not a
-kinetic ageing model.
+$0.1$--$1000\,\mathrm{s}^{-1}$ rheometer interval, but only the overlap
+with those dam-break supports is directly video-supported; agreement
+outside that support is an HB extrapolation diagnostic. The
+freshness panel shows that a two-setup estimate can replay a third
+same-session setup with mean median-front error $0.297$\,cm, mean
+$x_{08}$ error $0.548$\,cm, mean mask IoU $0.902$, and image XOR
+fraction $0.0052$. EggFoam and YolkEmulsion are not counted as
+application-level unique recoveries: EggFoam lacks enough complete
+held-out replay evidence, while YolkEmulsion remains a
+setup-generalization conflict. This supports a
+repeated-capture protocol enabled by speed, not a kinetic ageing model
+or a guarantee of unique recovery on every real material.
 
 The main practical gain is amortisation. The expensive MPM corpus is
 paid for once, while inverse queries, multi-setup ambiguity checks,
@@ -2479,7 +2612,11 @@ but it is not yet a fully automatic unique-parameter estimator. Future
 work should improve this selector by validating it against held-out MPM
 replays, relaxing overly aggressive plausibility gates, and calibrating
 scores so that near-truth candidates are ranked ahead of false basins
-that happen to fit the surrogate.
+that happen to fit the surrogate. For real materials, the negative
+continuous-refocus and interpolation audits suggest that the remaining
+split cases are not solved by a simple local score repair. They require
+either richer observations, stronger setup evidence, or an explicit
+real--simulation discrepancy model that is itself validated by replay.
 
 Second, the range of setups and material parameters implicitly defines
 the range where the estimate is reliable. The surrogate has been
