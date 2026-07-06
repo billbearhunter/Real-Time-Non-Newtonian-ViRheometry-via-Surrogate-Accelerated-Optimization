@@ -2122,16 +2122,15 @@ diagnostic from the local GP surrogate trained on the quality-controlled
 fixed-density MPM corpus.
 Fig.~\ref{fig:flow-real} shows the regenerated flow-curve overlays,
 and Fig.~\ref{fig:real-snapdiff}
-shows the image-replay binary-mask check in the predecessor-style
+shows the corresponding binary-mask replay check in the predecessor-style
 snap-difference layout: real foregrounds, MPM foregrounds, and
-amplified pairwise differences are shown across the observed frames.
-The flow-curve and snap-difference panels may use different diagnostic
-candidates because they answer different validation questions. This
-separation is intentional: it exposes the real/simulator gap instead of
-forcing one point estimate to optimise both the rheometer and image-space
-diagnostics. The accompanying contracted silhouette replay packet evaluates all twelve
-material/setup cases against the registered real foregrounds; its
-mean case-level IoU is $0.886$, with minimum frame-level IoU $0.747$.
+amplified pairwise differences are shown across the observed frames for
+a representative Chuno setup. The shear-rate support audit in
+Fig.~\ref{fig:gammadot-real} determines how strongly these replay and
+flow-curve diagnostics should be interpreted as evidence about the
+rheometer curve: agreement is most direct where the real dam-break
+setups actually excite the relevant shear-rate regime, and agreement
+outside that support is an HB-model extrapolation check.
 
 The numerical $\hat{\boldsymbol{\theta}}$ values in
 Tab.~\ref{tab:rheo-recovery} are diagnostic candidates used to draw the
@@ -2307,20 +2306,26 @@ extrapolation rather than direct evidence from the dam-break videos.
 
 \begin{figure*}[!htbp]
     \centering
-    \includegraphics[width=0.88\textwidth]{figs/real_world/real6_current_selected_snapdiff_panel_black.png}
+    \includegraphics[width=0.88\textwidth]{figs/real_world/snapdiff_chuno_joint_current_gp.png}
     \caption{Binary snap-difference replay check in the
-    predecessor-style layout, regenerated with the replay-diagnostic
-    GP candidate. Each row is one real
-    material/setup case at frame~8. Columns show the segmented real
-    foreground, the GP replay foreground, and the XOR foreground
-    difference as white pixels on a black background. This figure is a
-    visual diagnostic for sim--real discrepancy under the image-space
-    replay candidate; it is not a material-theta selector in
-    Tab.~\ref{tab:rheo-recovery}.}
-    \Description{Twelve-row binary-mask replay panel for the six real
-    materials and two setups per material, showing observed masks,
-    diagnostic GP replay masks, and black-background
-    white-difference rows at frame 8.}
+    predecessor-style layout, regenerated with the reported GP inverse result.
+    The example shows the Chuno second setup under the same two-setup
+    GP estimate used by the Chuno joint flow curve in
+    Fig.~\ref{fig:flow-real}. The first rows show the segmented real
+    frames, the MPM replay at the GP estimate, and the MPM replay at
+    the rheometer-reference HB fit after conversion to the simulator
+    parameter convention used for the simple-shear flow-curve
+    calibration; the lower rows show amplified XOR foreground
+    differences as white pixels on a black background. Together with
+    the Chuno shear-rate support in Fig.~\ref{fig:gammadot-real}, this
+    replay check is a visual diagnostic for sim--real discrepancy and
+    GP-vs-rheometer replay behaviour, not a validation of the entire
+    rheometer flow curve outside the shear-rate regimes excited by the
+    videos.}
+    \Description{Eight-frame binary-mask replay panel for the Chuno
+    second setup, with observed masks, reported two-setup GP-estimate
+    replay masks, rheometer-reference replay masks, and amplified
+    black-background white-difference rows.}
     \label{fig:real-snapdiff}
 \end{figure*}
 
@@ -2336,9 +2341,9 @@ geometries where the real--sim gap or the remaining
 Herschel--Bulkley ridge dominates. The flow-curve overlays are
 shown in Fig.~\ref{fig:flow-real}. The snap-difference panel in
 Fig.~\ref{fig:real-snapdiff} adds a frame-level binary-mask check of
-the same replay discrepancy. The replay audit provides a pixel-level
-diagnostic of the GP estimates after inference. The diagnostic
-flow-curve branch gives mean/worst
+the same replay discrepancy for the representative Chuno case, while
+the aggregate silhouette packet remains a numerical audit over all
+twelve material/setup cases. The diagnostic flow-curve branch gives mean/worst
 $E_{\mathrm{flow}}=0.100/0.137$, while the image-space replay branch
 gives mean front/$x_8$ replay errors $0.306/0.341$\,cm. The contracted
 twelve-case silhouette replay audit gives mean case-level IoU $0.886$
