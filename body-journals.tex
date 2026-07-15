@@ -592,7 +592,8 @@ implemented transformed order are
 \end{aligned}
 \]
 The logarithms act on numerical values expressed in the fixed corpus
-unit convention.  The material-only inverse coordinate is
+unit convention.  The material-only inverse coordinate uses natural
+logarithms,
 \[
     \mathbf{z}=(n,\log\eta,\log\sigma_Y)^\top\in\mathcal{Z}.
 \]
@@ -642,11 +643,23 @@ the finite-value, positive-value, and non-decreasing-trajectory gates; it
 does not mean that MPM is discrepancy-free relative to an experiment.
 The split separates GP fitting, BAE estimation, and final testing.
 
-The offline partition is fitted once from the clean training
-trajectories before inverse experiments.  Validation and test
-trajectories may be assigned to the frozen regions for BAE estimation and
-forward assessment, but they do not determine GP scalers or
-hyperparameters.  For region $s$, let $\mathcal{D}_s$ be its assigned
+The offline partition is a frozen, \emph{response-informed} assignment
+constructed once, before any inverse experiment, from all
+$407{,}480$ clean rows and their recorded trajectories---training,
+validation, and test alike---with the resulting region labels written
+back to the three splits.  Regions are formed from the responses, not
+as a rectangular grid over the five GP inputs: a first stage groups
+rows into geometry roots by quantile bins of $\ln(H/W)$ and
+$\ln\bigl(\sqrt{HW}/1\,{\rm cm}\bigr)$ and recursively splits each root
+using normalised trajectory shape, the log-scaled terminal front, and
+stationarity-screening features; a second stage further splits any
+region whose terminal-front quantile span exceeds the $3$ cm bound
+below.  GP scalers and hyperparameters are fitted from training rows
+only, and validation rows supply BAE estimation.  Because test
+responses participated in partition construction, held-out metrics
+measure GP fitting error \emph{given} this fixed partition rather than
+fully partition-independent generalisation.  For region $s$, let
+$\mathcal{D}_s$ be its assigned
 training rows and let $\mathcal{T}_s\subseteq\mathcal{D}_s$ be the subset,
 capped at $800$ rows, used for scaler and GP fitting.  The terminal-front
 heterogeneity statistic is
@@ -1081,14 +1094,15 @@ Assumed density $\rho$ & $1.0$ & fixed simulator condition \\
 \end{tabular}
 \end{table}
 
-The clean training rows are partitioned once into local trajectory
+The clean rows are partitioned once into local trajectory
 regions before any inverse experiment is run. The partition is selected
 to keep a large number of small local models while bounding local
 trajectory heterogeneity: in the reported bank, the maximum within-region
 $x_{08}$ quantile span is below $3$ cm, yielding $2{,}775$ final
-experts. The training assignment has min/median/max
-$10/71/4{,}191$ rows per expert. For numerical cost, GP fitting uses at
-most $800$ training rows per expert. Each expert then fits
+experts. The all-row region sizes are min/median/max
+$10/71/4{,}191$; the training rows assigned per expert are
+$5/57/3{,}362$. For numerical cost, GP fitting uses at
+most $800$ training rows per expert ($5/57/800$). Each expert then fits
 expert-local input and output scalers and trains eight exact GP heads,
 one for each flow-front frame. Validation rows
 assigned to the same local region estimate the diagonal Bayesian
@@ -1409,15 +1423,15 @@ Every candidate is evaluated relative to the training support of the
 selected local expert. Let
 $[\mathbf{z}_{\min,s^\star},\mathbf{z}_{\max,s^\star}]$ be its support
 in $z$-space, padded by a fraction $p$ of its local standard-deviation
-vector $\boldsymbol{\rho}_{z,s^\star}$ and clipped to the global HB
+vector $\boldsymbol{\omega}_{z,s^\star}$ and clipped to the global HB
 bounds,
 \begin{equation}
 \label{eq:tight-box}
     \mathcal{Z}_{s^\star}
     =
     \mathcal{Z}\cap
-    [\mathbf{z}_{\min,s^\star}-p\boldsymbol{\rho}_{z,s^\star},\,
-     \mathbf{z}_{\max,s^\star}+p\boldsymbol{\rho}_{z,s^\star}].
+    [\mathbf{z}_{\min,s^\star}-p\boldsymbol{\omega}_{z,s^\star},\,
+     \mathbf{z}_{\max,s^\star}+p\boldsymbol{\omega}_{z,s^\star}].
 \end{equation}
 We record a support penalty
 \begin{equation}
@@ -1518,8 +1532,13 @@ values,
     E_i^\infty\le E_\infty^{\max},\;
     q_i\le q_{\max}\}.
 \end{equation}
-A point estimate is reported only when $\mathcal{R}$ collapses to a
-single compatible basin or has small diameter in $z$-space. Otherwise
+Basins are formed by greedy centre linking in $z$-space: a retained
+candidate joins the nearest existing basin centre within a fixed
+linking radius and otherwise opens a new basin, so basin counts and
+labels require stability checks under candidate reordering. A point
+estimate is reported only when $\mathcal{R}$ contains at least a
+minimum retained count, forms a single compatible basin, and has small
+diameter in $z$-space. Otherwise
 the inverse reports an ambiguous plausible set and requests additional
 setup evidence. In the reported experiments, $\mathcal{C}$ is the
 explicit retrieval/local-proposal candidate set described above and is ranked
@@ -1680,8 +1699,9 @@ evaluation.}
 \quad local experts                 & $2{,}775$ final experts;
                                       $2{,}735$ with external validation,
                                       $40$ using a training holdout \\
-\quad train rows per expert         & assigned min / median / max =
+\quad rows per expert               & all-row region size min / median / max =
                                       $10$ / $71$ / $4{,}191$;
+                                      assigned train rows = $5$ / $57$ / $3{,}362$;
                                       fitted max $=800$ \\
 \quad $x_{08}$ within-region span    & median / p95 / max =
                                       $0.761$ / $2.323$ / $2.997$ cm \\
