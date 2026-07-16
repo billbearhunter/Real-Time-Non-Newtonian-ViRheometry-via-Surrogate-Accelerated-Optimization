@@ -439,585 +439,110 @@ condition; we therefore want estimation latency short enough to
 compute cost.
 
 \section{Method (Surrogate-Accelerated Inverse)}
+
 \label{sec:method-block}
 
-\subsection{Definitions and Notation}
+
+
+\subsection{Method Overview and Problem Formulation}
+
 \label{sec:method-definitions}
 
-The background establishes two premises that determine the method
-interface.  First, distinct Herschel--Bulkley (HB) parameter triples can
-produce similar short-window front trajectories, so a single observation
-need not identify one material uniquely.  Second, retaining a forward
-comparison would require many MPM evaluations for every candidate and
-setup.  We therefore keep the ambiguity-aware forward inverse, replace
-only its repeated online MPM calls by a frozen surrogate, and report a
-retained candidate set when the available observations do not support a
-unique estimate.
-
-This subsection fixes the objects used by that construction before the
-implementation is described.  Each modelling choice is introduced with
-the problem it addresses and the evidence needed to assess it.  Prior
-literature motivates established model properties; the paper-specific
-claim that a choice is adequate for this corpus is evaluated later by
-held-out forward tests, inverse tests, and real-video replay.  A citation
-is therefore not treated as a substitute for validation.
-
-\paragraph{Material, setup, and declared scope.}
-The unknown material and the controllable experiment must be distinct
-objects.  The material is
-\[
-    \boldsymbol{\theta}=(n,\eta,\sigma_Y)^\top\in\Theta ,
-\]
-where $n$ is dimensionless, $\eta$ is the HB consistency coefficient,
-and $\sigma_Y$ is the yield stress.  Numerical values use the CGS
-convention of Sec.~\ref{sec:mpm-forward}.  A dam-break setup is
-$S=(W,H)\in\mathcal{G}$, where $W$ and $H$ are the initial column width
-and height in cm.  The declared scope of the reported method is
-\[
-\begin{split}
-    \Theta={}&[0.3,1.0]\times[10^{-3},300]\times[10^{-3},400],\\
-    \mathcal{G}={}&[2,7]\ {\rm cm}\times[2,7]\ {\rm cm}.
-\end{split}
-\]
-These intervals define the parameter and setup values considered in this
-study.  They are not universal physical bounds for the HB law and do not
-assert uniform training coverage.  For observations from
-$j=1,\ldots,J$ setups, $S_j=(W_j,H_j)$ may change while one
-$\boldsymbol{\theta}$ is shared.  Additional setups can therefore add
-evidence about the same material rather than create unrelated estimates.
-
-We reserve $W$ and $H$ for physical setup dimensions and use
-$(W_{\rm px},H_{\rm px})$ for image dimensions.  The index $s$ denotes a
-local GP expert, while $s_{\rm fov}$ denotes the camera projection scale.
-Video frames are $I_d$.  Candidate mismatch statistics are denoted
-$E_i^{\rm rms}$ and $E_i^\infty$, rather than reusing $I$.  The
-expert-local scaling spreads are
-$\boldsymbol{\omega}_{X,s}$ and $\boldsymbol{\omega}_{Y,s}$, so
-$\sigma_Y$ is used only for yield stress.  The unit Hessian normal used
-by setup proposal is $\boldsymbol{\nu}_j$, which is distinct from the
-scalar support diagnostic $q_{\rm sup}$.
-
-\paragraph{Common simulation--experiment observation.}
-The MPM state is a high-dimensional particle field, whereas the
-experimental input is a sequence of pixel arrays.  A forward residual is
-meaningful only after both have been mapped to the same physical
-observable.  We define
-\[
-\begin{aligned}
-    \mathbf{y}(\boldsymbol{\theta};S)
-    &=
-    \mathcal{A}_{\rm sim}
-    \bigl(\mathrm{MPM}(\boldsymbol{\theta};S)\bigr)
-    =\mathcal{S}(\boldsymbol{\theta};S),\\
-    \mathbf{y}_{\rm obs}(S)
-    &=
-    \mathcal{A}_{\rm vid}
-    \bigl(I_{1:8};\mathbf{K}^{*},R^{*},\mathbf{t}^{*},S\bigr),
-\end{aligned}
-\qquad
-\mathbf{y},\mathbf{y}_{\rm obs}\in\mathbb{R}_{\geq0}^{8}.
-\]
-The operator $\mathcal{A}_{\rm sim}$ records the farthest downstream
-front distance from the container front wall at eight fixed times.
-The operator $\mathcal{A}_{\rm vid}$ performs calibrated projection,
-segmentation, ground-plane back-projection, and front extraction.  Thus
-the corpus values $(x_{01},\ldots,x_{08})$ and video values
-$(x_1,\ldots,x_8)$ are instances of the same cm-valued quantity.
-
-The front vector is used because it is available from both modalities
-with a common physical interpretation and reduces a particle field or
-silhouette sequence to eight values that can be evaluated repeatedly.
-This reduction enables the surrogate interface; it does not itself make
-the inverse identifiable.  Its validity must be checked by confirming a
-common release-time origin, spatial origin, flow direction, and cm scale,
-and by measuring held-out MPM recovery and real-video replay error.
-
-\paragraph{Forward inverse and surrogate contract.}
-A deterministic direct map
-$\mathbf{y}_{\rm obs}\mapsto\boldsymbol{\theta}$ would have to return one
-triple even when several triples produce indistinguishable fronts,
-unless its output model explicitly represented multiple solutions.
-Equation~\eqref{eq:ridge} and the predecessor analysis
-\cite{hamamichi2023nonnewtonian} motivate retaining the forward inverse:
-candidate materials are mapped to predicted observations and their
-compatibility with $\mathbf{y}_{\rm obs}$ is evaluated.  The output can
-then remain a set when the observation is ambiguous.
-
-Let
-\[
-    \widetilde{\mathcal{S}}(\boldsymbol{\theta};S)
-    \simeq
-    \mathcal{S}(\boldsymbol{\theta};S)
-\]
-be the forward surrogate frozen after offline training.  It is introduced
-because a forward inverse multiplies the in-loop MPM cost by both the
-number of candidates and the number of setups.  The surrogate replaces
-only those repeated online calls.  MPM remains the reference physical
-model, and the surrogate is not claimed to be more physically faithful.
-The relevant claim is instead that
-$\widetilde{\mathcal{S}}$ preserves sufficient forward and inverse
-fidelity while reducing online runtime.  This claim requires held-out
-surrogate-to-MPM error, end-to-end retained-set coverage, and measured
-runtime.
-
-The inverse needs a forward mean and a candidate-dependent indication of
-model uncertainty.  Exact GP regression supplies both under an explicit
-covariance model and marginal-likelihood fit
-\cite{rasmussen2006gaussian}; this is the reason for choosing a GP rather
-than treating a deterministic surrogate prediction as exact.  Its
-posterior variance is conditional on the kernel and fitting data and is
-not automatically calibrated for this MPM corpus.  A single exact GP is
-also infeasible at the corpus scale because dense exact-GP fitting grows
-cubically in time and quadratically in memory.  We therefore fit local
-exact-GP experts
-\cite{jordan1994hierarchical,tresp2001mixtures,liu2018generalized}.
-Localisation bounds each covariance problem and permits region-specific
-scales and hyperparameters, but can introduce partition-boundary and
-routing errors.  The resulting obligations are held-out prediction and
-tail error, uncertainty calibration, routing stability, retained-set
-coverage, and online runtime.  The paper does not claim universal
-superiority over sparse GPs, probabilistic neural surrogates, or
-ensembles without a matched-budget comparison.
-
-\paragraph{GP and inverse coordinates.}
-The GP fitting coordinates and material-space diagnostic coordinates
-serve different numerical purposes.  The physical GP input and its
-implemented transformed order are
-\[
-\begin{aligned}
-    \mathbf{x}
-    &=(n,\eta,\sigma_Y,W,H)^\top,\\
-    \mathbf{x}_{\log}
-    &=(W,H,n,\log_{10}\eta,\log_{10}\sigma_Y)^\top .
-\end{aligned}
-\]
-The logarithms act on numerical values expressed in the fixed corpus
-unit convention.  The material-only inverse coordinate uses natural
-logarithms,
-\[
-    \mathbf{z}=(n,\log\eta,\log\sigma_Y)^\top\in\mathcal{Z}.
-\]
-Equivalently, the logarithms may be read as ratios to unit reference
-values in the adopted corpus units, which makes the coordinates
-dimensionless.  Geometry is excluded from $\mathbf{z}$ because support,
-ridge, basin, and diameter diagnostics compare materials rather than
-setups.
-
-For expert $s$, input encoding, output encoding, and physical-unit
-decoding are
-\[
-\begin{aligned}
-    \widetilde{\mathbf{x}}_s
-    &=
-    (\mathbf{x}_{\log}-\boldsymbol{\mu}_{X,s})
-    \oslash\boldsymbol{\omega}_{X,s},\\
-    \widetilde{\mathbf{y}}_s
-    &=
-    (\mathbf{y}-\boldsymbol{\mu}_{Y,s})
-    \oslash\boldsymbol{\omega}_{Y,s},\\
-    \widehat{\mathbf{y}}
-    &=
-    \boldsymbol{\mu}_{Y,s}
-    +\boldsymbol{\omega}_{Y,s}\odot
-      \widehat{\widetilde{\mathbf{y}}}_s .
-\end{aligned}
-\]
-Here $\oslash$ and $\odot$ are componentwise division and multiplication.
-All four scaler vectors are computed from the expert's fitting rows and
-then frozen.  Log transformation prevents the several-order ranges of
-$\eta$ and $\sigma_Y$ from dominating numerical optimisation, while
-expert-local scaling gives the five GP inputs comparable local
-magnitudes.  Inverse residuals are evaluated only after predictions have
-been decoded to cm.
-
-\paragraph{Clean corpus, partition, and local expert.}
-The quality-controlled simulator corpus is
-\[
-    \mathcal{D}_{\rm clean}
-    =
-    \{(\boldsymbol{\theta}_i,S_i,\mathbf{y}_i)\}_{i=1}^{407{,}480},
-\]
-with fixed train/validation/test sizes
-$325{,}984/40{,}748/40{,}748$.  Here \emph{clean} means that a row passed
-the finite-value, positive-value, and non-decreasing-trajectory gates; it
-does not mean that MPM is discrepancy-free relative to an experiment.
-The split separates GP fitting, BAE estimation, and final testing.
-
-The offline partition is a frozen, \emph{response-informed} assignment
-constructed once, before any inverse experiment, from all
-$407{,}480$ clean rows and their recorded trajectories---training,
-validation, and test alike---with the resulting region labels written
-back to the three splits.  Regions are formed from the responses, not
-as a rectangular grid over the five GP inputs: a first stage groups
-rows into geometry roots by quantile bins of $\ln(H/W)$ and
-$\ln\bigl(\sqrt{HW}/1\,{\rm cm}\bigr)$ and recursively splits each root
-using normalised trajectory shape, the log-scaled terminal front, and
-stationarity-screening features; a second stage further splits any
-region whose terminal-front quantile span exceeds the $3$ cm bound
-below.  GP scalers and hyperparameters are fitted from training rows
-only, and validation rows supply BAE estimation.  Because test
-responses participated in partition construction, held-out metrics
-measure GP fitting error \emph{given} this fixed partition rather than
-fully partition-independent generalisation.  For region $s$, let
-$\mathcal{D}_s$ be its assigned
-training rows and let $\mathcal{T}_s\subseteq\mathcal{D}_s$ be the subset,
-capped at $800$ rows, used for scaler and GP fitting.  The terminal-front
-heterogeneity statistic is
-\[
-    h_s
-    =
-    Q_{0.95}\!\left(\{x_{08,i}:i\in\mathcal{D}_s\}\right)
-    -
-    Q_{0.05}\!\left(\{x_{08,i}:i\in\mathcal{D}_s\}\right),
-\]
-where $Q_p$ is the empirical $p$-quantile.  The reported partition has
-$2{,}775$ regions and enforces $h_s<3$ cm.  The inequality defines the
-reported terminal-front span; it does not prove homogeneity of all eight
-outputs or optimality of the $3$ cm threshold, row cap, or expert count.
-
-A local expert is the complete frozen object
-\[
-    \mathcal{E}_s
-    =
-    \left(
-    \mathcal{T}_s,
-    \boldsymbol{\mu}_{X,s},\boldsymbol{\omega}_{X,s},
-    \boldsymbol{\mu}_{Y,s},\boldsymbol{\omega}_{Y,s},
-    \{\mathrm{GP}_{s,d}\}_{d=1}^{8},
-    \Sigma_{\rm BAE,s}
-    \right).
-\]
-Thus an expert is neither one scalar regressor nor a voting ensemble.  It
-contains eight exact-GP heads that share one expert-local scaled
-five-dimensional fitting set.  Separate heads avoid fitting a full
-cross-frame covariance in thousands of small regions; this is a
-computational modelling choice, not an assertion that frame errors are
-independent.
-
-For head $d$, the implementation uses a linear mean
-$m_{s,d}(\widetilde{\mathbf{x}})$ and
-$k_s=k_{5/2}+k_{\rm lin}$, where the Mat\'ern-$5/2$ component is defined
-in Eq.~\eqref{eq:matern}.  The exact posterior mean and variance in
-Eq.~\eqref{eq:gp-predictive} retain the fitted mean function, and
-Eq.~\eqref{eq:gp-mll} fits the mean, covariance, and likelihood-noise
-parameters offline.  The marginal likelihood is a GP training criterion;
-it is not the inverse likelihood $\mathcal{L}_{\rm GP}$.  The independent
-heads and local partition require cross-frame residual, boundary, and
-partition-sensitivity checks rather than being justified by definition.
-
-\paragraph{Observation-conditioned expert selection.}
-The offline partition constructs the expert bank but cannot directly
-route a new experiment.  At inverse time
-$\boldsymbol{\theta}$ is unknown, so using it to select an expert would
-make the gate circular.  In addition, the response-informed offline
-assignment requires an MPM trajectory that is unavailable for a new
-query.  We therefore define
-\[
-    s^\star
-    =
-    g(W,H,\mathbf{y}_{\rm obs})
-\]
-as the deterministic expert selected from observable setup and
-trajectory evidence.  Equation~\eqref{eq:gate} defines $g$ from
-whole-trajectory resemblance, terminal-front consistency, and setup
-proximity; its coefficients are routing choices, not probabilities.
-The selected top-1 expert supplies the forward prediction.  Routing must
-be assessed by selector stability, selected-versus-assigned forward
-error, routing ablations, and downstream retained-set coverage.
-
-\paragraph{Forward uncertainty and BAE.}
-A selected GP posterior variance does not by itself represent all error
-between a prediction and an experimental observation.  For frame $d$ we
-define
-\[
-    v_d(\mathbf{z})
-    =
-    \sigma_{{\rm GP},d}^{2}(\mathbf{z})
-    +\sigma_{{\rm BAE},s^\star,d}^{2}
-    +\sigma_{\rm obs}^{2}.
-\]
-The first term is the selected GP's decoded conditional variance.  The
-second is the empirical variance of held-out MPM-minus-GP residuals and
-represents surrogate approximation error following the BAE principle
-\cite{kaipio2005statistical}.  The third represents measurement
-uncertainty from calibration, segmentation, front extraction, and frame
-timing.  The terms have different data sources and are added only after
-conversion to cm$^2$.
-
-Every expert stores a BAE variance entry.  For $2{,}735$ experts it is
-estimated from expert-local external validation rows; the $40$ experts
-without such rows use the frozen global residual variance.  This is the
-meaning of the fallback and does not create an additional expert type.
-No learned residual-mean correction is part of the reported forward map.
-Validation must distinguish GP-only from GP+BAE calibration, report the
-validation-empty cases, and quantify the observation-noise contribution.
-
-\paragraph{Candidates, support, and retained output.}
-The inverse evaluates a finite material pool
-\[
-    \mathcal{C}
-    =
-    \mathcal{C}_{\rm NN}
-    \cup\mathcal{C}_{\rm local}
-    \cup\mathcal{C}_{\rm global}
-    \subset\mathcal{Z}.
-\]
-The three components are training-neighbour seeds, local proposals, and
-support-aware global proposals.  A finite union is used because the
-continuous HB box cannot be enumerated and a single local search can miss
-disconnected low-loss regions.  Candidate generation only proposes
-points; it does not establish that they are plausible.
-
-Let $\mathbf{z}_{\min,s^\star}$ and
-$\mathbf{z}_{\max,s^\star}$ be componentwise material-coordinate bounds
-of the selected expert.  The support diagnostic is
-\[
-\begin{split}
- q_{\rm sup}(\mathbf{z};s^\star)
- ={}&
- \|\max(\mathbf{z}_{\min,s^\star}-\mathbf{z},0)\|_2^2\\
- &+
- \|\max(\mathbf{z}-\mathbf{z}_{\max,s^\star},0)\|_2^2 .
-\end{split}
-\]
-It is zero inside the observed local box and increases with squared
-distance outside it.  It is a dimensionless coordinate distance, not a
-GP variance, physical error, prior probability, or second likelihood.
-It is introduced so that an extrapolative low-residual candidate is not
-described as well supported.  Its padding, weight, and cutoff require
-sensitivity and false-rejection tests.
-
-Using $v_d$, define the whitened residual and Gaussian negative
-log-likelihood
-\[
-\begin{aligned}
- r_d(\mathbf{z})
- &=
- \frac{y_{{\rm obs},d}-\widehat y_d(\mathbf{z})}
-      {\sqrt{v_d(\mathbf{z})}},\\
- \mathcal{L}_{\rm GP}(\mathbf{z})
- &=
- \frac12\sum_{d=1}^{8}
- \left[r_d(\mathbf{z})^2+\log(2\pi v_d(\mathbf{z}))\right].
-\end{aligned}
-\]
-Whitening gives the same cm error different evidential weight under
-different predictive uncertainty, while the logarithmic variance term
-prevents a candidate from winning only by inflating uncertainty.  For
-candidate $\mathbf{z}_i$, let
-\[
-\begin{aligned}
- J_i&=\mathcal{L}_{\rm GP}(\mathbf{z}_i),&
- E_i^{\rm rms}&=\left[\tfrac18\sum_d r_d(\mathbf{z}_i)^2\right]^{1/2},\\
- E_i^\infty&=\max_d|r_d(\mathbf{z}_i)|,&
- q_i&=q_{\rm sup}(\mathbf{z}_i;s^\star),
- \qquad J_\star=\min_iJ_i .
-\end{aligned}
-\]
-These quantities have separate roles: $J_i+\lambda_{\rm sup}q_i$ ranks
-candidates, while simultaneous gates define the retained set
-\[
- \mathcal{R}
- =
- \{\mathbf{z}_i\in\mathcal{C}:
- J_i\le J_\star+\epsilon_J,\;
- E_i^{\rm rms}\le E_{\rm rms}^{\max},\;
- E_i^\infty\le E_\infty^{\max},\;
- q_i\le q_{\max}\}.
-\]
-The constants are frozen implementation thresholds, not physical HB
-bounds or posterior probabilities.  The output is $\mathcal{R}$ rather
-than the optimiser history.  A point estimate is reported only when the
-retained candidates form one sufficiently small compatible basin;
-otherwise the set, basin count, and diameter expose the remaining
-ambiguity.  Required evidence includes near-truth retained coverage,
-false exclusion and false uniqueness, threshold sensitivity, basin
-stability, and point-output reliability.
-
-\paragraph{Joint setups and setup proposal.}
-For observations of one material under $J$ setups, every setup keeps its
-own selected expert, prediction, uncertainty, and support diagnostic,
-while all terms are evaluated at the same $\boldsymbol{\theta}$.  The
-joint score is
-\[
- \mathcal{L}_{1:J}(\mathbf{z})
- =
- \sum_{j=1}^{J}\mathcal{L}_{\rm GP}^{(j)}(\mathbf{z})
- +\lambda_{\rm sup}\frac1J
-  \sum_{j=1}^{J}q_{\rm sup}^{(j)}(\mathbf{z}).
-\]
-Likelihood terms accumulate setup evidence.  The support terms are
-averaged so that their scale does not grow solely because another setup
-is added.  Conditional independence across setups is a modelling
-assumption; validation must check whether an added setup removes false
-basins and shrinks $\mathcal{R}$ without excluding a near-truth basin.
-
-When ambiguity remains, the next setup uses the inherited analytical
-Hessian rule of \citet{hamamichi2023nonnewtonian}.  Let
-$\boldsymbol{\nu}_j$ be the unit principal normal of the scaled
-analytical loss Hessian for setup $j$.  From feasible setup set
-$\mathcal{W}$,
-\[
- (W_2^\star,H_2^\star)
- =
- \arg\min_{(W,H)\in\mathcal W}
- \langle\boldsymbol{\nu}_1,\boldsymbol{\nu}_2(W,H)\rangle^2 .
-\]
-A small squared inner product selects a sensitivity direction
-complementary to the current ridge.  The analytical proposer is inherited;
-the present contribution is the fast subsequent inverse and retained-set
-update, not a new physical setup-selection principle.  Its evidence is
-causal retained-set shrinkage, basin reduction, near-truth survival, and
-proposal runtime relative to fixed or random setup choices.
-
-\paragraph{Camera and video interface.}
-The inverse consumes only a calibrated cm-valued front vector:
-\[
-    (I_{1:8},S)
-    \xrightarrow[\text{calibration and segmentation}]
-    {\mathcal{A}_{\rm vid}}
-    \mathbf{y}_{\rm obs}\in\mathbb{R}_{\geq0}^{8}.
-\]
-World points $\mathbf{P}_w$, camera points
-$\mathbf{P}_c=R\mathbf{P}_w+\mathbf{t}$, and pixels
-$\mathbf{p}=Z_c^{-1}\mathbf K\mathbf{P}_c$ are distinct objects.
-Stage~1 uses ChArUco correspondences to initialise the compact look-at
-camera; Stage~2 aligns that camera to the container because the board is
-not rigidly coupled to the front wall that defines the observation
-origin.  The final camera is
-$(\mathbf K^\star,R^\star,\mathbf t^\star)$.
-
-For frame $I_d$, calibrated contour pixels are back-projected to the
-ground plane.  If $\mathbf{v}$ is the unit world-plane flow direction and
-$x_{\rm box}^{\rm front}$ is the container front-wall coordinate, the
-experimental front is
-\[
- x_d
- =
- \max_{\mathbf u\in\partial\Omega_d}
- \mathbf v^\top
- \bigl(\mathbf P_w(\tau^\star(\mathbf u))\bigr)_{xz}
- -x_{\rm box}^{\rm front},
- \qquad
- \mathbf y_{\rm obs}=(x_1,\ldots,x_8)^\top .
-\]
-The farthest signed projection matches the simulator's downstream-front
-definition, and front-wall subtraction gives a common zero.  This
-interface must be validated by reprojection and container-edge error,
-known-distance back-projection, segmentation and morphology
-perturbations, repeated extraction, and frame-timing perturbations.
-Those measurements validate the observation operator; they do not tune
-inverse candidates or retained-set gates.
-
-The following subsections now specify the implementation of these
-objects without changing their meanings.
-\subsection{Problem Statement}
 \label{sec:problem}
 
-We adopt the inverse formulation of
-\citet{hamamichi2023nonnewtonian}. A material is represented by the
-Herschel--Bulkley triple
-$\boldsymbol{\theta}=(n,\eta,\sigma_Y)$; a dam-break setup is the
-initial column geometry $(W,H)$; and the raw observation is the
-short-window silhouette video used in Eq.~\eqref{eq:inverse-generic}.
-The predecessor estimates $\boldsymbol{\theta}$ by repeatedly executing
-the MPM forward simulator until the simulated silhouette video matches
-the observed one, and extends the same objective to multiple setups by
-sharing one material parameter across all observed setups.
 
-Our method keeps the same material parameters, dam-break setup space,
-and multi-setup shared-parameter formulation, but changes the online
-observation model to match what the GP surrogate predicts. From each
-segmented silhouette sequence we extract the eight-frame flow-front
-summary $\mathbf{y}_{\mathrm{obs}}\in\mathbb{R}^{8}$, and each in-loop
-MPM evaluation is replaced by a GP forward emulator fixed after offline
-training. The flow-front observation-matching score is evaluated with
-an explicit surrogate-error budget. When this reduced observation is
-not uniquely identifying, the inverse reports the set of plausible
-parameter candidates retained by the score rather than forcing an
-unsupported single estimate. Additional setups are handled in the same
-shared-$\boldsymbol{\theta}$ manner as the predecessor formulation, but
-we evaluate whether the plausible set shrinks and whether the surviving
-basin remains consistent.
 
-The next components therefore define how the offline trajectory corpus
-is collected, partitioned, and converted into a GP/BAE surrogate, and
-how the resulting surrogate score is searched and audited. The inverse
-may search this score with a derivative-free optimiser, but the reported
-validation evaluates an explicit candidate set so that basin
-coverage, support, and retention can be inspected directly. The output
-is either a supported point estimate or a retained plausible set. A
-first setup can also propose the next physical
-experiment through the analytical Hessian-orthogonal rule of
-\citet{hamamichi2023nonnewtonian}, with later setups chosen causally
-from the observations collected so far.
+Sections~\ref{sec:hb-rheology}--\ref{sec:obs-pipeline} define the
+Herschel--Bulkley parameter vector
+$\boldsymbol{\theta}=(n,\eta,\sigma_Y)$, a dam-break setup
+$S=(W,H)$, and the eight-frame flow-front observation.  We now define
+how these components are connected in the proposed inverse.  An MPM run
+produces a high-dimensional particle trajectory, whereas an experiment
+produces image frames.  We therefore introduce two observation
+operators, $\mathcal{A}_{\rm sim}$ for simulated particle states and
+$\mathcal{A}_{\rm vid}$ for calibrated video frames, and require them to
+return the same physical quantity:
+\begin{equation}
+\label{eq:shared-observation}
+\begin{aligned}
+  \mathbf{y}(\boldsymbol{\theta};S)
+  &=\mathcal{A}_{\rm sim}
+    \!\left(\mathcal{X}_{\rm MPM}(\boldsymbol{\theta};S)\right),\\
+  \mathbf{y}_{\rm obs}(S)
+  &=\mathcal{A}_{\rm vid}
+    \!\left(I_{1:8};\mathbf{K}^{*},R^{*},\mathbf{t}^{*},S\right),
+  \qquad
+  \mathbf{y},\mathbf{y}_{\rm obs}\in\mathbb{R}_{\geq0}^{8}.
+\end{aligned}
+\end{equation}
+Here $\mathcal{X}_{\rm MPM}$ denotes the simulated particle states and
+$I_{1:8}$ the eight experimental frames.  Both operators measure the
+downstream front displacement in centimetres, relative to the container
+front wall, at the common times $t_1,\ldots,t_8$.  The flow front is used
+because it is directly recoverable from both modalities, removes
+appearance variables that are absent from the simulator, and preserves
+the short-time runout signal used by the predecessor
+\cite{hamamichi2023nonnewtonian}.  This reduction does not by itself make
+the three HB parameters identifiable; it only makes simulated and
+experimental evidence comparable in a common observation space.
 
-\paragraph{Formal statement.}\label{sec:problem-formal}
-Using the predecessor's notation, the original single-setup inverse is
-\begin{taggedeqn}{P}{P}
-    \hat{\boldsymbol{\theta}}
-    =
-    \arg\min_{\boldsymbol{\theta}\in\Theta}
-    \delta\!\left(
-    \mathcal{V}(\boldsymbol{\theta};S),
-    \mathcal{V}^{\mathrm{obs}}(S)
-    \right),
-\end{taggedeqn}
-where $\delta$ is the averaged silhouette difference in
-Eq.~\eqref{eq:silhouette-delta}. For $J$ setups of the same material,
-the predecessor uses the same shared-parameter idea by accumulating the
-per-setup observation losses,
-\begin{taggedeqn}{P$_{1:J}$}{Porigmulti}
-    \hat{\boldsymbol{\theta}}
-    =
-    \arg\min_{\boldsymbol{\theta}\in\Theta}
-    \frac{1}{J}
-    \sum_{j=1}^{J}
-    \delta\!\left(
-    \mathcal{V}(\boldsymbol{\theta};S_j),
-    \mathcal{V}^{\mathrm{obs}}(S_j)
-    \right).
-\end{taggedeqn}
-Our single-setup estimator replaces the video simulator-and-rendering
-loss by the trained local GP emulator of the flow-front summary and
-evaluates a finite candidate pool
-$\mathcal{C}\subset\mathcal{Z}$ with an error-aware surrogate score,
-\begin{taggedeqn}{P$'$}{Pprime}
-    \begin{aligned}
-    \mathcal{R}
-    =
-    \left\{
-    \mathbf{z}_i\in\mathcal{C}\;:\;
-    J_i\le J_\star+\epsilon_J,\;
-    E_i^{\rm rms}\le E_{\rm rms}^{\max},\;
-    E_i^\infty\le E_\infty^{\max},\;
-    q_{\mathrm{sup}}(\mathbf{z}_i;s^\star)\le q_{\max}
-    \right\}.
-    \end{aligned}
-\end{taggedeqn}
-Here $\mathbf{z}=(n,\log\eta,\log\sigma_Y)$,
-$J_i=\mathcal{L}_{\mathrm{GP}}(\mathbf{z}_i)$,
-$E_i^{\rm rms}$ and $E_i^\infty$ are the RMS and worst-frame
-standardised mismatches, and $q_{\mathrm{sup}}$ is the local-support
-diagnostic.  The score combines
-trajectory residual, GP variance, BAE variance, observation noise, and
-support diagnostics, and $\mathcal{R}$ is the plausible candidate set.
-A point estimate is reported only when this set collapses to one
-compatible basin. For $J$ setup observations of the same material, conditional
-independence gives the joint score
-\begin{taggedeqn}{P$^{\star}$}{Pstar}
-    \mathcal{L}_{1:J}(\mathbf{z})
-    =
-    \sum_{j=1}^{J}
-    \mathcal{L}_{\mathrm{GP}}^{(j)}(\mathbf{z})
-    +
-    \lambda_{\mathrm{sup}}
-    \frac{1}{J}\sum_{j=1}^{J}q_{\mathrm{sup}}^{(j)}(\mathbf{z}).
-\end{taggedeqn}
-This inverse does not use an explicit
-$\sigma_Y$ anchor prior; uncertainty along the HB ridge is instead
-reported through plausible-set diameter, basin count, and multi-setup
-shrinkage.
+The predecessor evaluates MPM and rendering for every trial parameter
+vector.  That formulation is physically direct, but its repeated forward
+calls prevent rapid exploration of a broad, possibly multimodal inverse
+landscape.  We therefore train a surrogate only for the forward map
+$\mathbf{y}(\boldsymbol{\theta};S)$.  The surrogate does not replace MPM
+as the physical model and is not assumed to be more accurate than MPM;
+its role is to amortise the offline simulation cost and to provide a
+predictive variance for online scoring.  A Gaussian process (GP) is used
+because the inverse requires both a forward prediction and an explicit
+local uncertainty estimate.  Whether this approximation is adequate is
+not assumed from the model choice: Sec.~\ref{sec:fidelity} tests its
+held-out MPM error and uncertainty calibration, while the subsequent
+synthetic and real experiments test inverse recovery, ambiguity
+reporting, and runtime.
+
+For numerical search we use
+$\mathbf{z}=(n,\ln\eta,\ln\sigma_Y)$ and let $\mathcal{Z}$ denote the
+corresponding transformed parameter domain.  Logarithms prevent the
+orders-of-magnitude ranges of $\eta$ and $\sigma_Y$ from dominating
+distance calculations; this natural-log search coordinate is distinct
+from the base-10, expert-local GP feature scaling defined in
+Sec.~\ref{sec:surrogate}.  Because different parameter vectors can
+produce indistinguishable short trajectories, the primary output is a
+retained set $\mathcal{R}\subseteq\mathcal{Z}$ of candidates consistent
+with the observation, surrogate error, and training support.  A point
+estimate is a conditional summary of $\mathcal{R}$, not an assumption
+that the inverse is unique.
+
+The method has two branches that meet at the inverse score.  Offline, MPM
+trajectories are converted into the shared observation and used to fit a
+fixed bank of local GP forward models and approximation-error statistics.
+Online, camera calibration and segmentation convert a video into
+$\mathbf{y}_{\rm obs}$.  Observable setup and trajectory evidence then
+retrieve a supported local model and construct candidates; the inverse
+combines residual, GP uncertainty, approximation error, and observation
+error to form $\mathcal{R}$.  Additional setups share the same material
+parameters and are introduced only when one setup leaves multiple
+plausible basins.
+
+
+
+\paragraph{Inverse input and output.}\label{sec:problem-formal}
+For one setup, the online input is $(S,\mathbf{y}_{\rm obs})$ together
+with the frozen expert bank; the output is a retained parameter set
+$\mathcal{R}\subseteq\mathcal{Z}$ and its residual, uncertainty, support,
+and basin diagnostics.  For $J>1$ observations of the same material, the
+input is $\{(S_j,\mathbf{y}_{\rm obs}^{(j)})\}_{j=1}^{J}$ and all setups
+share one $\boldsymbol{\theta}$.  The method returns a point estimate
+$\hat{\boldsymbol{\theta}}$ only if $\mathcal{R}$ is nonempty and
+contracts to one sufficiently small compatible basin.  It does not use
+an explicit $\sigma_Y$ anchor prior; unresolved HB-ridge uncertainty is
+reported through retained-set diameter, basin count, and contraction
+under additional setups.  Equations~\eqref{eq:obs-loss},
+\eqref{eq:retain}, and~\eqref{eq:multi-setup-loss} give the score,
+retention rule, and multi-setup extension once their components have been
+defined.
+
 Tab.~\ref{tab:subs} summarises the substitutions relative to the
 simulation-in-the-loop formulation.
 
@@ -1038,7 +563,7 @@ Forward cost
   & \S\ref{sec:surrogate} \\
 Local heterogeneity
   & observation-conditioned expert selection and support diagnostics
-  & \S\ref{sec:surrogate}, \S\ref{sec:inverse} \\
+  & \S\ref{sec:surrogate}, \S\ref{sec:retrieval} \\
 Scale and model uncertainty
   & variance-whitened flow-front residual score using GP variance,
     BAE variance, and observation noise
@@ -1051,21 +576,58 @@ Ridge diagnosis
 \end{tabular}
 \end{table}
 
-\subsection{Offline Surrogate Corpus and Expert Bank}
+
+
+\subsection{Shared Observation Representation and Offline Corpus}
+
 \label{sec:method-bank}
 
-The online inverse in this paper is driven by a GP surrogate, so after
-the problem statement we specify the fixed forward-emulator bank. The
-training corpus is generated offline in the data-collection codebase
-rather than inside the inverse optimiser. It uses the same HB dam-break
-formulation as Sec.~\ref{sec:mpm-forward}, but records the
-trajectory-level observation
-\((x_{01},\ldots,x_{08})\) directly from a CuPy/CUDA MLS-MPM backend,
-instead of storing rendered videos or silhouette losses from the
-predecessor's online MPM-in-the-loop implementation. This separation is
-important: GP fidelity in Sec.~\ref{sec:fidelity} is fidelity to this
-clean trajectory generator, while real-material validation additionally
-includes camera, segmentation, and simulator-to-experiment discrepancy.
+
+
+The surrogate target must be fixed before its architecture or training
+procedure can be interpreted.  For each simulated parameter--setup pair,
+we apply $\mathcal{A}_{\rm sim}$ in Eq.~\eqref{eq:shared-observation} and
+store one trajectory row.  The quality-controlled corpus is
+\begin{equation}
+\label{eq:clean-corpus}
+  \mathcal{D}_{\rm clean}
+  =\left\{
+  (\boldsymbol{\theta}_i,S_i,\mathbf{y}_i)
+  \right\}_{i=1}^{N_{\rm clean}},
+  \qquad
+  \mathbf{y}_i=\mathcal{A}_{\rm sim}
+  \!\left(\mathcal{X}_{\rm MPM}(\boldsymbol{\theta}_i;S_i)\right).
+\end{equation}
+A \emph{row} therefore means one complete simulated setup and its eight
+front positions, rather than one video frame or one GP sample per frame.
+A row is called \emph{clean} when its parameters and front positions are
+finite and positive and its trajectory satisfies the physical
+non-retraction condition $y_{i,1}\leq\cdots\leq y_{i,8}$.  This gate
+removes failed or physically inconsistent simulator outputs before any
+train/validation/test split; it does not select rows according to their
+agreement with real experiments.
+
+Using the same compact observable for training and experiment avoids
+asking a surrogate to generate particle states or image appearance that
+the inverse never scores.  The cost is an explicit information
+bottleneck: front position omits internal velocity and free-surface
+shape, so any ambiguity left by this summary must be reported rather
+than hidden by the estimator.  Its suitability is consequently assessed
+at two levels: held-out MPM trajectories test whether the surrogate
+learns the selected forward quantity, and multi-setup inverse tests show
+whether that quantity contains enough evidence to contract the retained
+parameter set.
+
+
+
+The corpus is generated offline with the CuPy/CUDA MLS-MPM formulation
+of Sec.~\ref{sec:mpm-forward}; no training row is generated during an
+inverse experiment.  It stores $(x_1,\ldots,x_8)$ directly rather
+than rendered videos or silhouette losses.  This provenance fixes the
+meaning of surrogate fidelity: Sec.~\ref{sec:fidelity} measures agreement
+with this trajectory generator, whereas real-material validation also
+contains camera, segmentation, constitutive-model, and
+simulator-to-experiment discrepancies.
 
 \begin{table}[!htbp]
 \centering
@@ -1082,7 +644,8 @@ Check & Value & Decision \\
 \midrule
 Trajectory generator & CuPy/CUDA MLS-MPM & offline corpus source \\
 Raw simulation batches & $8$ CSVs & merged before cleaning \\
-Stored observation & $x_{01}\ldots x_{08}$ & flow-front trajectory \\
+Stored observation & CSV fields $x_{01}\ldots x_{08}$ &
+  $x_1\ldots x_8$ in Eq.~\eqref{eq:y-def} \\
 Raw source rows & $433{,}811$ & input audit pool \\
 Finite positive rows & $433{,}811$ & retained \\
 Duplicate rows removed & $0$ & no duplicate full rows found \\
@@ -1094,48 +657,113 @@ Assumed density $\rho$ & $1.0$ & fixed simulator condition \\
 \end{tabular}
 \end{table}
 
-The clean rows are partitioned once into local trajectory
-regions before any inverse experiment is run. The partition is selected
-to keep a large number of small local models while bounding local
-trajectory heterogeneity: in the reported bank, the maximum within-region
-$x_{08}$ quantile span is below $3$ cm, yielding $2{,}775$ final
-experts. The all-row region sizes are min/median/max
-$10/71/4{,}191$; the training rows assigned per expert are
-$5/57/3{,}362$. For numerical cost, GP fitting uses at
-most $800$ training rows per expert ($5/57/800$). Each expert then fits
-expert-local input and output scalers and trains eight exact GP heads,
-one for each flow-front frame. Validation rows
-assigned to the same local region estimate the diagonal Bayesian
-approximation-error (BAE) variance~\cite{kaipio2005statistical};
-regions without separate validation rows use a training holdout for
-checkpoint selection and the global BAE variance in the inverse
-likelihood. Algorithm~\ref{alg:train} gives the construction, and
-Sec.~\ref{sec:surrogate} specifies the GP model and covariance used at
-prediction time.
+\subsection{Local GP Forward Surrogate and Approximation-Error Model}
 
-\subsection{Input and Output Representation}
 \label{sec:repr}
 
-Each surrogate query starts from the five-dimensional physical input
+\label{sec:surrogate}
+
+
+
+The clean corpus is too large for a single exact GP, whose standard
+training cost grows cubically with the number of rows, and the forward
+response changes non-uniformly across the combined material--geometry
+domain.  We therefore partition the corpus once, offline, into regions
+with similar trajectories and fit an exact GP only within each region.
+In this paper, a \emph{local expert} is not an additional physical model:
+it is the stored tuple
 \begin{equation}
-    \mathbf{x}=(n,\eta,\sigma_Y,W,H)^\top ,
+\label{eq:expert-definition}
+  \mathcal{E}_s=
+  \left(\mathcal{T}_s,\mathcal{V}_s,T_{\xi,s},T_{Y,s},
+  \{\mathcal{G}_{s,d}\}_{d=1}^{8},
+  \boldsymbol{\sigma}^{2}_{\rm BAE,s},\mathcal{M}_s\right),
 \end{equation}
-where $W$ and $H$ are measured in cm. Because $\eta$ and
-$\sigma_Y$ span several orders of magnitude, the GP feature vector uses
-base-10 logarithms and the implementation order
-\((W,H,n,\log_{10}\eta,\log_{10}\sigma_Y)\). After an expert $s$ has
-been selected, that expert applies its own affine input scaler,
+where $\mathcal{T}_s\subset\mathcal{D}_{\rm clean}$ is the capped local
+training subset, $\mathcal{V}_s$ is its assigned validation subset,
+$T_{\xi,s}$ and $T_{Y,s}$ are frozen input and output scalers,
+$\mathcal{G}_{s,d}$ is the GP for frame $d$,
+$\boldsymbol{\sigma}^{2}_{\rm BAE,s}$ is a validation-residual variance,
+and $\mathcal{M}_s$ stores the support summaries used for retrieval.  The
+term \emph{expert bank} denotes the fixed collection
+$\{\mathcal{E}_s\}_{s=1}^{N_E}$.
+For later use, define the frame-$d$ training outputs of expert $s$ by
+\begin{equation}
+  Y_{s,d}
+  =\left\{y_{i,d}:
+  (\boldsymbol{\theta}_i,S_i,\mathbf{y}_i)\in\mathcal{T}_s\right\},
+\end{equation}
+and the corresponding BAE covariance by
+$\Sigma_{\rm BAE,s}=\mathrm{diag}
+(\boldsymbol{\sigma}^{2}_{\rm BAE,s})$.
+
+This local construction has two purposes: it keeps exact-GP fitting
+tractable and lets the covariance length scales describe a restricted,
+more nearly homogeneous response region.  It also introduces a routing
+decision, so locality is a hypothesis to be tested rather than a free
+guarantee of accuracy.  The evaluation therefore reports held-out error
+over the full bank and separately examines retrieval and support failures.
+A neural or polynomial surrogate could also reduce forward cost; the GP
+is chosen here because its posterior variance enters the inverse error
+budget without training a separate uncertainty model.  We make no claim
+that GP is universally superior to those alternatives, or more
+physically faithful than MPM.
+
+The partition bounds within-region terminal-front heterogeneity: the
+maximum terminal-front ($x_8$, stored as $x_{08}$) quantile span is below
+$3$ cm, yielding $N_E=2{,}775$
+experts.  Region sizes over all clean rows are min/median/max
+$10/71/4{,}191$, with $5/57/3{,}362$ training rows assigned per expert;
+at most $800$ rows are fitted for numerical cost.  The $3$ cm threshold
+is an offline resolution choice that trades smaller within-region
+variation against sufficient rows per model; it is not a physical
+boundary or an optimality claim.  Once the fitting subsets are capped,
+exact inference is practical locally and avoids introducing an additional
+variational approximation.  Held-out bank-wide errors test whether this
+partition and cap preserve the MPM forward response.
+
+Each expert uses eight
+scalar GP heads because exact scalar-output GP regression provides a
+simple batched implementation and a per-frame variance.  The heads share
+the same five-dimensional input and partition but do not share output
+covariance.  Thus independence is a diagonal covariance approximation,
+not a claim that the eight physical front positions are temporally
+independent; the monotone output guard and trajectory-level validation
+retain and test their ordered structure.
+
+GP posterior variance alone does not measure all error made by a finite,
+locally trained surrogate.  We therefore estimate a diagonal Bayesian
+approximation-error (BAE) variance from validation residuals
+\cite{kaipio2005statistical} and add it to the GP and observation
+variances during inversion.  Of the $2{,}775$ experts, $2{,}735$ have
+external validation rows for local BAE estimation.  The remaining $40$
+use a training holdout for checkpoint selection and the global BAE
+variance in the inverse score; they do not estimate BAE from the query
+observation.  Algorithm~\ref{alg:train} summarises this offline
+construction.
+
+
+
+Each surrogate query is specified physically by
+$(\boldsymbol{\theta},S)$.  Because $\eta$ and $\sigma_Y$ span several
+orders of magnitude, its five-dimensional GP feature uses base-10
+logarithms and the fixed implementation order
+\begin{equation}
+    \boldsymbol{\xi}
+    =(W,H,n,\log_{10}\eta,\log_{10}\sigma_Y)^\top,
+\end{equation}
+where $W$ and $H$ are measured in cm. After an expert $s$ has been
+selected, that expert applies its own affine input scaler,
 \begin{equation}
 \label{eq:xscale}
-    \tilde{\mathbf{x}}_s
+    \tilde{\boldsymbol{\xi}}_s
     =
-    \frac{\mathbf{x}_{\log}-\boldsymbol{\mu}_{X,s}}
-         {\boldsymbol{\omega}_{X,s}},
-    \qquad
-    \mathbf{x}_{\log}
-    =
-    (W,H,n,\log_{10}\eta,\log_{10}\sigma_Y)^\top .
+    \frac{\boldsymbol{\xi}-\boldsymbol{\mu}_{\xi,s}}
+         {\boldsymbol{\omega}_{\xi,s}} .
 \end{equation}
+The logarithms express multiplicative parameter changes additively, and
+the local affine transform prevents geometry or material coordinates
+with larger numerical ranges from dominating the GP length-scale fit.
 The output is the eight-frame flow-front vector
 $\mathbf{y}\in\mathbb{R}^{8}$. Each expert also stores an affine output
 scaler fitted on its local training rows,
@@ -1147,96 +775,38 @@ scaler fitted on its local training rows,
          {\boldsymbol{\omega}_{Y,s}} .
 \end{equation}
 All scaler statistics are fit on training rows only and then frozen.
-They are GP training coordinates: predictions are decoded back to cm
+Output scaling similarly conditions the eight local regression targets.
+These transforms are GP training coordinates: predictions are decoded back to cm
 before inverse residuals are evaluated. At inverse time, the observed
 vector $\mathbf{y}_{\mathrm{obs}}$ is used both as likelihood data and
 as a signal for selecting the local GP expert.
 
-\subsection{Local GP Forward Emulator and Error Model}
-\label{sec:surrogate}
 
-The surrogate bank used here is trained specifically on the
-quality-controlled MPM corpus with fixed density $\rho=1.0$. The
-forward map is
+
+The bank approximates the five-to-eight dimensional forward map
+$(n,\eta,\sigma_Y,W,H)\mapsto(x_1,\ldots,x_8)$.  Its physical-unit
+posterior mean is the surrogate prediction, while its covariance is only
+one component of the inverse error model:
 \[
-    (n,\eta,\sigma_Y,W,H)\longmapsto (x_{01},\ldots,x_{08}),
-\]
-with $\eta$ and $\sigma_Y$ represented as
-$\log_{10}\eta$ and $\log_{10}\sigma_Y$ in the GP features. The
-resulting bank contains $2{,}775$ local exact-GP experts assigned by a
-fixed offline partition. Of these, $2{,}735$ have external validation
-rows for local BAE estimation. The remaining $40$ experts have no
-external validation rows; their checkpoints use an internal training
-holdout, while the inverse uncertainty uses a conservative global
-BAE variance.
-Each expert stores eight independent exact-GP heads in one batched
-container, one head per flow-front frame. The reported forward mean is
-the GP posterior mean decoded to cm, while the inverse likelihood uses
-the uncertainty model
-\[
-    \Sigma_{\mathrm{forward}}(\boldsymbol{\theta})
+    \Sigma_{\mathrm{total}}(\boldsymbol{\theta};S)
     =
     \Sigma_{\mathrm{GP}}(\boldsymbol{\theta})
-    + \mathrm{diag}(\Sigma_{\mathrm{BAE},s^\star})
+    + \Sigma_{\mathrm{BAE},s^\star}
     + \Sigma_{\mathrm{obs}} .
 \]
-The BAE term is estimated from validation residuals and propagates
-surrogate approximation error into the inverse objective. No additional
-learned residual corrector is used in the reported forward map.
-In this manuscript, residual correction is kept as an optional diagnostic
-rather than as part of the clean GP forward.
+Here $s^\star$ denotes the expert selected from observable evidence by
+Sec.~\ref{sec:retrieval}, and
+$\Sigma_{\rm GP}=\mathrm{diag}
+(\sigma_{{\rm GP},1}^2,\ldots,\sigma_{{\rm GP},8}^2)$ is its decoded
+posterior covariance.
+The three terms respectively represent GP posterior uncertainty,
+held-out surrogate approximation error, and experimental observation
+error.  They are kept separate so that a successful fit cannot conceal
+whether its confidence comes from local GP support or from a large error
+allowance.  No learned residual corrector is used in the reported forward
+map.
 
-\paragraph{Observation-Conditioned Expert Selection.}
-\label{sec:surr-3layer}
-The offline partition assigns each training row to one expert. At
-inverse time, the material parameters are unknown, so the expert must
-be selected from observable evidence: the setup geometry and the
-measured flow-front trajectory. For every expert $s$, the runtime stores
-the median setup $(\bar W_s,\bar H_s)$, the median trajectory
-$\bar{\mathbf{y}}_s$, and the terminal-front support statistics
-\(\mathrm{median}(Y_{s,8})\) and \(\mathrm{std}(Y_{s,8})\). Given
-$(W,H,\mathbf{y}_{\mathrm{obs}})$, the implemented evidence score is
-\begin{equation}
-\label{eq:gate}
-\begin{aligned}
-    e_s
-    &=
-    d_{\mathrm{shape},s}
-    + 0.25\,d_{8,s}
-    + 0.10\,d_{\mathrm{geo},s},\\
-    d_{\mathrm{shape},s}
-    &=
-    \sqrt{\frac{1}{8}\sum_{d=1}^{8}
-    \alpha_d^2(\bar y_{s,d}-y_{\mathrm{obs},d})^2},\\
-    d_{8,s}
-    &=
-    \frac{|y_{\mathrm{obs},8}-\mathrm{median}(Y_{s,8})|}
-         {\max(\mathrm{std}(Y_{s,8}),\,0.1)},\\
-    d_{\mathrm{geo},s}
-    &=
-    \sqrt{\left(\frac{\bar W_s-W}{5}\right)^2
-    +\left(\frac{\bar H_s-H}{5}\right)^2}.
-\end{aligned}
-\end{equation}
-The frame weights
-\[
-\boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)
-\]
-are used for expert routing and candidate anchors only. Their
-purpose is to reduce sensitivity to the earliest release transients:
-finite-time gate withdrawal, release-timing jitter, segmentation
-uncertainty, and unmodelled free-surface or surface-tension effects can
-move the first few fronts without indicating a different
-Herschel--Bulkley material. Later front positions provide more stable
-runout evidence and therefore receive larger weights. The selector first
-keeps a short list of low-$e_s$ experts and then chooses the primary
-expert by terminal-front support and the evidence score. The same rule is
-used for every observation, and the retained-set score below is computed
-from the fixed GP/BAE/observation-noise budget rather than from a
-separate observation-specific expert-selection formula. Selecting an expert from observed
-$(W,H,\mathbf{y}_{\mathrm{obs}})$ rather than the unknown
-$\boldsymbol{\theta}$ avoids a circular gate and makes out-of-support
-cases diagnosable by inspecting the selected expert's training box.
+
 
 \paragraph{Local Gaussian-Process Experts.}
 \label{sec:surr-experts}
@@ -1245,22 +815,28 @@ sharing the same expert-local scaled $5$-D input, following standard GP
 regression notation~\cite{rasmussen2006gaussian}. The implementation uses
 a linear mean and a Mat\'ern-$5/2$ automatic-relevance-determination
 (ARD) kernel with an added linear kernel,
-$k_s=k_{5/2}+k_{\mathrm{lin}}$. The Mat\'ern component is
+$k_s=k_{5/2}+k_{\mathrm{lin}}$.  The linear terms represent the broad
+local trend, while the Mat\'ern component represents smooth nonlinear
+departures without imposing the infinite differentiability of a
+squared-exponential kernel.  ARD gives each of the five encoded inputs
+its own length scale.  The Mat\'ern component is
 \begin{equation}
 \label{eq:matern}
     k_{5/2}(\mathbf{a},\mathbf{b})
     =
     \sigma_f^2
-    \left(1+\sqrt{5}r+\tfrac{5}{3}r^2\right)
-    e^{-\sqrt{5}r},
+    \left(1+\sqrt{5}\varrho+\tfrac{5}{3}\varrho^2\right)
+    e^{-\sqrt{5}\varrho},
     \quad
-    r^2=\sum_{d=1}^{5}\frac{(a_d-b_d)^2}{\ell_d^2}.
+    \varrho^2=\sum_{h=1}^{5}\frac{(a_h-b_h)^2}{\ell_h^2}.
 \end{equation}
-For head $d$,
+We suppress the output-head index on $k_s$ and its length scales for
+readability; each head has its own fitted covariance hyperparameters.
+For output frame $d$,
 $m_{s,d}(\mathbf{a})=\beta_{s,d,0}
 +\boldsymbol{\beta}_{s,d}^{\top}\mathbf{a}$ is the fitted linear mean.
 Let $N_s=|\mathcal{T}_s|$,
-$X_s\in\mathbb{R}^{N_s\times5}$ collect the encoded fitting inputs,
+$\Xi_s\in\mathbb{R}^{N_s\times5}$ collect the encoded fitting inputs,
 $\tilde{\mathbf{y}}_{s,d}\in\mathbb{R}^{N_s}$ collect the encoded
 frame-$d$ targets, $K_s\in\mathbb{R}^{N_s\times N_s}$ be their kernel
 matrix, and $\mathbf{k}_*\in\mathbb{R}^{N_s}$ contain covariances
@@ -1268,39 +844,43 @@ between a query and the fitting inputs.
 For output frame $d$, the posterior mean and variance are
 \begin{align}
 \label{eq:gp-predictive}
-    \mu_{s,d}(\tilde{\mathbf{x}}_s)
+    \mu_{s,d}(\tilde{\boldsymbol{\xi}}_s)
     &=
-    m_{s,d}(\tilde{\mathbf{x}}_s)
+    m_{s,d}(\tilde{\boldsymbol{\xi}}_s)
     +\mathbf{k}_*^\top
       (K_s+\sigma_{n,s,d}^2 I)^{-1}
       (\tilde{\mathbf{y}}_{s,d}-\mathbf{m}_{s,d}),
 \nonumber\\
-    \sigma_{s,d}^2(\tilde{\mathbf{x}}_s)
+    \sigma_{s,d}^2(\tilde{\boldsymbol{\xi}}_s)
     &=
-    k_s(\tilde{\mathbf{x}}_s,\tilde{\mathbf{x}}_s)
+    k_s(\tilde{\boldsymbol{\xi}}_s,\tilde{\boldsymbol{\xi}}_s)
     -
     \mathbf{k}_*^\top
     (K_s+\sigma_{n,s,d}^2 I)^{-1}\mathbf{k}_* .
 \end{align}
 where $K_s$ and $\mathbf{k}_*$ are formed with the full covariance
-$k_s$, and $\mathbf{m}_{s,d}=m_{s,d}(X_s)$ is the linear mean evaluated
+$k_s$, and $\mathbf{m}_{s,d}=m_{s,d}(\Xi_s)$ is the linear mean evaluated
 at the local fitting inputs.  Equation~\eqref{eq:matern} gives the
 smooth Mat\'ern component.
 Hyperparameters are fitted by maximising the exact GP marginal
-likelihood,
+likelihood. Define the centred target
+$\mathbf{c}_{s,d}=\tilde{\mathbf{y}}_{s,d}-\mathbf{m}_{s,d}$ and the
+noisy covariance $\bar K_{s,d}=K_s+\sigma_{n,s,d}^{2}I$. Then
 \begin{equation}
 \label{eq:gp-mll}
 \begin{aligned}
-    \log p(\tilde{\mathbf{y}}_{s,d}\mid X_s)
-    =
-    &-\tfrac{1}{2}
-      (\tilde{\mathbf{y}}_{s,d}-\mathbf{m}_{s,d})^{\top}
-      (K_s+\sigma_{n,s,d}^2I)^{-1}
-      (\tilde{\mathbf{y}}_{s,d}-\mathbf{m}_{s,d})
-      -\tfrac{1}{2}\log|K_s+\sigma_{n,s,d}^2I| \\
-    &-\tfrac{|X_s|}{2}\log 2\pi .
+    \log p(\tilde{\mathbf{y}}_{s,d}\mid \Xi_s)
+    ={}&-\tfrac{1}{2}\mathbf{c}_{s,d}^{\top}
+      \bar K_{s,d}^{-1}\mathbf{c}_{s,d}
+      -\tfrac{1}{2}\log|\bar K_{s,d}| \\
+      &-\tfrac{N_s}{2}\log 2\pi .
 \end{aligned}
 \end{equation}
+This objective balances data fit and covariance complexity and permits
+all local heads to be trained offline by the same rule, without
+observation-specific or material-specific kernel tuning.  Kernel choice
+is ultimately assessed by held-out predictive error and standardised
+residual calibration rather than by the marginal likelihood alone.
 
 \paragraph{Single-Expert Prediction.}
 \label{sec:surr-top1}
@@ -1313,7 +893,7 @@ vector with the selected expert's output scaler,
     =
     \boldsymbol{\mu}_{Y,s^\star}
     +\boldsymbol{\omega}_{Y,s^\star}\odot
-     \boldsymbol{\mu}_{s^\star}(\tilde{\mathbf{x}}_{s^\star}).
+     \boldsymbol{\mu}_{s^\star}(\tilde{\boldsymbol{\xi}}_{s^\star}).
 \end{equation}
 The corresponding decoded frame variance is
 $\sigma_{\mathrm{GP},d}^{2}
@@ -1363,397 +943,52 @@ the mean to physical units, and apply the monotonic guard of
 Eq.~\eqref{eq:mono}. The GP also returns a predictive standard
 deviation that the inverse loss of \S\ref{sec:inv-loss} consumes.
 
-\subsection{GP-Aware Inverse}
-\label{sec:inverse}
 
-\paragraph{Candidate Generation.}
-\label{sec:inv-nn}
-The inverse input is the setup geometry and observed trajectory,
-$(W,H,\mathbf{y}_{\mathrm{obs}})$, and the output is either a point
-estimate $\hat{\boldsymbol{\theta}}=(\hat n,\hat\eta,\hat\sigma_Y)$
-or a set of plausible candidates when the observation remains
-ambiguous. The reported validation forms a finite candidate set in
-$\mathbf{z}=(n,\log\eta,\log\sigma_Y)$ by combining
-support-aware training-neighbour retrieval, local proposals, and
-support-aware global proposals. This $\mathbf{z}$-space uses natural
-logarithms for parameter-distance diagnostics; it is separate from the
-base-10 feature scaling used inside each GP expert. For each local
-expert, the nearest training trajectory is
-\begin{equation}
-\label{eq:nn}
-    \mathbf{z}^{\mathrm{NN}}
-    =
-    \mathbf{z}_{i^\star},\quad
-    i^\star
-    =
-    \arg\min_{i\in\mathcal{D}_{s^\star}}
-    \frac{1}{8}\sum_{d=1}^{8}
-      \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
-\end{equation}
-This point is an initializer or candidate seed, not a prior. The
-reported candidate generator expands these seeds with local proposals,
-evaluates all candidates under the same GP/BAE score, and then applies
-the plausible-set gates below.
-This candidate set is not claimed to be a superior optimiser. Its purpose is
-to exploit the cheap GP evaluations to expose the score landscape:
-CMA-ES, least-squares refinement, or Bayesian optimisation could use the
-same GP/BAE objective, while the candidate set lets us report which
-basins were covered, retained, or ranked ahead of the near-truth basin.
-The validation below shows that candidate coverage and final ranking are
-distinct failure modes.
-The frame weights form the fixed non-decreasing schedule
-\[
-\boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0).
-\]
-By construction, the early frames of the dam-break sequence are where
-release timing, segmentation, gate withdrawal, and unresolved
-free-surface or surface-tension transients are most likely to perturb the
-front position without changing the Herschel--Bulkley parameters. The weights
-therefore reduce transient sensitivity during expert selection
-and candidate seeding only; the final retained-set score uses the unweighted
-whitened residual energy described below. This is a deliberate
-robustness choice, not a hidden prior on $\boldsymbol{\theta}$: all
-retained-set decisions still expose the residual, uncertainty, and
-support components separately. The expert-selection schedule is listed in
-\S\ref{sec:data} (Tab.~\ref{tab:hyper}).
 
-\paragraph{Support and Extrapolation Diagnostics.}
-\label{sec:inv-box}
-Every candidate is evaluated relative to the training support of the
-selected local expert. Let
-$[\mathbf{z}_{\min,s^\star},\mathbf{z}_{\max,s^\star}]$ be its support
-in $z$-space, padded by a fraction $p$ of its local standard-deviation
-vector $\boldsymbol{\omega}_{z,s^\star}$ and clipped to the global HB
-bounds,
-\begin{equation}
-\label{eq:tight-box}
-    \mathcal{Z}_{s^\star}
-    =
-    \mathcal{Z}\cap
-    [\mathbf{z}_{\min,s^\star}-p\boldsymbol{\omega}_{z,s^\star},\,
-     \mathbf{z}_{\max,s^\star}+p\boldsymbol{\omega}_{z,s^\star}].
-\end{equation}
-We record a support penalty
-\begin{equation}
-\label{eq:support}
-    q_{\mathrm{sup}}(\mathbf{z};s^\star)
-    =
-    \left\|\max(\mathbf{z}_{\min,s^\star}-\mathbf{z},0)\right\|_2^2
-    +
-    \left\|\max(\mathbf{z}-\mathbf{z}_{\max,s^\star},0)\right\|_2^2 .
-\end{equation}
-This term is a ranking and diagnostic signal, in the spirit of
-history-matching implausibility checks that rule out unsupported
-parameter regions rather than forcing a single fit~\cite{vernon2010galaxy}.
-It prevents a low trajectory residual in an extrapolative region from
-being mistaken for a well-supported material estimate.
+\subsection{Calibrated Experimental Observation and Observation Error}
 
-\paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
-\label{sec:inv-sy}
-Rather than break the residual $(\eta,\sigma_Y)$ identifiability
-ridge with a hand-chosen prior, we expose it through the plausible
-candidate set, its diameter in $z$-space, and its behaviour under
-additional setups. If several low-loss, well-supported candidates
-remain separated in $\mathbf{z}$, the output is an ambiguity report
-rather than a forced point estimate.
-
-\paragraph{Error-Aware Surrogate Objective.}
-\label{sec:inv-loss}
-For a candidate $\mathbf{z}$, the selected GP provides both
-$\hat{y}_d(\mathbf{z})$ and predictive standard deviation
-$\sigma_{\mathrm{GP},d}(\mathbf{z})$. The inverse compares the predicted
-and observed flow-front positions after whitening by the GP/BAE error
-budget. The per-frame variance used by the score is
-\begin{equation}
-\label{eq:gp-var}
-    v_d(\mathbf{z})
-    =
-    \sigma_{\mathrm{GP},d}^{2}(\mathbf{z})
-    +
-    \sigma_{\mathrm{BAE},s^\star,d}^{2}
-    + \sigma_{\mathrm{obs}}^2 .
-\end{equation}
-The whitened residual and Gaussian negative log-likelihood are
-\begin{equation}
-\label{eq:obs-loss}
-\begin{aligned}
-    r_d(\mathbf{z})
-    &=
-    \frac{y_{\mathrm{obs},d}-\hat y_d(\mathbf{z})}
-         {\sqrt{v_d(\mathbf{z})}},
-    \\
-    \mathcal{L}_{\mathrm{GP}}(\mathbf{z})
-    &=
-    \frac{1}{2}
-    \sum_{d=1}^{8}
-      \left[
-      r_d(\mathbf{z})^2+\log\!\bigl(2\pi v_d(\mathbf{z})\bigr)
-      \right].
-\end{aligned}
-\end{equation}
-The implementation also records $E^{\rm rms}(\mathbf{z})=
-\sqrt{\frac{1}{8}\sum_d r_d(\mathbf{z})^2}$, weighted RMSE, max-frame
-implausibility, and per-frame uncertainty diagnostics. The variance
-denominator prevents a candidate from winning merely because it matches
-the trajectory under an unexplained low-variance assumption. For ranking
-and retention we keep the score decomposed into explicit diagnostics:
-trajectory residual, GP epistemic variance, the local BAE residual
-variance, and an observation-noise floor, with Gaussian negative log
-likelihood and max-frame implausibility as diagnostics. This
-decomposition is
-important because the
-experiments reported here show that the hard failure mode is not candidate
-generation alone, but overconfident ranking of false basins.
-
-\paragraph{Candidate Ranking and Plausible Sets.}
-\label{sec:inv-ranking}
-Let $\mathcal{C}$ be the post-search candidate pool and let
-$J_i=\mathcal{L}_{\mathrm{GP}}(\mathbf{z}_i)$,
-$E_i^{\rm rms}=E^{\rm rms}(\mathbf{z}_i)$,
-$E_i^\infty=\max_d|r_d(\mathbf{z}_i)|$, and $q_i$ the support
-diagnostic. The point
-estimate, when supported, is the best plausible candidate under a
-transparent ranking rule such as
-\[
-    \mathrm{score}_i
-    =
-    J_i
-    + \lambda_{\mathrm{sup}} q_i ,
-\]
-The plausible set is defined by explicit gates around the best observed
-values,
-\begin{equation}
-\label{eq:retain}
-    \mathcal{R}
-    =
-    \{\mathbf{z}_i\in\mathcal{C}\mid
-    J_i\le J_\star+\epsilon_J,\;
-    E_i^{\rm rms}\le E_{\rm rms}^{\max},\;
-    E_i^\infty\le E_\infty^{\max},\;
-    q_i\le q_{\max}\}.
-\end{equation}
-Basins are formed by greedy centre linking in $z$-space: a retained
-candidate joins the nearest existing basin centre within a fixed
-linking radius and otherwise opens a new basin, so basin counts and
-labels require stability checks under candidate reordering. A point
-estimate is reported only when $\mathcal{R}$ contains at least a
-minimum retained count, forms a single compatible basin, and has small
-diameter in $z$-space. Otherwise
-the inverse reports an ambiguous plausible set and requests additional
-setup evidence. In the reported experiments, $\mathcal{C}$ is the
-explicit retrieval/local-proposal candidate set described above and is ranked
-by the same GP/BAE score that a CMA-ES search~\cite{hansen2016cma} could
-optimise. Thus the method should not be read as a claim that CMA-ES is
-inferior; the core change is that the expensive forward call has been
-amortised and the inverse decision is reported through explicit residual,
-uncertainty, support, and retained-set components.
-
-\paragraph{No-Leakage Boundary.}
-\label{sec:no-leakage-boundary}
-The main inverse method stops at the retained-set decision above. All
-candidate scores, support gates, and setup proposals are computed from
-the MPM-trained GP surrogate, MPM-heldout BAE statistics, and fixed
-observation-noise assumptions. Measurements from parallel-plate
-rheometers, real replay errors, binary-mask or silhouette diagnostics,
-freshness hold-out results, material names, and gamma-dot audits are not
-used to select candidates, set thresholds, choose a representative, or
-define a setup policy. They enter only after inference as validation and
-failure-analysis evidence. This separation follows the computer-model
-calibration literature: model discrepancy can be important for
-interpreting physical experiments, but if it is used as an unconstrained
-selector it can become confounded with the physical parameters
-~\cite{kennedy2001bayesian,bayarri2007framework,brynjarsdottir2014discrepancy,plumlee2017bayesian,liu2009modularization}.
-Consequently, any real-experiment discrepancy model or flow-curve/replay
-trade-off is treated as a diagnostic outside the main Method, not as the
-reported surrogate inverse.
-
-\paragraph{Joint Multi-Setup Inverse.}
-\label{sec:inv-joint}
-For observations of the same material at setups
-$j=1,\ldots,J$, each setup keeps its own forward evaluation and
-uncertainty model but all setups share one
-$\boldsymbol{\theta}$. The joint score is
-\begin{equation}
-\label{eq:multi-setup-loss}
-    \mathcal{L}_{1:J}(\mathbf{z})
-    =
-    \sum_{j=1}^{J}
-    \mathcal{L}_{\mathrm{GP}}^{(j)}(\mathbf{z})
-    + \lambda_{\mathrm{sup}}\,
-      \frac{1}{J}\sum_{j=1}^{J} q_{\mathrm{sup}}^{(j)}(\mathbf{z}).
-\end{equation}
-The multi-setup validation asks whether adding setup $J+1$ shrinks
-the plausible set and removes false basins while preserving the
-correct basin. If the correct basin is removed, the likelihood or BAE
-gates are too aggressive; if it survives but the best-ranked point
-remains poor, candidate generation is adequate and ranking remains the
-remaining source of error.
-
-\begin{algorithm}[!htbp]
-\caption{Online surrogate inverse with ambiguity reporting.}
-\label{alg:invert}
-\KwIn{One or more setup observations
-$\{(\mathbf{y}^{(j)}_{\mathrm{obs}},W_j,H_j)\}_{j=1}^{J}$;
-fixed GP forward emulator and BAE variances.}
-\KwOut{Point estimate $\hat{\boldsymbol{\theta}}$ if supported, or
-plausible set $\mathcal{R}$ with score components and ambiguity measures.}
-\BlankLine
-Generate candidate seeds from training-neighbour retrieval,
-local proposals, and support-aware global proposals under the fixed GP
-forward\;
-For each candidate and setup, evaluate
-Eq.~\eqref{eq:obs-loss}, the BAE/GP variance components, and the
-support diagnostic Eq.~\eqref{eq:support}\;
-For $J>1$, combine setup scores by Eq.~\eqref{eq:multi-setup-loss}\;
-Rank candidates with explicit score components and form the plausible
-set by Eq.~\eqref{eq:retain}\;
-\eIf{$\mathcal{R}$ is single-basin and has small $z$-diameter}{
-  \Return{best plausible $\hat{\boldsymbol{\theta}}$ and score components\;}
-}{
-  \Return{$\mathcal{R}$ as an ambiguity report for additional setup evidence\;}
-}
-\end{algorithm}
-
-\subsection{Setup Proposal and Ridge Disambiguation}
-\label{sec:proposer}
-
-Additional setups are used to disambiguate plausible ridges, not to
-make a single setup uniquely identifiable. The reference policy is the
-closed-form, Fisher-information-based proposer of
-\citet{hamamichi2023nonnewtonian}. Given the current estimate or a
-representative plausible candidate $\hat{\boldsymbol{\theta}}$, they
-approximate the dam break by plane-Poiseuille flow and derive an
-analytical loss-Hessian $\mathbf{H}(\hat{\boldsymbol{\theta}};W,H)$.
-Let $\boldsymbol{\nu}_1$ be the unit principal normal associated with the
-largest eigenvalue of the first setup's Hessian, after rescaling the
-parameter axes to the search box. This vector is normal to the local
-low-loss ridge: two setups with nearly parallel normals leave nearly
-the same ambiguity. The Hessian-orthogonal proposer selects
-\begin{equation}
-\label{eq:proposer}
-    (W_2^\star,H_2^\star)
-    \;=\;
-    \arg\min_{(W,H)\in\mathcal{W}}
-    \bigl\langle \boldsymbol{\nu}_1,\,
-    \boldsymbol{\nu}_2(W,H)\bigr\rangle^2 ,
-\end{equation}
-making the joint Fisher information full-rank in the
-$(\boldsymbol{\nu}_1,\boldsymbol{\nu}_2)$ subspace. The Hessian is closed-form,
-so evaluating Eq.~\eqref{eq:proposer} requires no forward
-simulations.
-
-In a strictly sequential protocol, setup selection is causal. After
-setup $k$ has been observed, the inverse is rerun on the observations
-collected through setup $k$ to form a current plausible set
-$\mathcal{R}_k$; only this information may be used to choose setup
-$k+1$. The selector is therefore part of the measurement policy, not a
-post-hoc reordering of a precomputed fixed setup panel.
-
-The reported pipeline uses this inherited Hessian-orthogonal policy as
-the sequential setup proposer. The surrogate contribution is not a new
-physical setup-selection principle; it is that each sequential inverse
-update and candidate-set update can be evaluated with the GP/BAE
-objective instead of launching a new MPM optimisation. The validation
-therefore asks
-whether the proposed setups shrink the retained set, reduce the number
-of plausible basins, preserve a near-truth basin in synthetic tests, and
-run fast enough for repeated measurement. Learned or GP-only setup
-policies were explored during development but are not part of the
-reported main pipeline.
-
-\subsection{Implementation Configuration}
-\label{sec:data}
-
-All reported results use the single surrogate bank constructed in
-Sec.~\ref{sec:method-bank}. It is trained once on the cleaned
-$\rho=1.0$ trajectory corpus and then re-used across all inverse,
-setup-selection, and validation experiments. No
-material-specific retraining or per-experiment hyperparameter sweep is
-performed on top of this bank. The global parameter box spans
-$n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
-$\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and $W,H\in[2,7]$ cm.
-The fixed numerical choices used by the evaluations are summarised in
-Tab.~\ref{tab:hyper}; corpus provenance and cleaning statistics are
-given in Tab.~\ref{tab:data-integrity}.
-
-\begin{table}[!t]
-\begingroup
-\centering
-\caption{Fixed implementation configuration used throughout the
-evaluation.}
-\label{tab:hyper}
-\scriptsize
-\setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{0.86}
-\begin{tabular}{@{}p{0.34\linewidth}p{0.60\linewidth}@{}}
-\toprule
-\textit{Training data} & \\
-\quad quality-controlled MPM rows     & $407{,}480$ total \\
-\quad train / val / test rows       & $325{,}984$ / $40{,}748$ /
-                                      $40{,}748$ \\
-\quad parameter box                 & $n\in[0.3,1.0]$,
-                                      $\eta\in[10^{-3},300]$,
-                                      $\sigma_Y\in[10^{-3},400]$ \\
-\midrule
-\textit{Local GP forward emulator} & \\
-\quad local experts                 & $2{,}775$ final experts;
-                                      $2{,}735$ with external validation,
-                                      $40$ using a training holdout \\
-\quad rows per expert               & all-row region size min / median / max =
-                                      $10$ / $71$ / $4{,}191$;
-                                      assigned train rows = $5$ / $57$ / $3{,}362$;
-                                      fitted max $=800$ \\
-\quad $x_{08}$ within-region span    & median / p95 / max =
-                                      $0.761$ / $2.323$ / $2.997$ cm \\
-\midrule
-\textit{Local GP expert} & \\
-\quad kernel                        & Mat\'ern-$5/2$ automatic-relevance-
-                                      determination kernel $+$ linear kernel
-                                      on $\mathbb{R}^{5}$ \\
-\quad mean / outputs                & linear mean; $8$ independent exact
-                                      GP heads per expert \\
-\midrule
-\textit{Expert selection} & \\
-\quad evidence terms                & weighted trajectory-median distance,
-                                      terminal-front support distance,
-                                      and geometry distance \\
-\quad oversample                    & short evidence-ranked candidate list
-                                      before terminal-support rerank \\
-\quad selected experts              & top-$1$ per query \\
-\midrule
-\textit{Inverse evaluation} & \\
-\quad main constraint               & surrogate-only inverse; no MPM-in-loop
-                                      optimisation \\
-\quad candidate set                 & retrieval and local/global proposals
-                                      scored by the GP/BAE objective \\
-\quad optimiser compatibility       & CMA-ES can optimise the same score;
-                                      not the claimed source of accuracy \\
-\quad plausible-set output          & enabled when the observation remains
-                                      ridge-ambiguous \\
-\midrule
-\textit{Likelihood / UQ} & \\
-\quad loss                          & variance-whitened flow-front residual
-                                      with GP variance, BAE variance, and
-                                      observation noise \\
-\quad expert-selection weights $\boldsymbol{\alpha}$ & $(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$;
-                                      expert routing and candidate anchors only \\
-\quad default forward covariance    & $\Sigma_{\mathrm{GP}}+
-                                       \mathrm{diag}(\Sigma_{\mathrm{BAE,expert}})
-                                       +\Sigma_{\mathrm{obs}}$ \\
-\bottomrule
-\end{tabular}
-\endgroup
-\end{table}
-
-\section{Camera Calibration}
 \label{sec:calib}
 
-To run the inverse on a real experiment, we need to convert a
-smartphone video of the dam-break flow into the observation vector
-$\mathbf{y}_{\mathrm{obs}} = (x_{1}, \dots, x_{8}) \in
-\mathbb{R}_{\ge 0}^{8}$ of Eq.~\eqref{eq:y-def}. We use a two-stage
-camera calibration followed by silhouette-based flow-front
-extraction; the full pipeline is summarised in
+
+
+The online branch must produce the same metric observable used by the
+offline branch.  Pixel displacement alone is unsuitable because it
+changes with camera pose and focal length, whereas the GP target is a
+world-space distance in centimetres.  We therefore calibrate the camera,
+segment the fluid, back-project its contour to the floor plane, and apply
+$\mathcal{A}_{\rm vid}$ to obtain $\mathbf{y}_{\rm obs}$.  Calibration is
+introduced here as a necessary measurement transform, not as a layer of
+the surrogate: the GP can be trained without a camera, but a real video
+cannot be compared with the GP until both are expressed in the common
+coordinates of Eq.~\eqref{eq:shared-observation}.
+
+We model the extracted vector as
+\begin{equation}
+\label{eq:observation-error}
+  \mathbf{y}_{\rm obs}
+  =\mathbf{y}_{\rm exp}+\boldsymbol{\varepsilon}_{\rm obs},
+  \qquad
+  \boldsymbol{\varepsilon}_{\rm obs}
+  \sim\mathcal{N}(\mathbf{0},\Sigma_{\rm obs}),
+  \qquad
+  \Sigma_{\rm obs}=\sigma_{\rm obs}^{2}I_8,
+\end{equation}
+where $\mathbf{y}_{\rm exp}$ is the latent metric front trajectory and
+$\sigma_{\rm obs}$ is a fixed floor for calibration, segmentation, and
+frame-extraction error.  This term is distinct from
+$\Sigma_{\rm GP}$, which describes posterior uncertainty of the selected
+surrogate, and $\Sigma_{\rm BAE}$, which is estimated from MPM validation
+residuals.  The camera procedure is checked through marker reprojection
+and silhouette alignment; the complete observation-to-inverse path is
+then tested on synthetic emulations and real captures in
+Secs.~\ref{sec:mainresults} and~\ref{sec:rheometer}.
+
+
+
+The following two stages implement $\mathcal{A}_{\rm vid}$ in
+Eq.~\eqref{eq:shared-observation}: camera calibration establishes the
+pixel-to-world transform, after which silhouette-based extraction returns
+the eight metric front positions. The full pipeline is summarised in
 Algorithm~\ref{alg:calib}. This section specifies the observation
 preprocessing used by the real-material diagnostics; the validated
 contribution of this paper remains the GP-surrogate inverse and its
@@ -1960,9 +1195,10 @@ specks. We then extract the outer contour $\partial\Omega_{i}$ of
 the foreground mask at frame $i$ and back-project every contour
 pixel $\mathbf{u} = (u, v)$ to the world ground plane $y = 0$
 through the calibrated pinhole camera. With
-$\mathbf{C}_{w} = -R^{\!\top}\,\mathbf{t}$ the world-frame camera
+$\mathbf{C}_{w} = -(R^*)^{\!\top}\,\mathbf{t}^*$ the world-frame camera
 centre and
-$\mathbf{d}(\mathbf{u}) = R^{\!\top}\,\mathbf{K}_{0}^{-1}\,(u, v, 1)^{\!\top}$
+$\mathbf{d}(\mathbf{u}) = (R^*)^{\!\top}\,(\mathbf{K}^*)^{-1}
+\,(u, v, 1)^{\!\top}$
 the world-frame ray direction, the ray
 \begin{equation}
 \label{eq:backproj}
@@ -2029,6 +1265,557 @@ Write the resulting camera XML and use it for flow-front extraction\;
 
 \Return{$(\mathbf{K}^{*},R^{*},\mathbf{t}^{*})$.}
 \end{algorithm}
+
+
+
+\subsection{Observation-Conditioned Expert Retrieval and Candidate Construction}
+
+\label{sec:retrieval}
+
+
+
+Localisation creates a question that a single global surrogate does not
+have: which expert should evaluate a new experiment?  Routing by
+$\boldsymbol{\theta}$ would be circular because those parameters are the
+unknowns.  We instead use only quantities available before inversion,
+namely $S=(W,H)$ and $\mathbf{y}_{\rm obs}$, to retrieve experts whose
+training trajectories resemble the observation.  Retrieval determines
+where a supported forward approximation can be queried; it is not itself
+the material estimate.
+
+We retain inversion rather than train a direct regressor
+$\mathbf{y}_{\rm obs}\mapsto\boldsymbol{\theta}$ because the forward map
+can be many-to-one.  A direct single-valued prediction would collapse
+separated parameter basins during training, whereas an explicit forward
+inverse can evaluate and report all candidates that remain compatible
+with the observed trajectory.  For a selected expert $s^\star$, the
+finite search pool is
+\begin{equation}
+\label{eq:candidate-pool}
+  \mathcal{C}
+  =\mathcal{C}_{\rm NN}\cup\mathcal{C}_{\rm local}
+   \cup\mathcal{C}_{\rm global}
+  \subseteq\mathcal{Z},
+\end{equation}
+combining supported training neighbours, proposals around retrieved
+anchors, and broader support-aware proposals.  This construction exploits
+cheap surrogate evaluations to expose multiple basins; every member is
+subsequently judged by the same uncertainty-aware score, so retrieval
+similarity is neither a posterior probability nor an acceptance rule.
+
+
+
+\paragraph{Observation-Conditioned Expert Selection.}
+\label{sec:surr-3layer}
+The offline partition assigns each training row to one expert. At
+inverse time, the material parameters are unknown, so the expert must
+be selected from observable evidence: the setup geometry and the
+measured flow-front trajectory. For every expert $s$, the runtime stores
+the median setup $(\bar W_s,\bar H_s)$, the median trajectory
+$\bar{\mathbf{y}}_s$, and the terminal-front support statistics
+\(\mathrm{median}(Y_{s,8})\) and \(\mathrm{std}(Y_{s,8})\). Given
+$(W,H,\mathbf{y}_{\mathrm{obs}})$, the implemented evidence score is
+\begin{equation}
+\label{eq:gate}
+\begin{aligned}
+    e_s
+    &=
+    d_{\mathrm{shape},s}
+    + \lambda_8 d_{8,s}
+    + \lambda_{\mathrm{geo}}d_{\mathrm{geo},s},\\
+    d_{\mathrm{shape},s}
+    &=
+    \sqrt{\frac{1}{8}\sum_{d=1}^{8}
+    \alpha_d^2(\bar y_{s,d}-y_{\mathrm{obs},d})^2},\\
+    d_{8,s}
+    &=
+    \frac{|y_{\mathrm{obs},8}-\mathrm{median}(Y_{s,8})|}
+         {\max(\mathrm{std}(Y_{s,8}),\,0.1\,\mathrm{cm})},\\
+    d_{\mathrm{geo},s}
+    &=
+    \sqrt{\left(\frac{\bar W_s-W}{5\,\mathrm{cm}}\right)^2
+    +\left(\frac{\bar H_s-H}{5\,\mathrm{cm}}\right)^2}.
+\end{aligned}
+\end{equation}
+Here $d_{\mathrm{shape},s}$ is in cm, while $d_{8,s}$ and
+$d_{\mathrm{geo},s}$ are dimensionless.  The fixed coefficients
+$\lambda_8=0.25$ cm and $\lambda_{\mathrm{geo}}=0.10$ cm therefore make
+$e_s$ a dimensionally consistent ranking distance; they do not enter the
+inverse likelihood.
+The frame weights
+\[
+\boldsymbol{\alpha}=(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)
+\]
+are used for expert routing and candidate anchors only. Their
+purpose is to reduce sensitivity to the earliest release transients:
+finite-time gate withdrawal, release-timing jitter, segmentation
+uncertainty, and unmodelled free-surface or surface-tension effects can
+move the first few fronts without indicating a different
+Herschel--Bulkley material. Later front positions provide more stable
+runout evidence and therefore receive larger weights. The selector first
+keeps a short list of low-$e_s$ experts and then chooses the primary
+expert by terminal-front support and the evidence score. The same rule is
+used for every observation, and the retained-set score below is computed
+from the fixed GP/BAE/observation-noise budget rather than from a
+separate observation-specific expert-selection formula. Selecting an expert from observed
+$(W,H,\mathbf{y}_{\mathrm{obs}})$ rather than the unknown
+$\boldsymbol{\theta}$ avoids a circular gate and makes out-of-support
+cases diagnosable by inspecting the selected expert's training box.
+
+
+
+\paragraph{Candidate Generation.}
+\label{sec:inv-nn}
+The inverse input is the setup geometry and observed trajectory,
+$(W,H,\mathbf{y}_{\mathrm{obs}})$, and the output is either a point
+estimate $\hat{\boldsymbol{\theta}}=(\hat n,\hat\eta,\hat\sigma_Y)$
+or a set of plausible candidates when the observation remains
+ambiguous. The reported validation forms a finite candidate set in the
+transformed search coordinate $\mathbf{z}$ defined in
+Sec.~\ref{sec:method-definitions} by combining
+support-aware training-neighbour retrieval, local proposals, and
+support-aware global proposals. This $\mathbf{z}$-space uses natural
+logarithms for parameter-distance diagnostics; it is separate from the
+base-10 feature scaling used inside each GP expert. For each local
+expert, the nearest training trajectory is
+\begin{equation}
+\label{eq:nn}
+    \mathbf{z}^{\mathrm{NN}}
+    =
+    \mathbf{z}_{i^\star},\quad
+    i^\star
+    =
+    \arg\min_{i\in\mathcal{T}_{s^\star}}
+    \frac{1}{8}\sum_{d=1}^{8}
+      \alpha_d^2\left(y_{i,d}-y_{\mathrm{obs},d}\right)^2 .
+\end{equation}
+This point is an initializer or candidate seed, not a prior. The
+reported candidate generator expands these seeds with local proposals,
+evaluates all candidates under the same GP/BAE score, and then applies
+the plausible-set gates below.
+This candidate set is not claimed to be a superior optimiser. Its purpose is
+to exploit the cheap GP evaluations to expose the score landscape:
+CMA-ES, least-squares refinement, or Bayesian optimisation could use the
+same GP/BAE objective, while the candidate set lets us report which
+basins were covered, retained, or ranked ahead of the near-truth basin.
+The validation below shows that candidate coverage and final ranking are
+distinct failure modes.
+The same frame-weight schedule used by Eq.~\eqref{eq:gate} is used only
+for this candidate anchor.  The final retained-set decision does not
+reuse these weights; it exposes residual, uncertainty, and support terms
+separately.  The fixed schedule is listed in Tab.~\ref{tab:hyper}.
+
+\paragraph{Support and Extrapolation Diagnostics.}
+\label{sec:inv-box}
+Every candidate is evaluated relative to the training support of the
+selected local expert. Let
+$[\mathbf{z}_{\min,s^\star},\mathbf{z}_{\max,s^\star}]$ be its support
+in $z$-space, padded by a fraction $\kappa_{\rm pad}$ of its local
+standard-deviation
+vector $\boldsymbol{\omega}_{z,s^\star}$ and clipped to the global HB
+bounds,
+\begin{equation}
+\label{eq:tight-box}
+    \mathcal{Z}_{s^\star}
+    =
+    \mathcal{Z}\cap
+    [\mathbf{z}_{\min,s^\star}-\kappa_{\rm pad}
+       \boldsymbol{\omega}_{z,s^\star},\,
+     \mathbf{z}_{\max,s^\star}+\kappa_{\rm pad}
+       \boldsymbol{\omega}_{z,s^\star}].
+\end{equation}
+We record a support penalty
+\begin{equation}
+\label{eq:support}
+    q_{\mathrm{sup}}(\mathbf{z};s^\star)
+    =
+    \left\|\max(\mathbf{z}_{\min,s^\star}-\mathbf{z},0)\right\|_2^2
+    +
+    \left\|\max(\mathbf{z}-\mathbf{z}_{\max,s^\star},0)\right\|_2^2 .
+\end{equation}
+This term is a ranking and diagnostic signal, in the spirit of
+history-matching implausibility checks that rule out unsupported
+parameter regions rather than forcing a single fit~\cite{vernon2010galaxy}.
+It prevents a low trajectory residual in an extrapolative region from
+being mistaken for a well-supported material estimate.
+
+\paragraph{Ridge Diagnosis Without an Explicit $\sigma_Y$ Prior.}
+\label{sec:inv-sy}
+Rather than break the residual $(\eta,\sigma_Y)$ identifiability
+ridge with a hand-chosen prior, we expose it through the plausible
+candidate set, its diameter in $z$-space, and its behaviour under
+additional setups. If several low-loss, well-supported candidates
+remain separated in $\mathbf{z}$, the output is an ambiguity report
+rather than a forced point estimate.
+
+
+
+\subsection{Uncertainty-Aware Inverse and Retained-Set Reporting}
+
+\label{sec:inverse}
+
+
+
+Candidate construction answers where to evaluate the inverse, but not
+whether any candidate is supported by the data.  A raw squared residual
+is insufficient because prediction reliability varies across frames and
+local experts.  We therefore standardise each residual using the total
+error budget introduced above.  GP variance accounts for uncertainty at
+the query, BAE variance accounts for observed surrogate residuals on
+held-out MPM rows, and observation variance accounts for measurement
+noise.  Their roles are additive in variance, not interchangeable tuning
+penalties.
+
+The score ranks $\mathcal{C}$, while explicit residual and support gates
+define the retained set $\mathcal{R}$.  This distinction is necessary for
+an underdetermined inverse: the lowest-score candidate is always
+available numerically, but it is scientifically meaningful as a point
+estimate only when the retained candidates form one sufficiently small
+basin.  Otherwise the method reports the set and requests additional
+setup evidence.  Synthetic tests can verify coverage because the true
+parameters are known; held-out MPM tests assess the variance model; real
+experiments test trajectory replay and external rheometer consistency
+without using those measurements to choose the answer.
+
+
+
+\paragraph{Error-Aware Surrogate Objective.}
+\label{sec:inv-loss}
+For a candidate $\mathbf{z}$, the selected GP provides both
+$\hat{y}_d(\mathbf{z})$ and predictive standard deviation
+$\sigma_{\mathrm{GP},d}(\mathbf{z})$. The inverse compares the predicted
+and observed flow-front positions after whitening by the GP/BAE error
+budget. The per-frame variance used by the score is
+\begin{equation}
+\label{eq:gp-var}
+    v_d(\mathbf{z})
+    =
+    \sigma_{\mathrm{GP},d}^{2}(\mathbf{z})
+    +
+    \sigma_{\mathrm{BAE},s^\star,d}^{2}
+    + \sigma_{\mathrm{obs}}^2 .
+\end{equation}
+The whitened residual and Gaussian negative log-likelihood are
+\begin{equation}
+\label{eq:obs-loss}
+\begin{aligned}
+    r_d(\mathbf{z})
+    &=
+    \frac{y_{\mathrm{obs},d}-\hat y_d(\mathbf{z})}
+         {\sqrt{v_d(\mathbf{z})}},
+    \\
+    \mathcal{L}_{\mathrm{GP}}(\mathbf{z})
+    &=
+    \frac{1}{2}
+    \sum_{d=1}^{8}
+      \left[
+      r_d(\mathbf{z})^2+\log\!\bigl(2\pi v_d(\mathbf{z})\bigr)
+      \right].
+\end{aligned}
+\end{equation}
+The implementation also records $E^{\rm rms}(\mathbf{z})=
+\sqrt{\frac{1}{8}\sum_d r_d(\mathbf{z})^2}$, weighted RMSE, max-frame
+implausibility, and per-frame uncertainty diagnostics.  Whitening scales
+each mismatch by its expected error, while the logarithmic term prevents
+a candidate from improving the score merely by predicting an inflated
+variance. For ranking
+and retention we keep the score decomposed into explicit diagnostics:
+trajectory residual, GP epistemic variance, the local BAE residual
+variance, and an observation-noise floor, with Gaussian negative log
+likelihood and max-frame implausibility as diagnostics.  This decomposition
+allows validation to distinguish failure to generate the correct basin
+from overconfident ranking of a false basin.
+
+\paragraph{Candidate Ranking and Plausible Sets.}
+\label{sec:inv-ranking}
+Let $\mathcal{C}$ be the post-search candidate pool and let
+$\ell_i=\mathcal{L}_{\mathrm{GP}}(\mathbf{z}_i)$,
+$E_i^{\rm rms}=E^{\rm rms}(\mathbf{z}_i)$,
+$E_i^\infty=\max_d|r_d(\mathbf{z}_i)|$, and
+$q_i=q_{\rm sup}(\mathbf{z}_i;s^\star)$ the support diagnostic.  The
+implemented ranking score is
+\[
+    \mathrm{score}_i
+    =
+    \ell_i
+    + \lambda_{\mathrm{sup}} q_i .
+\]
+Here $\lambda_{\rm sup}\geq0$ is the fixed support-penalty coefficient.
+Let $\ell_\star=\min_{\mathbf{z}_i\in\mathcal{C}}\ell_i$.  The plausible
+set is defined by explicit gates around that best observed likelihood,
+\begin{equation}
+\label{eq:retain}
+    \mathcal{R}
+    =
+    \{\mathbf{z}_i\in\mathcal{C}\mid
+    \ell_i\le \ell_\star+\epsilon_\ell,\;
+    E_i^{\rm rms}\le E_{\rm rms}^{\max},\;
+    E_i^\infty\le E_\infty^{\max},\;
+    q_i\le q_{\max}\}.
+\end{equation}
+The non-negative constants $\epsilon_\ell$, $E_{\rm rms}^{\max}$,
+$E_\infty^{\max}$, and $q_{\max}$ are respectively the likelihood,
+trajectory-RMS, worst-frame, and support tolerances.  They are fixed
+decision thresholds, not HB parameters or learned properties of the
+query material, and are frozen before the reported evaluations.
+Basins are formed by greedy centre linking in $z$-space: a retained
+candidate joins the nearest existing basin centre within a fixed
+linking radius and otherwise opens a new basin, so basin counts and
+labels require stability checks under candidate reordering. A point
+estimate is reported only when $\mathcal{R}$ contains at least a
+minimum retained count, forms a single compatible basin, and has small
+diameter in $z$-space. Otherwise
+the inverse reports an ambiguous plausible set and requests additional
+setup evidence. In the reported experiments, $\mathcal{C}$ is the
+explicit retrieval/local-proposal candidate set described above and is ranked
+by the same GP/BAE score that a CMA-ES search~\cite{hansen2016cma} could
+optimise. Thus the method should not be read as a claim that CMA-ES is
+inferior; the core change is that the expensive forward call has been
+amortised and the inverse decision is reported through explicit residual,
+uncertainty, support, and retained-set components.
+
+\paragraph{No-Leakage Boundary.}
+\label{sec:no-leakage-boundary}
+The main inverse method stops at the retained-set decision above. All
+candidate scores, support gates, and setup proposals are computed from
+the MPM-trained GP surrogate, MPM-heldout BAE statistics, and fixed
+observation-noise assumptions. Measurements from parallel-plate
+rheometers, real replay errors, binary-mask or silhouette diagnostics,
+freshness hold-out results, material names, and gamma-dot audits are not
+used to select candidates, set thresholds, choose a representative, or
+define a setup policy. They enter only after inference as validation and
+failure-analysis evidence. This separation follows the computer-model
+calibration literature: model discrepancy can be important for
+interpreting physical experiments, but if it is used as an unconstrained
+selector it can become confounded with the physical parameters
+~\cite{kennedy2001bayesian,bayarri2007framework,brynjarsdottir2014discrepancy,plumlee2017bayesian,liu2009modularization}.
+Consequently, any real-experiment discrepancy model or flow-curve/replay
+trade-off is treated as a diagnostic outside the main Method, not as the
+reported surrogate inverse.
+
+
+
+\subsection{Multi-Setup Joint Inference and Next-Setup Proposal}
+
+\label{sec:proposer}
+
+
+
+A second setup is introduced only after one setup leaves an unresolved
+retained set.  All observations concern the same material and therefore
+share one $\boldsymbol{\theta}$, but each geometry has its own calibrated
+trajectory, selected expert, support region, and error budget.  Assuming
+their observation errors are conditionally independent given
+$\boldsymbol{\theta}$, evidence from the setups is accumulated by adding
+their per-setup negative log-likelihoods.  The intended benefit is not
+merely a lower score: independent geometry should intersect and contract
+the first setup's parameter ridge while preserving compatible basins.
+
+When another measurement is required, we use the analytical
+Hessian-orthogonal proposal of the predecessor
+\cite{hamamichi2023nonnewtonian}.  Thus the physical principle for
+choosing a complementary setup is inherited rather than claimed as a new
+contribution.  Our change is computational: after each new observation,
+the joint retained set can be recomputed with the surrogate instead of
+rerunning an MPM-based optimisation.  The validation consequently tests
+retained-set shrinkage, near-truth-basin preservation, basin removal, and
+sequential runtime.
+
+
+
+\paragraph{Joint Multi-Setup Inverse.}
+\label{sec:inv-joint}
+For observations of the same material at setups
+$j=1,\ldots,J$, each setup keeps its own forward evaluation and
+uncertainty model but all setups share one
+$\boldsymbol{\theta}$. The joint score is
+\begin{equation}
+\label{eq:multi-setup-loss}
+    \mathcal{L}_{1:J}(\mathbf{z})
+    =
+    \sum_{j=1}^{J}
+    \mathcal{L}_{\mathrm{GP}}^{(j)}(\mathbf{z})
+    + \lambda_{\mathrm{sup}}\,
+      \frac{1}{J}\sum_{j=1}^{J} q_{\mathrm{sup}}^{(j)}(\mathbf{z}).
+\end{equation}
+The multi-setup validation asks whether adding setup $J+1$ shrinks
+the plausible set and removes false basins while preserving the
+correct basin. If the correct basin is removed, the likelihood or BAE
+gates are too aggressive; if it survives but the best-ranked point
+remains poor, candidate generation is adequate and ranking remains the
+remaining source of error.
+
+\begin{algorithm}[!htbp]
+\caption{Online surrogate inverse with ambiguity reporting.}
+\label{alg:invert}
+\KwIn{One or more setup observations
+$\{(\mathbf{y}^{(j)}_{\mathrm{obs}},W_j,H_j)\}_{j=1}^{J}$;
+fixed GP forward emulator and BAE variances.}
+\KwOut{Point estimate $\hat{\boldsymbol{\theta}}$ if supported, or
+plausible set $\mathcal{R}$ with score components and ambiguity measures.}
+\BlankLine
+Generate candidate seeds from training-neighbour retrieval,
+local proposals, and support-aware global proposals under the fixed GP
+forward\;
+For each candidate and setup, evaluate
+Eq.~\eqref{eq:obs-loss}, the BAE/GP variance components, and the
+support diagnostic Eq.~\eqref{eq:support}\;
+For $J>1$, combine setup scores by Eq.~\eqref{eq:multi-setup-loss}\;
+Rank candidates with explicit score components and form the plausible
+set by Eq.~\eqref{eq:retain}\;
+\eIf{$\mathcal{R}$ is single-basin and has small $z$-diameter}{
+  \Return{best plausible $\hat{\boldsymbol{\theta}}$ and score components\;}
+}{
+  \Return{$\mathcal{R}$ as an ambiguity report for additional setup evidence\;}
+}
+\end{algorithm}
+
+
+
+Additional setups are used to disambiguate plausible ridges, not to
+make a single setup uniquely identifiable. The reference policy is the
+closed-form, Fisher-information-based proposer of
+\citet{hamamichi2023nonnewtonian}. Given the current estimate or a
+representative plausible candidate $\hat{\boldsymbol{\theta}}$, they
+approximate the dam break by plane-Poiseuille flow and derive an
+analytical loss-Hessian $\mathbf{H}(\hat{\boldsymbol{\theta}};W,H)$.
+Let $\boldsymbol{\nu}_1$ be the unit principal normal associated with the
+largest eigenvalue of the first setup's Hessian, after rescaling the
+parameter axes to the search box. This vector is normal to the local
+low-loss ridge: two setups with nearly parallel normals leave nearly
+the same ambiguity. Let $\mathcal{W}$ denote the finite set of admissible
+container geometries. The Hessian-orthogonal proposer selects
+\begin{equation}
+\label{eq:proposer}
+    (W_2^\star,H_2^\star)
+    \;=\;
+    \arg\min_{(W,H)\in\mathcal{W}}
+    \bigl\langle \boldsymbol{\nu}_1,\,
+    \boldsymbol{\nu}_2(W,H)\bigr\rangle^2 ,
+\end{equation}
+making the joint Fisher information full-rank in the
+$(\boldsymbol{\nu}_1,\boldsymbol{\nu}_2)$ subspace. The Hessian is closed-form,
+so evaluating Eq.~\eqref{eq:proposer} requires no forward
+simulations.
+
+In a strictly sequential protocol, setup selection is causal. After
+setup $k$ has been observed, the inverse is rerun on the observations
+collected through setup $k$ to form a current plausible set
+$\mathcal{R}_k$; only this information may be used to choose setup
+$k+1$. The selector is therefore part of the measurement policy, not a
+post-hoc reordering of a precomputed fixed setup panel.
+
+The reported pipeline uses this inherited Hessian-orthogonal policy as
+the sequential setup proposer. The surrogate contribution is not a new
+physical setup-selection principle; it is that each sequential inverse
+update and candidate-set update can be evaluated with the GP/BAE
+objective instead of launching a new MPM optimisation. The validation
+therefore asks
+whether the proposed setups shrink the retained set, reduce the number
+of plausible basins, preserve a near-truth basin in synthetic tests, and
+run fast enough for repeated measurement. Learned or GP-only setup
+policies were explored during development but are not part of the
+reported main pipeline.
+
+
+
+\subsection{Implementation Configuration and Reproducibility}
+
+\label{sec:data}
+
+
+
+This subsection records fixed numerical choices and the provenance needed
+to reproduce the reported pipeline; it does not introduce another method
+component.  All thresholds, feature transforms, expert metadata, and
+error statistics are frozen before the validation observations are
+inverted.  Keeping this boundary explicit prevents material labels,
+rheometer curves, or real-experiment outcomes from being used to tune the
+candidate ranking after the fact.
+
+
+
+All reported results use the single surrogate bank constructed in
+Sec.~\ref{sec:method-bank}. It is trained once on the cleaned
+$\rho=1.0$ trajectory corpus and then re-used across all inverse,
+setup-selection, and validation experiments. No
+material-specific retraining or per-experiment hyperparameter sweep is
+performed on top of this bank. The global parameter box spans
+$n \in [0.3,1.0]$, $\eta \in [10^{-3},3{\times}10^{2}]$,
+$\sigma_Y \in [10^{-3},4{\times}10^{2}]$, and $W,H\in[2,7]$ cm.
+The fixed numerical choices used by the evaluations are summarised in
+Tab.~\ref{tab:hyper}; corpus provenance and cleaning statistics are
+given in Tab.~\ref{tab:data-integrity}.
+
+\begin{table}[!t]
+\begingroup
+\centering
+\caption{Fixed implementation configuration used throughout the
+evaluation.}
+\label{tab:hyper}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{0.86}
+\begin{tabular}{@{}p{0.34\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textit{Training data} & \\
+\quad quality-controlled MPM rows     & $407{,}480$ total \\
+\quad train / val / test rows       & $325{,}984$ / $40{,}748$ /
+                                      $40{,}748$ \\
+\quad parameter box                 & $n\in[0.3,1.0]$,
+                                      $\eta\in[10^{-3},300]$,
+                                      $\sigma_Y\in[10^{-3},400]$ \\
+\midrule
+\textit{Local GP forward emulator} & \\
+\quad local experts                 & $2{,}775$ final experts;
+                                      $2{,}735$ with external validation,
+                                      $40$ using a training holdout \\
+\quad rows per expert               & all-row region size min / median / max =
+                                      $10$ / $71$ / $4{,}191$;
+                                      assigned train rows = $5$ / $57$ / $3{,}362$;
+                                      fitted max $=800$ \\
+\quad $x_{08}$ within-region span    & median / p95 / max =
+                                      $0.761$ / $2.323$ / $2.997$ cm \\
+\midrule
+\textit{Local GP expert} & \\
+\quad kernel                        & Mat\'ern-$5/2$ automatic-relevance-
+                                      determination kernel $+$ linear kernel
+                                      on $\mathbb{R}^{5}$ \\
+\quad mean / outputs                & linear mean; $8$ independent exact
+                                      GP heads per expert \\
+\midrule
+\textit{Expert selection} & \\
+\quad evidence terms                & weighted trajectory-median distance,
+                                      terminal-front support distance,
+                                      and geometry distance \\
+\quad oversample                    & short evidence-ranked candidate list
+                                      before terminal-support rerank \\
+\quad selected experts              & top-$1$ per query \\
+\midrule
+\textit{Inverse evaluation} & \\
+\quad main constraint               & surrogate-only inverse; no MPM-in-loop
+                                      optimisation \\
+\quad candidate set                 & retrieval and local/global proposals
+                                      scored by the GP/BAE objective \\
+\quad optimiser compatibility       & CMA-ES can optimise the same score;
+                                      not the claimed source of accuracy \\
+\quad plausible-set output          & enabled when the observation remains
+                                      ridge-ambiguous \\
+\midrule
+\textit{Likelihood / UQ} & \\
+\quad loss                          & variance-whitened flow-front residual
+                                      with GP variance, BAE variance, and
+                                      observation noise \\
+\quad expert-selection weights $\boldsymbol{\alpha}$ & $(0.2,0.2,0.35,0.5,0.8,1.0,1.4,2.0)$;
+                                      expert routing and candidate anchors only \\
+\quad default forward covariance    & $\Sigma_{\mathrm{GP}}+
+                                       \mathrm{diag}(\Sigma_{\mathrm{BAE,expert}})
+                                       +\Sigma_{\mathrm{obs}}$ \\
+\bottomrule
+\end{tabular}
+\endgroup
+\end{table}
+
 
 
 \section{Results}
