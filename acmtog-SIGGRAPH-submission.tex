@@ -173,43 +173,35 @@
 \renewcommand\shortauthors{Xiong, Y. et al.}
 
 \begin{abstract}
-We estimate Herschel--Bulkley (HB) parameters
-$(n,\eta,\sigma_Y)$ from dam-break video observations by replacing
-simulation-in-the-loop inversion with a local Gaussian-process (GP)
-surrogate trained on curated simulation data. The predecessor protocol of
-\cite{hamamichi2023nonnewtonian} repeatedly evaluates a
-material point method (MPM) forward simulator inside a derivative-free
-optimizer, taking around eight hours per setup. We instead train a
-$2{,}775$-expert local GP bank on $407{,}480$ cleaned MPM rows with
-fixed density $\rho=1.0$ to emulate
-$(n,\eta,\sigma_Y,W,H)\mapsto(x_{01},\ldots,x_{08})$, and propagate
-GP posterior variance, local Bayesian approximation error (BAE), and
-observation noise into the inverse objective.
+We estimate Herschel--Bulkley (HB) parameters $(n,\eta,\sigma_Y)$
+from calibrated dam-break observations using a fixed local
+Gaussian-process (GP) surrogate. A bank of $2{,}775$ experts is constructed from a cleaned
+$407{,}480$-row simulation corpus, with GP fitting restricted to
+$325{,}984$ training rows; $2{,}735$ experts are eligible for inverse use. It predicts eight signed front displacements
+from material parameters and setup geometry. Within compatible local
+supports, bounded continuous CMA-ES jointly fits one material triple
+using a Gaussian marginal objective with GP/BAE and observation-error
+allowances. The output includes applicability and raw-fit status;
+online inversion calls no physical simulator.
 
-The resulting inverse is surrogate-only: it generates or optimizes a
-candidate pool under the GP+BAE score and returns either a supported
-point estimate or an ambiguous plausible set when a single dam-break
-observation does not justify a unique parameter triple. On the
-held-out forward test split the GP bank achieves sub-cm trajectory
-error, with overall MAE $0.05296$\,cm and $x_{08}$ MAE
-$0.08790$\,cm. On a $64$-case synthetic inverse validation, the
-plausible set contains a near-truth representative in $98.4$--$100.0\%$
-of cases, while forced rank-$1$ selection remains low
-($6.3$--$14.1\%$), motivating ambiguity reporting rather than
-overconfident single-theta output.
+Assigned-expert evaluation on $40{,}748$ test rows gives MAE
+$0.05297$\,cm, conditional on the response-informed partition.
+In a synthetic perturbation study, 62 of 64 fits on 40 parameter
+truths pass the raw-fit gate, while substantial parameter and curve
+errors remain. On six rheometer-reference materials, mean joint
+flow-curve discrepancy is $0.271667$ in natural-log stress RMS.
+Recorded joint fits take $13.058$--$25.241$\,s for these materials
+and $5.192$--$25.409$\,s for a separate freshness collection, excluding
+acquisition, preprocessing and offline replay.
 
-We further report setup-selection diagnostics, speed measurements,
-real-material diagnostics, and setup-level held-out validation for
-same-session repeated captures. The
-unoptimised Python implementation scores a $512$-candidate inverse pass
-with plausible-set summaries in $3.63$\,s per case/setup, and one
-surrogate candidate/setup evaluation is
-$190$--$618\times$ faster than measured one-shot MPM replays. These
-results support a fast GP-surrogate inverse with explicit uncertainty
-and plausible-set validation. Rheometer-infeasible materials are
-evaluated by dam-break replay diagnostics, and time-varying materials
-are evaluated at the held-out setup level rather than as a fitted
-kinetic ageing law.
+The freshness comparison predicts the same original-batch third
+observation from same-batch fast inputs or a simulation-based workflow
+using a later remade-batch second capture. Mean IoU over six materials
+and 48 frames is $0.913819$ versus $0.877112$. The comparison supports
+shorter computational waiting as a practical measurement goal, without
+isolating material-change effects. Proxy fit, physical curve agreement,
+cross-setup prediction and parameter uniqueness remain distinct claims.
+
 \end{abstract}
 
 
@@ -276,8 +268,8 @@ kinetic ageing law.
 
 \keywords{Material parameter estimation, Herschel--Bulkley,
 non-Newtonian fluids, video-based estimation, Gaussian-process
-surrogates, set-valued inverse estimation, Bayesian approximation
-error, uncertainty calibration}
+surrogates, continuous numerical inversion, Bayesian approximation
+error, multi-setup measurement}
 
 
 % Teaser omitted in this draft to avoid duplicating the method overview.
