@@ -58,7 +58,7 @@ distinct limitations rather than treating a low surrogate loss as truth.
 We evaluate two observations acquired close together from one preparation
 against a third observation from that preparation. We also complete a
 simulation-based workflow that reuses the same first observation but
-acquires its recommended second observation from a later, remade batch.
+acquires its recommended second observation from the later measurement period.
 Both frozen estimates predict the same original third observation.
 This compares the predictive behaviour and computational burden of the
 two workflows; it does not isolate material change from geometry,
@@ -2529,7 +2529,7 @@ reconstructed by recompiling or rerunning the inverse.
 The real-material and fast freshness estimates use fixed measured
 geometries. They do not consume the optional recommendation of
 Sec.~\ref{sec:proposer}. The simulation-based freshness comparison
-uses its own second-setup proposal and remade-batch observation.
+uses its own second-setup proposal and later second observation.
 All returned parameters are fixed before image-space evaluation.
 
 \section{Evaluation}
@@ -2588,7 +2588,7 @@ New-geometry prediction & Six different materials, two observed
 setups and an excluded third setup; 48 framewise mask comparisons \\
 Computational cost & Saved numerical and simulation-stage times,
 with loading, setup count, caching, and budget scope stated \\
-Time-sensitive acquisition & Completed same-batch versus later-remade-batch
+Time-sensitive acquisition & Completed same-batch versus later-observation
 workflow comparison; causal drift controls remain separate \\
 \bottomrule
 \end{tabular}
@@ -2615,7 +2615,7 @@ instead contains cream, custard, egg foam, potato-starch paste,
 oats, and yolk emulsion, with two inverse observations and a third
 replay geometry. Its main fast route uses the original same-batch
 sequence; the simulation-based route reuses the first observation
-and a later remade-batch second capture. They share one original-batch
+and a later second capture. They share one original-batch
 third target per material, not two independent test specimens.
 These remain two distinct six-material collections.
 Multiple frames from one material are repeated measurements, not
@@ -2634,7 +2634,7 @@ The same HB law does not make these matched optimiser workloads.
 
 The simulation-based freshness workflow in Sec.~\ref{sec:freshness}
 has completed first-setup fits, geometry proposals, supplementary
-second captures from later remade batches, joint fits, and prediction
+second captures from later measurements, joint fits, and prediction
 at the same original third setup used by the fast workflow. The two
 workflows share their first input and third evaluation target, but
 their second captures and geometries differ. This is a workflow
@@ -3314,70 +3314,23 @@ discrepancy, surrogate coverage, and finite numerical search.
 \label{sec:freshness}
 
 \subsubsection{Question, preparation batches and observation roles}
-Here, freshness concerns the temporal consistency of the material
-represented by successive observations and the resulting estimate.
-Simulation-in-the-loop estimation can impose hours of computation
-before the next geometry is available. Continuing the sequence may then
-require a newly prepared specimen; following the same preparation
-procedure does not guarantee the same rheological response. A fast
-inverse can reduce this computational waiting and the need to combine
-captures across preparations. We examine the predictive behaviour and
-recorded computation cost of these two practical workflows, rather
-than defining a freshness parameter or identifying an ageing law.
+Here, freshness denotes the temporal consistency of the material state represented by sequential observations. Both workflows acquire setup~2 after completing their own setup~1 estimation. Faster estimation therefore permits earlier acquisition, reducing the interval during which the stored material can change. The proposed mechanism is shorter computation, earlier second observation, more consistent fitting inputs, and improved prediction of the initial state. The common initial setup~3 tests that prediction. We evaluate the saved estimates and computation records; we do not identify an ageing law or assume in advance that every material changes sufficiently to favour the fast workflow.
 
-The six materials are cream, custard, egg foam, potato-starch paste
-(Katakuriko), oat paste, and yolk emulsion. They differ from the
-rheometer-reference collection in Sec.~\ref{sec:rheometer}.
-For each material, batch~A denotes the original preparation: setups~1,
-2 and~3 were acquired close together from that batch. Batch~B denotes
-a later, separately prepared specimen used for the simulation-based
-workflow's supplementary setup~2. This preparation relationship was
-confirmed by the experimenter. Exact preparation-to-capture intervals,
-temperature histories and constitutive drift magnitudes were not
-measured in this comparison. Batch labels identify specimen provenance;
-they do not certify exactly constant HB parameters within a batch or
-a known parameter change between batches.
+The existing six-material packet comprises cream, custard, egg foam, potato-starch paste (Katakuriko), oat paste, and yolk emulsion, and is distinct from the rheometer-reference collection in Sec.~\ref{sec:rheometer}. For cream, oats and custard, the experimenter confirms that the two workflows use aliquots from one preparation, including the refrigerated portion for the later simulation-based setup~2. Their existing observations, parameter estimates and scores are retained. The earlier description of these three second captures as newly prepared batches is corrected here. Setup~1 and the held-out setup~3 are acquired in the initial measurement period and shared by both workflows. Setup~2 is an estimation input, not a validation target. Egg foam, Katakuriko and yolk emulsion remain existing cases pending replacement by egg-related formulations; their numerical results are retained, but the same-batch refrigerated provenance newly confirmed for the other three is not assigned to them. Exact capture intervals and temperature histories are unavailable in the saved packet.
 
-The fast workflow fits the two stored front trajectories from
-batch~A setups~1 and~2 using Sec.~\ref{sec:inverse}, freezes the
-returned parameters, and predicts batch~A setup~3. The simulation-based
-workflow reuses exactly the same first observation from batch~A,
-performs the first-setup fit and setup-2 proposal, and acquires the
-supplementary second observation from batch~B at the proposed geometry.
-It then fits those two observations jointly and freezes the optimiser
-library's returned parameters before predicting the same batch~A
-setup~3. Figure~\ref{fig:fresh-workflow} separates these observation
-sources from the later computation and scoring stages. The original
-fast captures use their existing geometries; they did not consume the
-simulation-based proposals.
+In the same-preparation protocol, one preparation is divided before testing into independent portions for the common initial setups~1 and~3 and the two workflows' setup~2 captures. No released material is reused. Reserved portions remain sealed and refrigerated until measurement; both workflows complete their own first fit before acquiring setup~2. Each joint fit then combines the common setup~1 with its own setup~2 and freezes its parameters before prediction of the common setup~3. For the retained data, the fast route fits stored trajectories using Sec.~\ref{sec:inverse}, whereas the simulation-based route uses its own recommended second geometry. The original fast captures use fixed geometries and did not consume the optional proposer. This protocol explains the observation roles; the saved fit-call times do not establish a complete, prospectively logged acquisition timeline. Refrigeration for an additional two or three days is a separately specified storage challenge, not a computation duration inferred from the baseline. New trials must log preparation, computation, storage, temperature equilibration and capture separately.
 
 \begin{figure*}[!htbp]
 \centering
-\includegraphics[width=0.98\textwidth]{figs/freshness_workflow_20261022/workflow_batches.pdf}
-\caption{Observation roles in the freshness workflow comparison.
-The original fast fit uses batch~A setups~1 and~2. The simulation-based
-workflow uses the same batch~A setup~1, then a recommended setup~2
-captured from a later, remade batch~B. Both returned parameter triples
-are frozen before prediction at the common third geometry and scoring
-against batch~A setup~3. The arrows show data dependencies, not a
-measured acquisition timeline. Simulation does not create or change
-the preparation batch of the recorded reference.}
+\includegraphics[width=0.98\textwidth]{figs/freshness_same_batch_20261029/workflow.pdf}
+\caption{Sequential observation roles. Both routes share the initial setup~1 and held-out setup~3, and acquire their own setup~2 after the first fit. Cream, oats and custard use refrigerated aliquots from the same preparation; the other three saved cases are pending replacement and do not inherit this provenance. Parameters are frozen before common-target prediction. Arrows show protocol dependencies, not measured historical capture intervals.}
 \Description{Two routes with different second observations produce
 frozen parameters, simulate the same third geometry, and compare with
 one original-batch third observation.}
 \label{fig:fresh-workflow}
 \end{figure*}
 
-Both joint fits still assume that one HB triple explains their two
-inputs. If the remade specimen responds differently, the cross-batch
-simulation-based estimate may be a compromise rather than the true
-parameters of either preparation. The known batch difference does not
-by itself measure that response change. The common third observation
-tests prediction of batch~A, not prediction of a future batch~B capture.
-Neither fit uses setup~3 in its objective, initialisation, parameter
-selection or quality gate. Offline simulation dates do not change the
-material state represented by the original recording, and fit-call
-durations do not reconstruct the physical acquisition intervals.
+Both joint fits assume that one HB triple explains their two observations. Storage can change the response even within one preparation; combining different states may then produce a compromise estimate. Same-preparation provenance alone neither measures drift nor proves constant HB parameters. Setup~3 evaluates prediction of the initial state and is excluded from the objective, initialisation, parameter selection and quality gate. The six-material mean below describes the unchanged existing packet, not a completed six-material replacement experiment.
 
 \subsubsection{Frozen estimates and common third-setup evaluation}
 Table~\ref{tab:fresh-holdout} retains the original fast parameters and
@@ -3388,13 +3341,12 @@ evaluation geometry remain common within each material.
 
 \begin{table}[!htbp]
 \centering\small
-\caption{Second-observation geometry $(W,H)$ in cm and preparation
-source. The two columns are different captures, not alternative
+\caption{Second-observation geometry $(W,H)$ in cm and acquisition roles. The two columns are different captures, not alternative
 processing of one video.}
 \label{tab:fresh-second-geometries}
 \begin{tabular}{@{}lll@{}}
 \toprule
-Material & Fast: batch A & Simulation: batch B \\
+Material & Fast setup 2 & Simulation setup 2 \\
 \midrule
 Cream & $(6.0,2.0)$ & $(3.5,2.0)$ \\
 Custard & $(6.0,2.5)$ & $(2.0,2.0)$ \\
@@ -3476,8 +3428,8 @@ third-setup performance.
 \caption{Main freshness workflow comparison on the same original-batch
 third observation. Each entry averages frames~1--8 at full resolution;
 the final row gives the 48-frame equal-weight mean. The simulation-based
-fit combines batch~A setup~1 with remade-batch setup~2; the fast fit
-uses batch~A setups~1 and~2. A dagger retains a fast raw-fit-review
+fit combines batch~A setup~1 with later setup~2; the fast fit
+uses the early setups~1 and~2. A dagger retains a fast raw-fit-review
 outcome; it does not signify an accepted estimate.}
 \label{tab:fresh-workflow-results}
 \begin{tabular}{@{}lrrrrl@{}}
@@ -3581,7 +3533,7 @@ parameters, experts or thresholds.
 the original preparation batch. The fast estimate uses the first two
 observations from that batch; the simulation-based estimate combines
 the same first observation with a supplementary second observation
-from a later, separately prepared batch. Rows show frame~8 for the six
+from the later measurement period. Rows show frame~8 for the six
 materials. Columns are observation, contour overlay, simulation-based
 mismatch and original fast mismatch. Observations are black, the
 simulation-based baseline is orange (dashed in the overlay), and the
@@ -3662,7 +3614,7 @@ Returned parameters are fixed before common third-setup evaluation.
 \centering\small
 \setlength{\tabcolsep}{7pt}
 \caption{Completed simulation-based joint estimates from original
-setup~1 and remade-batch setup~2. Parameters are in SI units; the
+setup~1 and later setup~2. Parameters are in SI units; the
 returned candidate is the original optimiser-library output.
 Joint XOR averages the two eight-frame means at the native
 $960\times540$ optimisation resolution, not the third-setup score.
@@ -3697,20 +3649,7 @@ front-displacement representation and marginal objective.
 
 \subsubsection{Interpretation and further attribution controls}
 \label{sec:freshness-future-protocol}
-The completed comparison combines an original same-preparation
-observation sequence with a later remade-batch supplementary capture.
-It is not a new, synchronised, randomly assigned trial of two complete
-acquisition schedules. The known batch provenance and recorded costs
-make the practical state-consistency issue explicit, while the
-common-target scores quantify predictive behaviour on the original
-preparation. They do not assign the entire score difference to waiting,
-ageing or remaking: second geometry, acquisition variation, inverse
-representation, surrogate error and numerical implementation can also
-contribute. A cross-batch shared-HB fit remains a defined numerical
-problem; its physical interpretation depends on whether the two
-specimens actually share a response. No batch~B third observation is
-evaluated here, so these scores do not establish the returned baseline
-parameters' accuracy for future use on batch~B.
+The retained observations and frozen estimates constitute a workflow comparison, not a newly completed synchronised randomised acquisition trial. Cream, oats and custard have experimenter-confirmed same-preparation refrigerated second captures; the remaining three cases await replacement. The speed advantage concerns the opportunity to acquire setup~2 before appreciable state change, rather than refrigeration preventing change indefinitely. Higher common-target agreement is consistent with this motivation, but second geometry, acquisition variation, surrogate approximation and numerical implementation also differ. The saved first-stage simulation times are hours, not two or three days. Any deliberately extended storage must be declared separately. The same-preparation protocol does not retrospectively supply missing timestamps or measured rheological drift.
 
 More specific causal attribution would require prespecified repeated
 preparations or paired aliquots, explicit records of preparation,
@@ -3728,8 +3667,7 @@ from offline computation timestamps or silhouette residual shapes.
 The supported conclusion is that the original fast same-batch workflow
 has better average original-batch third-setup agreement in this
 six-material collection, with substantially shorter recorded inverse
-computation. This supports reducing computational waiting and reliance
-on cross-preparation observations as a practical motivation. It is
+computation. This supports reducing computational waiting and state mismatch between observations as a practical motivation. It is
 not an identified ageing law, a proof of exact constant material state,
 an isolated optimiser accuracy comparison, or a claim of HB parameter
 uniqueness.
@@ -3961,7 +3899,7 @@ separate freshness collection.
 For the separate freshness collection, the fast same-batch
 estimates predict the excluded third observation with mean IoU
 $0.913819$ over six materials and 48 frames, compared with $0.877112$
-for the simulation-based cross-batch workflow
+for the simulation-based sequential workflow
 (Tab.~\ref{tab:fresh-workflow-results}). This supports the stated
 workflow and cross-setup image comparison, not rheometer agreement
 or parameter recovery. Four fast estimates pass the proxy gate;
@@ -3984,44 +3922,26 @@ are offline checks of fixed estimates; they do not enter the online
 selector or change the saved acceptance states.
 
 \paragraph{Freshness as a time-sensitive acquisition question.}
-The original fast setup~1, setup~2 and held-out setup~3 were acquired
-close together from one preparation. The completed simulation-based
-workflow reuses that first recording but obtains its proposed second
-capture from a later, separately prepared specimen. It then completes
-the joint inverse and predicts the same original third observation.
-The two routes therefore differ in the practical arrangement of
-their second observations; neither an exported geometry nor a later
-simulation timestamp is treated as a new same-batch measurement.
+The corrected acquisition premise uses one preparation for cream, oats and custard: common initial setups~1 and~3, with reserved refrigerated portions for setup~2 after each method's first estimate. Their existing data remain in use. Faster estimation can shorten the inter-observation wait and thereby improve state consistency; this is the practical mechanism to test with the common initial third observation. The remaining three saved materials are pending replacement and are not newly certified same-preparation trials.
 
 The fast route's higher average third-setup IoU and lower XOR in this
 collection, together with its seconds-scale joint fits and the
 baseline's hours-scale first and joint stages, support reducing
-computational waiting and reliance on remade specimens as a practical
+computational waiting and state mismatch during storage as a practical
 measurement goal. The baseline's first-stage computation is especially
 relevant because its recommendation and supplementary capture follow
 that stage. The record does not supply matched full-workflow acquisition
 latencies for the two routes, however, and the original fast captures
 did not consume the baseline's geometry proposals.
 
-Following one recipe does not guarantee the same response after
-remaking, but distinct batch provenance is not itself a measurement
-of rheological drift. The comparison changes second geometry,
-preparation, acquisition and numerical pathway together. It therefore
-cannot assign the roughly $3.67$ percentage-point mean-IoU difference
-solely to material freshness, or establish that one optimiser solves
-the same static inverse problem more accurately. If the responses
-of the two preparations differ, forcing one shared HB triple can
-produce a compromise; that is a limitation of the observation/state
-assumption, not proof that simulation-based inversion is intrinsically
-invalid. The common reference remains the original batch, and no
-third-setting capture from the remade batch is evaluated.
+Within-batch storage can change a material's response, but neither batch identity nor elapsed computation alone measures that change. The comparison also changes second geometry, acquisition and numerical pathway. It therefore cannot attribute the roughly $3.67$ percentage-point mean-IoU difference solely to freshness or establish that one optimiser solves an identical static inverse problem more accurately. A common HB triple across changing states may be a compromise. The held-out reference represents the initial state; no separately measured late-state setup~3 is evaluated.
 
 The attribution controls in
 Sec.~\ref{sec:freshness-future-protocol} remain a separate question:
 repeated preparations, recorded acquisition intervals and fixed-geometry
 early/late measurements would distinguish state changes from release,
 camera and estimation effects. The present work reports completed
-cross-setup predictions and a cross-preparation workflow comparison,
+cross-setup predictions and a sequential workflow comparison,
 while retaining this causal limit, all six cases and their fit states.
 It does not identify an ageing law or certify a constant constitutive
 state solely from short acquisition intervals.
@@ -4174,11 +4094,11 @@ criterion with flagged common-offset continuation when its bridge is
 invalid. Numerical availability does not establish acquisition superiority.
 The fast freshness workflow uses original same-batch inputs and gives
 mean IoU $0.913819$, against $0.877112$ for the simulation-based route
-with a remade-batch second capture. Whole-image XOR is $0.004363$
+with a later second capture. Whole-image XOR is $0.004363$
 versus $0.006449$. Five materials favour the fast route; egg foam
 slightly favours the baseline. Both fast raw-fit-review cases remain
 in the average. These results support reducing computational waiting
-and cross-preparation dependence, without isolating material drift,
+and state mismatch during storage, without isolating material drift,
 geometry selection, acquisition variability or numerical approximation.
 The contribution is a reusable numerical inverse with explicit support
 and fit reports, evaluated through distinct constitutive, predictive
